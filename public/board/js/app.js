@@ -1,0 +1,1014 @@
+var C={
+  market:{l:"Markets",i:"&#127805;",c:"#3d6b42"},
+  foodhall:{l:"Food Hall",i:"&#127869;",c:"#b8860b"},
+  bars:{l:"Bars & Restaurants",i:"&#127864;",c:"#6b1e3c"},
+  artwalk:{l:"Art Walk",i:"&#127912;",c:"#2c5f8a"},
+  cityart:{l:"City Art",i:"&#127917;",c:"#6a4e7a"},
+  parks:{l:"Parks",i:"&#127795;",c:"#5a8c3a"},
+  venue:{l:"Theaters",i:"&#127963;",c:"#7a5230"},
+  holiday:{l:"Holiday",i:"&#9917;",c:"#8B0000"},
+  shop:{l:"Shops",i:"&#128717;",c:"#c0392b"}
+};
+var ORD=["holiday","market","foodhall","bars","artwalk","cityart","parks","venue","shop"];
+var CN={sj:"San Jose, CA",sc:"Santa Clara, CA",sv:"Sunnyvale, CA",mv:"Mountain View, CA",camp:"Campbell, CA"};
+var CITY_ABBR={sj:"SJ",sc:"SC",sv:"SV",mv:"MV",camp:"Camp"};
+function setBrand(v){
+  var name="BayPinned "+(CITY_ABBR[v]||v.toUpperCase());
+  var el=document.getElementById("brandName");
+  if(el)el.textContent=name;
+  document.title=name;
+}
+/* San Jose's mini-city neighborhoods - same list/order/ids as the
+   HOODS array in baypinnedmap1/data/places.js, so a flyer's hood tag
+   lines up with that map's pins once the two sites combine. Events
+   with no hood field are treated as "downtown" (all of today's seed
+   data is downtown San Jose). Only San Jose has this wired up for now;
+   other cities keep their existing single-board "coming soon" view. */
+var HOODS_SJ=[
+  {id:"downtown",l:"Downtown San Jose"},
+  {id:"japantown",l:"Japantown"},
+  {id:"santana",l:"Santana Row & Valley Fair"},
+  {id:"willow",l:"Willow Glen"},
+  {id:"alum",l:"Alum Rock"},
+  {id:"east",l:"East San Jose"}
+];
+var curHood="downtown";
+var DEF=[
+{id:"mariachi2026",cat:"holiday",lbl:"Live Festival",exp:false,mapId:"u1783885081451",
+ t:"Silicon Valley Mariachi Festival",w:"Today 1pm - 8pm",d:"2026-07-12",sh:13,eh:20,
+ a:"Plaza de Cesar Chavez, San Jose, CA 95113",ph:"",wb:"https://tr.ee/6G_IJFtshX",
+ ds:"Silicon Valley Mariachi Festival at Plaza de Cesar Chavez, 1-8pm today - live music with vendors along the street. Supported in part by a Cultural Affairs grant from the City of San Jose.",
+ tags:["Live Music","Festival","Tickets","Family"],photo:"img/mariachi-festival-flyer.jpg",g:[],mx:342,my:498,ed:"2026-07-12",ms:"",
+ pk:"Contact organizer.",tr:"VTA Convention Center stop, short walk.",
+ ac:"Contact organizer.",fam:"Family friendly festival.",
+ fp:"At Plaza de Cesar Chavez",fd:"See Google Maps",vg:[]},
+{id:"fm",cat:"market",lbl:"Weekly Market",exp:false,
+ t:"Downtown SJ Farmers Market",w:"Wednesdays 9:00am - 1:30pm",d:"wed",
+ a:"101 Paseo de San Antonio, San Jose, CA 95113",ph:"(408) 555-0100",wb:"https://downtownsanjosefarmersmarket.com",
+ ds:"One of downtown San Jose's most beloved weekly traditions. Over 20 local farms and vendors every Wednesday on Paseo de San Antonio.",
+ tags:["Produce","Weekly","Free Entry","Dog Friendly"],photo:"",g:[],mx:420,my:434,ed:"",ms:"",
+ pk:"ParkSJ garage 90 min free. Entrances on 2nd and 3rd Street.",
+ tr:"VTA Light Rail Convention Center stop 5 min walk. Routes 68 522.",
+ ac:"Fully accessible. Wide pathways accessible parking.",
+ fam:"Family friendly stroller-friendly.",
+ fp:"2 min walk",fd:"18 min walk or 5 min ride",
+ vg:[
+  {g:"Farmers",items:["Xiong Farms - Asian veggies","Lopez Family Farm - conventional fruits","Bay Fresh - strawberries","Green Mix Ranch - organic veggies"]},
+  {g:"Packaged Food",items:["California Bakeshop - artisanal bakery cookies empanadas","Brothers Products SF - hummus yogurt","Hurno - pastries","Mango Blossom Apiary - honey","Baby Tiger Bakery - conchas baked goods","Valley Toffee LLC - multi-variety toffee"]},
+  {g:"Hot Food",items:["Dumpling King - dumplings","Chikens Tamales - tamales vegan empanadas","Thai Street Food - satay papaya salad thai tea","Jadens Kettle Corn","Cuisina Express - Filipino food"]},
+  {g:"Arts and Crafts",items:["Sea Moss Healing - sea moss soaps","Plant Code - essential oils 2nd 4th Wed","Starme - handmade clothes"]}
+ ]},
+{id:"sm",cat:"foodhall",lbl:"Food Hall Daily",exp:false,
+ t:"SoFA Market",w:"Open Daily 11am - 9pm",d:"daily",
+ a:"387 S 1st St, San Jose, CA 95113",ph:"(408) 642-5270",wb:"https://sofamarketsj.com",
+ ds:"A permanent downtown food hall with multiple restaurants and a craft cocktail bar in the SoFA District.",
+ tags:["Food Hall","Daily","Permanent","Bar","Outdoor Seating"],photo:"",g:[],mx:480,my:572,ed:"",ms:"",
+ pk:"Street parking on 1st and 2nd. ParkSJ on 2nd Street.",
+ tr:"VTA Route 65 68 on 1st Street. 10 min walk from Convention Center.",
+ ac:"Accessible entrance on S 1st Street.",fam:"Family friendly.",
+ fp:"6 min walk south",fd:"22 min walk or 6 min ride",
+ vg:[
+  {g:"Restaurants",items:["Vietnoms - pho banh mi Vietnamese Ste 121","3 Hermanos Mexican - tacos burritos cocktail bar 105","Pizzeria Rosa Maria - wood-fired pizza 104","Umi Hand Roll Bar - sushi outdoor seating","Habana Cuba Restaurant - Cuban classics closed Mondays","Iscu Tea - temporarily closed"]},
+  {g:"Bar",items:["Fountainhead Bar - craft cocktails back of SoFA Noon-9pm"]}
+ ]},
+{id:"wc",cat:"holiday",lbl:"World Cup Free",exp:false,
+ t:"Soccer Celebration - World Cup Watch Party",w:"June 11 - July 19 All 104 matches live",d:"today",
+ a:"San Pedro Square Market, 87 N San Pedro St, San Jose, CA 95110",ph:"(408) 792-3033",wb:"https://sanpedrosquaremarket.com",
+ ds:"Bay Areas largest free World Cup watch party. All 104 FIFA World Cup 2026 matches live on multiple jumbo screens. Official San Jose USA Soccer watch party location.",
+ tags:["Free","World Cup","Watch Party","All Matches"],photo:"",g:[],mx:200,my:248,ed:"2026-07-19",ms:"",
+ pk:"San Pedro Street garage nearby.",tr:"VTA Route 522 on Santa Clara.",
+ ac:"Accessible open air market.",fam:"Very family friendly all ages welcome.",
+ fp:"12 min walk north",fd:"22 min walk or 6 min ride",vg:[]},
+{id:"aw",cat:"artwalk",lbl:"Monthly Art Walk",exp:false,
+ t:"South First Fridays ArtWalk",w:"First Friday Monthly 5pm - 9pm",d:"monthly",
+ a:"South 1st Street, SoFA District, San Jose, CA",ph:"",wb:"https://southfirstfridays.com",
+ ds:"Free self-guided evening art walk through downtown galleries museums live music and pop-up art installations.",
+ tags:["Art","Music","Free","Monthly","All Ages"],photo:"",g:[],mx:480,my:568,ed:"",
+ ms:"Confirming gallery list vendor lineup beer garden vintage market this month.",
+ pk:"Street parking on S 1st 2nd 3rd. Free after 6pm in many garages.",
+ tr:"VTA Route 65 68. Walk south from Convention Center light rail.",
+ ac:"Most galleries fully accessible.",fam:"100 percent family friendly.",
+ fp:"8 min walk south",fd:"24 min walk or 7 min ride",vg:[]},
+{id:"gs",cat:"cityart",lbl:"City Art On View",exp:false,
+ t:"Gaiascope at Circle of Palms",w:"May 22 - Aug 18 2026 Always open",d:"",
+ a:"Circle of Palms Plaza, 127 S Market St, San Jose, CA 95113",ph:"",wb:"https://www.sanjoseca.gov",
+ ds:"Three suspended kaleidoscope sculptures by artist Brooke Einbender at Circle of Palms Plaza next to Plaza de Cesar Chavez.",
+ tags:["Public Art","Free","Always Open","Outdoor"],photo:"",g:[],mx:342,my:498,ed:"2026-08-18",ms:"",
+ pk:"Market Street garage one block north.",tr:"VTA Convention Center stop 2 min walk.",
+ ac:"Fully accessible outdoor plaza.",fam:"Very family friendly.",
+ fp:"1 min walk adjacent",fd:"20 min walk or 5 min ride",vg:[]},
+{id:"j4",cat:"holiday",lbl:"4th of July",exp:false,
+ t:"4th of July Downtown Events",w:"Friday July 4 2026 Various times",d:"2026-07-04",
+ a:"Downtown San Jose, CA Multiple Locations",ph:"",wb:"https://www.sanjoseca.gov",
+ ds:"Independence Day celebrations across downtown San Jose. Fireworks live music food vendors and family activities.",
+ tags:["Holiday","Fireworks","Free","Annual","Family"],photo:"",g:[],mx:420,my:468,ed:"2026-07-04",
+ ms:"Full schedule not confirmed. Check sanjoseca.gov.",
+ pk:"Arrive early. Many garages free on holiday.",tr:"Take VTA extra service on holiday.",
+ ac:"Most venues accessible.",fam:"Perfect for families.",
+ fp:"At or near Plaza de Cesar Chavez",fd:"20 min walk or 5 min ride",vg:[]},
+{id:"ht",cat:"venue",lbl:"Theater Downtown",exp:false,
+ t:"Hammer Theatre Center",w:"Box Office Hours Vary",d:"daily",
+ a:"101 Paseo de San Antonio, San Jose, CA 95113",ph:"(408) 924-8501",wb:"https://www.hammertheatre.com",
+ ds:"Premier performing arts venue on Paseo de San Antonio. Part of San Jose State University. Hosts theater dance opera and community performances year-round.",
+ tags:["Theater","Performing Arts","SJSU","Downtown"],photo:"",g:[],mx:440,my:416,ed:"",ms:"",
+ pk:"ParkSJ garages on 2nd and 3rd Street.",tr:"VTA light rail Convention Center stop 5 min walk.",
+ ac:"Fully accessible.",fam:"Family friendly events check listings.",
+ fp:"3 min walk",fd:"19 min walk",vg:[]},
+{id:"ct",cat:"venue",lbl:"Historic Theater",exp:false,
+ t:"California Theatre",w:"Box Office Hours Vary",d:"daily",
+ a:"345 S 1st St, San Jose, CA 95113",ph:"(408) 792-4111",wb:"https://www.sanjosetheaters.org",
+ ds:"Magnificently restored 1927 Spanish Colonial Revival theater. Home to Opera San Jose and Symphony Silicon Valley.",
+ tags:["Theater","Opera","Symphony","Historic","1927"],photo:"",g:[],mx:480,my:553,ed:"",ms:"",
+ pk:"Street parking on 1st and 2nd.",tr:"VTA Route 65 68 on 1st Street.",
+ ac:"Accessible entrance and seating.",fam:"Family appropriate shows available.",
+ fp:"5 min walk south",fd:"20 min walk",vg:[]},
+{id:"cp",cat:"venue",lbl:"Performing Arts",exp:false,
+ t:"Center for the Performing Arts",w:"Box Office Hours Vary",d:"daily",
+ a:"255 Almaden Blvd, San Jose, CA 95113",ph:"(408) 792-4111",wb:"https://www.sanjosetheaters.org",
+ ds:"Major performing arts center hosting Broadway shows concerts dance and cultural performances adjacent to the Convention Center.",
+ tags:["Theater","Broadway","Concerts","Dance"],photo:"",g:[],mx:200,my:565,ed:"",ms:"",
+ pk:"Adjacent garages. Convention Center garage nearby.",tr:"VTA Convention Center light rail stop 5 min walk.",
+ ac:"Fully accessible large venue.",fam:"Many family-friendly shows.",
+ fp:"8 min walk",fd:"15 min walk",vg:[]}
+];
+
+var KEY="pinnedsj-v9",evts=[],mS=1,mX=0,mY=0,pan=false,ps={x:0,y:0};
+
+/* Shared legal/safety copy - used on the Report form and the payment
+   disclaimer gate, so the wording stays identical everywhere it appears. */
+var PLATFORM_DISCLAIMER="Please note: BayPinned and its sister city networks (including Citypinned) are interactive advertising directories and do not host, process, or hold funds for any transactions. Submitting this report alerts our moderation team to review the vendor's platform safety status. BayPinned and its sister city networks cannot issue refunds, reverse external app transfers, or resolve financial disputes between parties. For payment issues, please contact your peer-to-peer application or financial institution directly.";
+
+/* Website/social links people type without a protocol (e.g. "mysite.com")
+   render as a relative link and silently go nowhere when clicked - this
+   normalizes them to an absolute https:// URL so Website/Instagram/etc.
+   links actually navigate. Shared by app.js (event website) and
+   vendors.js (vendor website/social). */
+function normalizeUrl(s){
+  s=(s||"").trim();
+  if(!s)return s;
+  if(/^https?:\/\//i.test(s))return s;
+  return "https://"+s;
+}
+
+document.getElementById("zOv").onclick=function(){this.classList.remove("on");};
+document.getElementById("zOvClose").onclick=function(e){e.stopPropagation();document.getElementById("zOv").classList.remove("on");};
+function zoomPhoto(url){
+  if(!url)return;
+  document.getElementById("zImg").src=url;
+  document.getElementById("zOv").classList.add("on");
+}
+document.getElementById("postBtn").onclick=function(){openForm("");};
+document.getElementById("postBtn2").onclick=function(){openForm("");};
+
+function init(){
+  load();
+  setBrand(curCity);
+  renderHoodRow();
+  renderToday();
+  renderBoards();
+  renderPins();
+  setupPan();
+  setupBgParallax();
+  setupBackToTop();
+  setupStickyOffsetWatcher();
+  setupBgUpload();
+  setCityBg(curCity,curHood);
+  openFlyerFromQuery();
+}
+
+/* Map pins have no real link back to a Board flyer (separate data -
+   PLACES/pins vs evts) - this is a best-effort bridge for map.js's
+   "View/Edit on Board" button, which passes the pin's title in the
+   URL. Matches by exact title (case-insensitive) since that's the only
+   thing both sides share; if you rename a flyer after pinning it on the
+   map, the link stops matching until the pin/flyer titles agree again. */
+function openFlyerFromQuery(){
+  var params=new URLSearchParams(location.search);
+  var title=params.get("openFlyer");
+  if(!title)return;
+  var match=evts.find(function(e){return e.t.toLowerCase()===title.toLowerCase();});
+  if(match)openDetail(match.id);
+  else alert("Couldn't find a flyer titled \""+title+"\" on the Board yet - post it here first, then the map link will work.");
+}
+
+/* The top nav wraps to 2-3 rows on narrow screens (logo/buttons/city
+   picker/post button don't all fit on one line), and the neighborhood
+   row only exists at all for San Jose - so neither the sticky hood row
+   nor the sticky category bar below it can assume a fixed pixel offset.
+   Measuring the actual rendered heights keeps the nav -> hoodrow -> cnav
+   stack aligned at any width, hood count, or font-load state. */
+function syncStickyOffsets(){
+  var nav=document.querySelector(".nav"),hood=document.getElementById("hoodRow");
+  if(nav)document.documentElement.style.setProperty("--nav-h",nav.offsetHeight+"px");
+  if(hood)document.documentElement.style.setProperty("--hood-h",hood.offsetHeight+"px");
+}
+function setupStickyOffsetWatcher(){
+  var raf=null;
+  syncStickyOffsets();
+  window.addEventListener("resize",function(){
+    if(raf)cancelAnimationFrame(raf);
+    raf=requestAnimationFrame(syncStickyOffsets);
+  });
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(syncStickyOffsets);
+}
+
+/* Background photo drifts and zooms slightly in the direction of whatever
+   the visitor is swiping/scrolling through (page scroll = vertical,
+   ticker/flyer strips = horizontal), so it feels like the scene is moving
+   with them rather than sitting static behind the corkboard. The .bg
+   layer is scaled up a bit as a buffer so panning never reveals its edges. */
+var bgX=0,bgY=0,bgScale=1.06;
+function applyBgTransform(){
+  var bg=document.querySelector(".bg");
+  if(bg)bg.style.transform="translate3d("+bgX+"px,"+bgY+"px,0) scale("+bgScale+")";
+}
+function bindStripParallax(el){
+  if(!el)return;
+  el.addEventListener("scroll",function(){
+    bgX=Math.max(-40,Math.min(40,el.scrollLeft*0.05));
+    bgScale=1.06+Math.min(Math.abs(el.scrollLeft)/2500,0.05);
+    applyBgTransform();
+  },{passive:true});
+}
+function setupBgParallax(){
+  window.addEventListener("scroll",function(){
+    bgY=Math.max(-40,Math.min(40,window.scrollY*0.04));
+    bgScale=1.06+Math.min(window.scrollY/3000,0.05);
+    applyBgTransform();
+  },{passive:true});
+  bindStripParallax(document.getElementById("tdCrds"));
+  bindStripParallax(document.getElementById("wkCrds"));
+}
+
+function load(){
+  try{var r=localStorage.getItem(KEY);evts=r?JSON.parse(r):JSON.parse(JSON.stringify(DEF));}
+  catch(e){evts=JSON.parse(JSON.stringify(DEF));}
+  expire();
+}
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(evts));}
+  catch(e){alert("This flyer couldn't be saved - your browser's local storage is full. Try removing an old flyer or photo, then try again.");}
+}
+/* Local calendar date (YYYY-MM-DD), not UTC - toISOString() slides to
+   tomorrow's date the moment UTC crosses midnight, which for Pacific
+   visitors is still mid-afternoon. That was silently expiring today's
+   event and dropping it out of isToday() hours before it actually
+   ended in real local time. */
+function todayLocal(){
+  var d=new Date(),pad=function(n){return n<10?"0"+n:""+n;};
+  return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+}
+function expire(){
+  var t=todayLocal();
+  evts.forEach(function(e){if(e.ed&&e.ed<t)e.exp=true;});
+}
+function isToday(ev){
+  var d=new Date(),dn=["sun","mon","tue","wed","thu","fri","sat"][d.getDay()];
+  if(!ev.d)return false;
+  if(ev.d==="daily"||ev.d==="today")return true;
+  if(ev.d===dn)return true;
+  if(ev.d==="monthly"){
+    if(d.getDay()!==5)return false;
+    var f=new Date(d.getFullYear(),d.getMonth(),1);
+    while(f.getDay()!==5)f.setDate(f.getDate()+1);
+    return d.getDate()===f.getDate();
+  }
+  if(ev.d&&ev.d.length===10)return ev.d===todayLocal();
+  return false;
+}
+function isWeek(ev){return!isToday(ev)&&!ev.exp&&["daily","wed","thu","fri","sat","sun","mon","tue","monthly"].indexOf(ev.d)>=0;}
+
+/* "Live now" (blinking green border, sorted first) - not just "happening
+   today" but actually inside its sh/eh hour window right now, same idea
+   as the map's isLive(). Events with no sh/eh are treated as live all day
+   once isToday() matches, same as the map's behavior. */
+function isLiveNow(ev){
+  if(ev.exp)return false;
+  if(!isToday(ev))return false;
+  if(ev.sh!=null&&ev.eh!=null){
+    var now=new Date(),h=now.getHours()+now.getMinutes()/60;
+    if(h<ev.sh||h>ev.eh)return false;
+  }
+  return true;
+}
+
+/* Each city gets its own downtown background photo. Until real photos are
+   supplied for Santa Clara/Sunnyvale/Mountain View/Campbell, they fall
+   back to the San Jose photo so the layer never 404s. A site owner can
+   also upload a custom photo per city from the browser (the camera
+   button by the city picker) - that's stored in localStorage and takes
+   priority over the default file, so swapping in real photos never
+   needs a code change. */
+var CITY_BG={sj:"img/background.jpg",sc:"img/bg-sc.jpg",sv:"img/bg-sv.jpg",mv:"img/bg-mv.jpg",camp:"img/bg-camp.jpg"};
+var curCity="sj";
+function customBgKey(city,hood){return hood?("citybg-"+city+"-"+hood):("citybg-"+city);}
+function hoodLabel(id){var h=HOODS_SJ.find(function(x){return x.id===id;});return h?h.l:id;}
+function setCityBg(city,hood){
+  var bg=document.querySelector(".bg");if(!bg)return;
+  var custom=Storage.get(customBgKey(city,hood),null);
+  /* Downtown SJ's custom photo used to live under the plain "citybg-sj"
+     key before neighborhoods existed - fall back to it so an
+     already-uploaded photo doesn't quietly vanish now that downtown is
+     also a hood. */
+  if(!custom&&hood==="downtown")custom=Storage.get(customBgKey(city),null);
+  var file=custom||CITY_BG[city]||CITY_BG.sj;
+  bg.style.backgroundImage="linear-gradient(180deg,rgba(15,8,0,.5),rgba(20,10,0,.28) 50%,rgba(12,6,0,.52)),url('"+file+"')";
+  var bgBtn=document.getElementById("bgBtn"),bgReset=document.getElementById("bgResetBtn");
+  if(bgBtn)bgBtn.classList.toggle("custom",!!custom);
+  if(bgReset)bgReset.classList.toggle("hidden",!custom);
+  var label=city==="sj"&&hood?hoodLabel(hood):(CN[city]||city);
+  if(bgBtn){bgBtn.title="Change background photo for "+label;bgBtn.setAttribute("aria-label","Change background photo for "+label);}
+  if(bgReset){bgReset.title="Reset "+label+"'s background photo";bgReset.setAttribute("aria-label","Reset "+label+"'s background photo");}
+}
+
+function setupBgUpload(){
+  var btn=document.getElementById("bgBtn"),file=document.getElementById("bgFile"),reset=document.getElementById("bgResetBtn");
+  if(!btn||!file)return;
+  btn.addEventListener("click",function(){file.click();});
+  file.addEventListener("change",function(){
+    var f=file.files[0];file.value="";
+    if(!f)return;
+    var hood=curCity==="sj"?curHood:null;
+    resizeImageFile(f,1600,0.85,function(dataUrl){
+      if(!Storage.set(customBgKey(curCity,hood),dataUrl)){
+        alert("This photo couldn't be saved - your browser's local storage is full. Try removing an old flyer or photo, then try again.");
+        return;
+      }
+      setCityBg(curCity,hood);
+    });
+  });
+  if(reset)reset.addEventListener("click",function(){
+    var hood=curCity==="sj"?curHood:null;
+    var label=curCity==="sj"&&hood?hoodLabel(hood):(CN[curCity]||curCity);
+    if(!confirm("Remove the custom background photo for "+label+" and go back to the default?"))return;
+    Storage.remove(customBgKey(curCity,hood));
+    if(hood==="downtown")Storage.remove(customBgKey(curCity));
+    setCityBg(curCity,hood);
+  });
+}
+
+/* Neighborhood ("mini city") row - only San Jose has real hood data so
+   far, so the row simply renders empty (and collapses via CSS) for
+   every other city. Mirrors baypinnedmap1's cityRow->hoodRow pattern:
+   switching hoods swaps the whole board view the same way switching
+   cities does. */
+function renderHoodRow(){
+  var row=document.getElementById("hoodRow");
+  if(!row)return;
+  row.innerHTML="";
+  if(curCity!=="sj")return;
+  HOODS_SJ.forEach(function(h){
+    var b=document.createElement("button");
+    b.className="hoodbtn"+(h.id===curHood?" on":"");
+    b.dataset.hoodId=h.id;
+    b.textContent=h.l;
+    b.onclick=function(){goToHood(h.id);};
+    row.appendChild(b);
+  });
+  syncStickyOffsets();
+}
+
+function goToHood(hoodId){
+  clearJumpSpacer();
+  curHood=hoodId;
+  document.querySelectorAll(".hoodbtn").forEach(function(b){b.classList.toggle("on",b.dataset.hoodId===hoodId);});
+  document.getElementById("citylbl").textContent=(CN.sj||"San Jose, CA")+(hoodId!=="downtown"?" · "+hoodLabel(hoodId):"");
+  setCityBg(curCity,curHood);
+  renderBoards();
+  renderToday();
+}
+
+function setCity(v){
+  clearJumpSpacer();
+  curCity=v;
+  curHood=v==="sj"?"downtown":null;
+  document.getElementById("citylbl").textContent=CN[v]||v;
+  setBrand(v);
+  renderHoodRow();
+  setCityBg(v,curHood);
+  var bv=document.getElementById("bView");
+  if(v!=="sj"){
+    bv.innerHTML="<div class='soon'>"+(CN[v]||v)+"<p>Events coming soon. Be the first to post a flyer!</p></div>";
+    document.getElementById("tdwrap").style.display="none";
+  }else{
+    document.getElementById("tdwrap").style.display="block";
+    renderBoards();
+  }
+  renderToday();
+}
+
+function renderToday(){
+  var tc=document.getElementById("tdCrds"),wc=document.getElementById("wkCrds");
+  if(!tc||!wc)return;
+  var hood=curCity==="sj"?curHood:null;
+  var pool=hood?evts.filter(function(e){return(e.hood||"downtown")===hood;}):evts;
+  var td=pool.filter(function(e){return isToday(e)&&!e.exp;});
+  td.sort(function(a,b){return (isLiveNow(b)?1:0)-(isLiveNow(a)?1:0);});
+  var wk=pool.filter(function(e){return isWeek(e);});
+  var none="<div style='color:rgba(218,184,112,.35);padding:16px;font-size:13px;'>Nothing confirmed yet</div>";
+  tc.innerHTML=none;wc.innerHTML=none;
+  if(td.length){tc.innerHTML="";td.forEach(function(ev){tc.appendChild(mkTCard(ev));});}
+  if(wk.length){wc.innerHTML="";wk.forEach(function(ev){wc.appendChild(mkTCard(ev));});}
+}
+
+function mkTCard(ev){
+  var ico=C[ev.cat]?C[ev.cat].i:"&#128204;";
+  var d=document.createElement("div");
+  d.className="tc"+(isLiveNow(ev)?" live-now":"");
+  var imgDiv=document.createElement("div");
+  imgDiv.className="tcimg";
+  if(ev.photo){imgDiv.style.backgroundImage="url("+ev.photo+")";imgDiv.style.backgroundSize="cover";imgDiv.style.backgroundPosition="center";}
+  else{imgDiv.innerHTML=ico;}
+  var body=document.createElement("div");
+  body.className="tcbody";
+  body.innerHTML="<h4>"+ev.t+"</h4><div class='tw'>"+ev.w+"</div>";
+  d.appendChild(imgDiv);d.appendChild(body);
+  d.addEventListener("click",function(){openDetail(ev.id);});
+  return d;
+}
+
+function renderBoards(){
+  var bv=document.getElementById("bView");
+  bv.innerHTML="";
+  var hood=curCity==="sj"?curHood:null;
+  /* Every neighborhood except downtown starts with zero seed flyers -
+     show all category boards there (not just venue/shop/bars) so
+     residents have somewhere to post the first one instead of hitting
+     what looks like a dead end. */
+  var alwaysShow=hood&&hood!=="downtown";
+  ORD.forEach(function(cat){
+    var items=evts.filter(function(e){return e.cat===cat&&(!hood||(e.hood||"downtown")===hood);});
+    if(!items.length&&!alwaysShow&&cat!=="venue"&&cat!=="shop"&&cat!=="bars"&&cat!=="parks")return;
+    bv.appendChild(mkBoard(cat,items));
+  });
+  setupCatScrollSpy();
+}
+
+/* Keeps the sticky category bar in sync with whichever board is in view,
+   so it doubles as a "you are here" guide instead of just a set of jump
+   links - lights up the matching pill as the visitor scrolls up or down
+   past a board's frame. Re-run after every renderBoards() since the
+   .bsec sections it observes are rebuilt from scratch each time. */
+var catObserver=null;
+function setupCatScrollSpy(){
+  if(catObserver){catObserver.disconnect();catObserver=null;}
+  var catBtns={};
+  document.querySelectorAll(".cnav .cc[data-cat]").forEach(function(b){catBtns[b.dataset.cat]=b;});
+  var sections=document.querySelectorAll(".bsec");
+  Object.keys(catBtns).forEach(function(k){catBtns[k].classList.remove("on");});
+  if(!sections.length||!("IntersectionObserver" in window))return;
+  var cnav=document.querySelector(".cnav");
+  var stickyH=(cnav?cnav.getBoundingClientRect().bottom:100)+10;
+  catObserver=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(!entry.isIntersecting)return;
+      var cat=entry.target.id.replace("board-","");
+      Object.keys(catBtns).forEach(function(k){catBtns[k].classList.toggle("on",k===cat);});
+    });
+  },{rootMargin:"-"+Math.round(stickyH)+"px 0px -70% 0px",threshold:0});
+  sections.forEach(function(s){catObserver.observe(s);});
+}
+
+function setupBackToTop(){
+  var btn=document.getElementById("toTopBtn");
+  if(!btn)return;
+  window.addEventListener("scroll",function(){
+    btn.classList.toggle("show",window.scrollY>420);
+  },{passive:true});
+  btn.addEventListener("click",function(){clearJumpSpacer();window.scrollTo({top:0,behavior:"smooth"});});
+}
+
+function mkBoard(cat,items){
+  var a=items.filter(function(e){return!e.exp;}).length;
+  var p=items.filter(function(e){return e.exp;}).length;
+  var sec=document.createElement("section");
+  sec.className="bsec";sec.id="board-"+cat;
+
+  var lbl=document.createElement("div");lbl.className="blbl";
+  var dot=document.createElement("span");dot.className="dot "+cat;
+  var h2=document.createElement("h2");h2.textContent=C[cat]?C[cat].l:cat;
+  var bi=document.createElement("span");bi.className="bi";
+  bi.textContent=a+" active"+(p?" - "+p+" past":"");
+  lbl.appendChild(dot);lbl.appendChild(h2);lbl.appendChild(bi);
+
+  var frame=document.createElement("div");frame.className="frame compact";
+  var cork=document.createElement("div");cork.className="cork";
+  var stripWrap=document.createElement("div");stripWrap.className="strip-wrap";
+  var stringLine=document.createElement("div");stringLine.className="string-line";
+  var fstrip=document.createElement("div");fstrip.className="fstrip";
+  fstrip.id="fr-"+cat;
+  stripWrap.appendChild(stringLine);stripWrap.appendChild(fstrip);
+  cork.appendChild(stripWrap);
+  frame.appendChild(cork);
+
+  sec.appendChild(lbl);sec.appendChild(frame);
+
+  var slotIdx=0;
+  items.slice().sort(function(a,b){return (isLiveNow(b)?1:0)-(isLiveNow(a)?1:0);}).forEach(function(ev){
+    fstrip.appendChild(mkPinSlot(mkFlyer(ev),slotIdx++));
+  });
+
+  var afc=document.createElement("div");afc.className="afc";
+  var ap=document.createElement("div");ap.className="ap";ap.textContent="+";
+  var al=document.createElement("div");al.className="al";al.textContent="Post a Flyer";
+  afc.appendChild(ap);afc.appendChild(al);
+  afc.addEventListener("click",(function(c){return function(){openForm(c);};})(cat));
+  fstrip.appendChild(mkPinSlot(afc,slotIdx++));
+
+  while(slotIdx<4){
+    var empty=document.createElement("div");empty.className="fc-empty";
+    empty.addEventListener("click",(function(c){return function(){openForm(c);};})(cat));
+    fstrip.appendChild(mkPinSlot(empty,slotIdx++));
+  }
+
+  bindStripParallax(fstrip);
+
+  return sec;
+}
+
+/* Wraps a card in a clothespin-clipped slot on the board's string.
+   Rotation is applied inline (rather than via CSS nth-child) since each
+   strip now scrolls instead of laying out in a fixed 3-column grid. */
+function mkPinSlot(card,idx){
+  var rotations=["-2deg","1.5deg","-1deg"];
+  card.style.transform="rotate("+rotations[idx%3]+")";
+  var slot=document.createElement("div");slot.className="pin-slot";
+  var pin=document.createElement("div");pin.className="clothespin";
+  slot.appendChild(pin);slot.appendChild(card);
+  return slot;
+}
+
+/* Tapping a flyer opens the full detail modal directly (it used to flip
+   in place to a small vendor list first — that flip is now the Vendor Hub
+   view reachable from inside the modal via the top-left toggle button,
+   see openDetail/toggleVendorView, which has room to show it properly). */
+function mkFlyer(ev){
+  var ico=C[ev.cat]?C[ev.cat].i:"&#128204;";
+
+  var live=isLiveNow(ev);
+  var fc=document.createElement("div");fc.className="fc"+(ev.exp?" exp":"")+(live?" live-now":"");
+
+  var fimg=document.createElement("div");fimg.className="fimg"+(ev.photo?" hp":"");
+  if(ev.photo){fimg.style.backgroundImage="url("+ev.photo+")";fimg.style.backgroundSize="cover";fimg.style.backgroundPosition="center";}
+  else{
+    fimg.innerHTML=ico;
+    if(ev.exp){var etag=document.createElement("div");etag.className="etag";etag.textContent="Past";fimg.appendChild(etag);}
+  }
+  var fb=document.createElement("div");fb.className="fb";
+  var rib=document.createElement("span");rib.className="rib "+ev.cat;rib.textContent=ev.lbl;
+  var h3=document.createElement("h3");h3.textContent=ev.t;
+  var fw=document.createElement("div");fw.className="fw";fw.textContent=ev.w;
+  var fa=document.createElement("div");fa.className="fa";fa.textContent=ev.a.split(",")[0];
+  fb.appendChild(rib);fb.appendChild(h3);fb.appendChild(fw);fb.appendChild(fa);
+
+  fc.appendChild(fimg);fc.appendChild(fb);
+  fc.addEventListener("click",function(){openDetail(ev.id);});
+  return fc;
+}
+
+function openDetail(id){
+  var ev=evts.find(function(e){return e.id===id;});
+  if(!ev)return;
+  var mu="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(ev.a);
+  var ico=C[ev.cat]?C[ev.cat].i:"&#128204;";
+  var dp=document.getElementById("detPanel");
+  dp.innerHTML="";
+  dp.dataset.eid=id;
+  delete dp.dataset.vid;
+  delete dp.dataset.fromEvent;
+
+  var xb=document.createElement("button");xb.className="xbtn";xb.textContent="X";
+  xb.onclick=cls;dp.appendChild(xb);
+
+  var vhBtn=document.createElement("button");vhBtn.className="vhbtn";vhBtn.id="vhToggle";
+  vhBtn.innerHTML="&#128722; Vendor Hub";vhBtn.title="View Vendor Hub";
+  vhBtn.onclick=function(e){e.stopPropagation();toggleVendorView();};
+  dp.appendChild(vhBtn);
+
+  var hero=document.createElement("div");hero.className="dhero"+(ev.photo?" hp":"");
+  if(ev.photo){
+    hero.style.backgroundImage="url("+ev.photo+")";hero.style.backgroundSize="cover";hero.style.backgroundPosition="center";
+    var zoomBtn=document.createElement("button");zoomBtn.className="photozoom";zoomBtn.innerHTML="&#128269;";zoomBtn.title="View full photo";
+    zoomBtn.onclick=function(e){e.stopPropagation();zoomPhoto(ev.photo);};
+    hero.appendChild(zoomBtn);
+  }else{hero.innerHTML=ico;}
+  dp.appendChild(hero);
+
+  var body=document.createElement("div");body.className="dbody";body.id="infoView";
+
+  var rib=document.createElement("span");rib.className="rib "+ev.cat;rib.style.marginBottom="9px";rib.textContent=ev.lbl;
+  var h2=document.createElement("h2");h2.textContent=ev.t;
+  var dw=document.createElement("div");dw.className="dw";dw.textContent=ev.w;
+
+  var dloc=document.createElement("div");dloc.className="dloc";
+  var dadr=document.createElement("span");dadr.className="dadr";dadr.textContent=ev.a;
+  var mapBtn=document.createElement("a");mapBtn.className="ab blue";mapBtn.href=mu;mapBtn.target="_blank";mapBtn.textContent="Open in Maps";
+  var pinBtn=document.createElement("a");pinBtn.className="ab gold";
+  if(ev.mapId){
+    /* This event already has a real pin on our map (not a fresh
+       submission) - link straight to it instead of opening /pins/,
+       which would let someone create a duplicate pin for the same
+       event, same as happened here once already. */
+    pinBtn.textContent="Find on Our Map";
+    pinBtn.href="../map/index.html?showPlace="+encodeURIComponent(ev.mapId);
+  }else{
+    pinBtn.textContent="Add to Map";
+    pinBtn.href="../pins/index.html?title="+encodeURIComponent(ev.t)+"&addr="+encodeURIComponent(ev.a)+"&cat="+encodeURIComponent(ev.cat);
+  }
+  dloc.appendChild(dadr);dloc.appendChild(mapBtn);dloc.appendChild(pinBtn);
+
+  body.appendChild(rib);body.appendChild(h2);body.appendChild(dw);body.appendChild(dloc);
+
+  if(ev.exp){var ew=document.createElement("div");ew.className="warn r";ew.textContent="This event has ended.";body.appendChild(ew);}
+  if(ev.ms){var mw=document.createElement("div");mw.className="warn";mw.textContent=ev.ms;body.appendChild(mw);}
+
+  var desc=document.createElement("p");desc.className="ddesc";desc.textContent=ev.ds;body.appendChild(desc);
+
+  var tags=document.createElement("div");tags.className="dtags";
+  (ev.tags||[]).forEach(function(t){var s=document.createElement("span");s.className="dtag";s.textContent=t;tags.appendChild(s);});
+  body.appendChild(tags);
+
+  if(ev.ph){var pline=document.createElement("p");pline.style.cssText="font-size:13px;margin-bottom:6px;";pline.innerHTML="Phone: <a href='tel:"+ev.ph+"' style='color:#2c5f8a;'>"+ev.ph+"</a>";body.appendChild(pline);}
+  if(ev.wb){var wline=document.createElement("p");wline.style.cssText="font-size:13px;margin-bottom:14px;";wline.innerHTML="<a href='"+ev.wb+"' target='_blank' style='color:#2c5f8a;'>Visit Website</a>";body.appendChild(wline);}
+
+  var igrid=document.createElement("div");igrid.className="igrid";
+  function mkIbox(label,val){var b=document.createElement("div");b.className="ibox";b.innerHTML="<h4>"+label+"</h4><p>"+(val||"See organizer.")+"</p>";return b;}
+  igrid.appendChild(mkIbox("Parking",ev.pk));
+  igrid.appendChild(mkIbox("Transit",ev.tr));
+  igrid.appendChild(mkIbox("Accessibility",ev.ac));
+  igrid.appendChild(mkIbox("Family",ev.fam));
+  if(ev.fp)igrid.appendChild(mkIbox("From Plaza",ev.fp));
+  if(ev.fd)igrid.appendChild(mkIbox("From Diridon",ev.fd));
+  body.appendChild(igrid);
+
+  var btns=document.createElement("div");btns.className="dbtnrow";
+  var sh=document.createElement("button");sh.className="ab gray";sh.textContent="Share";sh.onclick=(function(id){return function(){shareEv(id);};})(ev.id);
+  var ed=document.createElement("button");ed.className="ab green";ed.textContent="Edit";ed.onclick=(function(id){return function(){editEv(id);};})(ev.id);
+  var dl=document.createElement("button");dl.className="ab dark";dl.textContent="Remove";dl.onclick=(function(id){return function(){delEv(id);};})(ev.id);
+  var rp=document.createElement("button");rp.className="ab gray";rp.textContent="Report";rp.onclick=(function(id,t){return function(){openReportForm("event",id,t);};})(ev.id,ev.t);
+  btns.appendChild(sh);btns.appendChild(ed);btns.appendChild(dl);btns.appendChild(rp);
+  body.appendChild(btns);
+
+  dp.appendChild(body);
+  dp.appendChild(buildVendorHub(ev));
+  document.getElementById("detOv").classList.add("on");
+  hPin(id);
+}
+
+/* The bigger Vendor Hub view for an event, reached via the top-left toggle
+   button in openDetail instead of the old small in-card flip. Combines the
+   registered-vendor list (boost/featured sorted, tap to open a vendor's
+   own page) with the free-text vendor directory groups. */
+function buildVendorHub(ev){
+  var vhub=document.createElement("div");vhub.className="dbody";vhub.id="vhubView";vhub.style.display="none";
+
+  var vh2=document.createElement("h2");vh2.textContent="Vendor Hub";
+  var vsub=document.createElement("div");vsub.className="dw";vsub.textContent=ev.t;
+  vhub.appendChild(vh2);vhub.appendChild(vsub);
+
+  /* Badges/ranking come purely from real purchased promotions
+     (js/promo.js), scoped to this specific event - a vendor with no
+     active promotion shows no badge at all (no "Free Vendor" label).
+     Top 10 Spotlight: up to 5 currently-Featured vendors, then up to 5
+     currently-Boost-active vendors, pulled out of the regular list so
+     the promotion is visibly worth something. */
+  var allLinked=typeof eventVendors==="function"?eventVendors(ev):[];
+  var featuredNow=allLinked.filter(function(v){return vendorPromoBadges(v.id,ev.id).featured;}).slice(0,5);
+  var boostNow=allLinked.filter(function(v){return vendorPromoBadges(v.id,ev.id).boostActive;}).slice(0,5);
+  var spotlightIds=featuredNow.concat(boostNow).map(function(v){return v.id;});
+  var rest=allLinked.filter(function(v){return spotlightIds.indexOf(v.id)<0;});
+
+  function mkVendorRow(v,rankLabel){
+    var row=document.createElement("div");row.className="vhub-row";
+    if(rankLabel){var rk=document.createElement("span");rk.className="vhub-rank";rk.textContent=rankLabel;row.appendChild(rk);}
+    var nm=document.createElement("span");nm.className="vhub-name";nm.textContent=v.name;
+    row.appendChild(nm);
+    var pb=vendorPromoBadges(v.id,ev.id);
+    if(pb.featured||pb.boostActive){
+      var badge=document.createElement("span");badge.className="vhub-badge";
+      badge.textContent=pb.boostActive?"Boost Live":"Featured";
+      row.appendChild(badge);
+    }
+    row.addEventListener("click",(function(vid,eid){return function(){openVendorDetail(vid,eid);};})(v.id,ev.id));
+    return row;
+  }
+
+  if(spotlightIds.length){
+    var spotHead=document.createElement("h4");spotHead.className="vhub-spot-head";spotHead.innerHTML="&#127942; Top 10 Spotlight";
+    vhub.appendChild(spotHead);
+    var spotlight=document.createElement("div");spotlight.className="vhub-list spotlight";
+    featuredNow.forEach(function(v,i){spotlight.appendChild(mkVendorRow(v,"#"+(i+1)));});
+    boostNow.forEach(function(v,i){spotlight.appendChild(mkVendorRow(v,"#"+(featuredNow.length+i+1)));});
+    vhub.appendChild(spotlight);
+    var restHead=document.createElement("h4");restHead.className="vhub-spot-head";restHead.textContent="All Vendors";
+    vhub.appendChild(restHead);
+  }
+  var list=document.createElement("div");list.className="vhub-list";
+  if(rest.length){
+    rest.forEach(function(v){list.appendChild(mkVendorRow(v,null));});
+  }else if(!spotlightIds.length){
+    var none=document.createElement("div");none.className="vhub-none";none.textContent="No vendors listed yet.";
+    list.appendChild(none);
+  }
+  vhub.appendChild(list);
+
+  var cta=document.createElement("div");cta.className="vhub-cta";
+  cta.textContent="Want your business seen here? Boost or feature your listing to land in the Top 10 Spotlight above.";
+  vhub.appendChild(cta);
+
+  var addV=document.createElement("button");addV.className="sugbtn";addV.textContent="+ Add Your Business";
+  addV.onclick=(function(cat,eid){return function(){startAddVendorFlow(cat,eid);};})(ev.cat,ev.id);
+  vhub.appendChild(addV);
+
+  /* Direct, easy-to-find entry point into checkout for anyone who
+     already has a listing here on this device - vendors were reporting
+     they couldn't find their way back to Boost/Feature checkout after
+     the initial post-creation prompt. */
+  var myLinked=allLinked.filter(function(v){return typeof isMyVendor==="function"&&isMyVendor(v.id);});
+  if(myLinked.length){
+    var promoQuick=document.createElement("button");promoQuick.className="sugbtn";promoQuick.style.cssText="background:#f0d890;border-color:var(--g);color:#2a1800;font-weight:700;";
+    promoQuick.innerHTML="&#128640; Boost or &#11088; Feature My Listing";
+    promoQuick.onclick=(function(vlist,eid){return function(){
+      if(vlist.length===1&&typeof openPromoPicker==="function")openPromoPicker(vlist[0].id,eid);
+      else if(typeof openVendorDashboard==="function"){cls();openVendorDashboard();}
+    };})(myLinked,ev.id);
+    vhub.appendChild(promoQuick);
+  }
+
+  if(ev.vg&&ev.vg.length){
+    var vsec=document.createElement("div");vsec.className="vsec";
+    var vh3=document.createElement("h3");vh3.textContent="Vendors and Directory";
+    vsec.appendChild(vh3);
+    var vf=document.createElement("div");vf.className="vfilts";
+    var allBtn=document.createElement("button");allBtn.className="vbtn on";allBtn.textContent="All";allBtn.dataset.g="all";allBtn.onclick=function(){vFilter(allBtn);};
+    vf.appendChild(allBtn);
+    ev.vg.forEach(function(gr){
+      var gb=document.createElement("button");gb.className="vbtn";gb.textContent=gr.g;gb.dataset.g=gr.g;
+      gb.onclick=function(){vFilter(gb);};
+      vf.appendChild(gb);
+    });
+    vsec.appendChild(vf);
+    ev.vg.forEach(function(gr){
+      var grDiv=document.createElement("div");grDiv.className="vgrp";grDiv.dataset.g=gr.g;
+      var gh=document.createElement("h4");gh.textContent=gr.g;grDiv.appendChild(gh);
+      gr.items.forEach(function(item){
+        var vi=document.createElement("div");vi.className="vi";vi.dataset.g=gr.g;vi.textContent=item;
+        grDiv.appendChild(vi);
+      });
+      vsec.appendChild(grDiv);
+    });
+    var sug=document.createElement("button");sug.className="sugbtn";sug.textContent="+ Suggest a vendor";
+    sug.onclick=(function(id){return function(){openSug(id);};})(ev.id);
+    vsec.appendChild(sug);
+    vhub.appendChild(vsec);
+  }
+
+  return vhub;
+}
+
+/* "Flips" the flyer between its event-info face and its Vendor Hub face -
+   a quick pinch (scaleX toward 0, swap content, scale back out) rather
+   than a true 3D rotate, so it works with whatever height either face's
+   content needs instead of requiring a fixed-height flip container. */
+function toggleVendorView(){
+  var info=document.getElementById("infoView"),vhub=document.getElementById("vhubView"),btn=document.getElementById("vhToggle");
+  var dp=document.getElementById("detPanel");
+  if(!info||!vhub||!btn||!dp)return;
+  dp.classList.add("flip-out");
+  setTimeout(function(){
+    var showingHub=vhub.style.display!=="none";
+    if(showingHub){
+      vhub.style.display="none";info.style.display="block";
+      btn.innerHTML="&#128722; Vendor Hub";btn.title="View Vendor Hub";
+      btn.classList.remove("back");
+    }else{
+      info.style.display="none";vhub.style.display="block";
+      btn.innerHTML="&#8617; Back to Flyer";btn.title="Back to Event Flyer";
+      btn.classList.add("back");
+    }
+    dp.classList.remove("flip-out");
+  },170);
+}
+
+function vFilter(btn){
+  var g=btn.dataset.g;
+  var sec=btn.closest(".vsec");
+  sec.querySelectorAll(".vbtn").forEach(function(b){b.classList.remove("on");});
+  btn.classList.add("on");
+  sec.querySelectorAll(".vgrp").forEach(function(el){
+    (g==="all"||el.dataset.g===g)?el.classList.remove("hidden"):el.classList.add("hidden");
+  });
+}
+
+function cls(){
+  document.getElementById("detOv").classList.remove("on");
+  document.getElementById("frmOv").classList.remove("on");
+  document.getElementById("detPanel").innerHTML="";
+  document.getElementById("frmPanel").innerHTML="";
+  document.querySelectorAll(".mp.pulse").forEach(function(p){p.classList.remove("pulse");});
+}
+
+function shareEv(id){
+  var ev=evts.find(function(e){return e.id===id;});if(!ev)return;
+  if(navigator.share){navigator.share({title:ev.t,text:ev.ds,url:location.href}).catch(function(){});return;}
+  if(!navigator.clipboard){alert("Copy the URL from your browser bar.");return;}
+  navigator.clipboard.writeText(location.href).then(function(){alert("Link copied!");},function(){alert("Couldn't copy automatically - copy the URL from your browser bar.");});
+}
+
+function delEv(id){
+  if(!confirm("Remove this flyer?"))return;
+  evts=evts.filter(function(e){return e.id!==id;});
+  save();cls();renderBoards();renderToday();renderPins();
+}
+
+function editEv(id){
+  var ev=evts.find(function(e){return e.id===id;});if(!ev)return;
+  cls();openForm(ev.cat);
+  setTimeout(function(){
+    var fp=document.getElementById("frmPanel");fp.dataset.eid=id;
+    function sv(i,v){var el=document.getElementById(i);if(el)el.value=v||"";}
+    sv("ft",ev.t);sv("fl",ev.lbl);sv("fw",ev.w);sv("fa",ev.a);
+    sv("fph",ev.ph);sv("fws",ev.wb);sv("fd",ev.ds);
+    sv("ft2",(ev.tags||[]).join(", "));sv("fen",ev.ed);
+    sv("fpk",ev.pk);sv("ftr",ev.tr);sv("fac",ev.ac);sv("ffam",ev.fam);
+    document.getElementById("fcat").value=ev.cat;
+    document.getElementById("fdate").value=ev.d||"";
+    var hoodEl=document.getElementById("fhood");
+    if(hoodEl)hoodEl.value=ev.hood||"downtown";
+  },60);
+}
+
+function openSug(lid){
+  var fp=document.getElementById("frmPanel");
+  fp.innerHTML="<div class='fi'><h2>Suggest a Vendor</h2><label>Group (e.g. Hot Food)</label><input id='sg' type='text' placeholder='e.g. Hot Food'><label>Vendor name and what they sell</label><input id='sn' type='text' placeholder='e.g. Rosarios Tacos - carnitas horchata'><div class='facts'><button class='bcan' id='sgBack'>Back</button><button class='bsub' id='sgSub'>Submit</button></div></div>";
+  document.getElementById("sgBack").onclick=function(){openDetail(lid);};
+  document.getElementById("sgSub").onclick=function(){subSug(lid);};
+  document.getElementById("detOv").classList.remove("on");
+  document.getElementById("frmOv").classList.add("on");
+}
+
+function subSug(lid){
+  var g=document.getElementById("sg").value.trim()||"Suggested";
+  var n=document.getElementById("sn").value.trim();
+  if(!n){alert("Please add a vendor name.");return;}
+  var ev=evts.find(function(e){return e.id===lid;});
+  if(!ev.vg)ev.vg=[];
+  var vg=ev.vg.find(function(x){return x.g.toLowerCase()===g.toLowerCase();});
+  if(!vg){vg={g:g,items:[]};ev.vg.push(vg);}
+  vg.items.push(n+" (suggested - pending confirmation)");
+  save();cls();openDetail(lid);
+}
+
+function openForm(defCat){
+  var fp=document.getElementById("frmPanel");
+  var opts=Object.entries(C).map(function(e){return "<option value='"+e[0]+"'>"+e[1].l+"</option>";}).join("");
+  var hoodField="";
+  if(curCity==="sj"){
+    var hoodOpts=HOODS_SJ.map(function(h){return "<option value='"+h.id+"'"+(h.id===curHood?" selected":"")+">"+h.l+"</option>";}).join("");
+    hoodField="<label>Neighborhood</label><select id='fhood'>"+hoodOpts+"</select>";
+  }
+  fp.innerHTML="<div class='fi'><h2>Post a Flyer</h2><label>Title *</label><input id='ft' type='text' placeholder='e.g. Japantown Night Market'><label>Category</label><select id='fcat'>"+opts+"</select>"+hoodField+"<label>Short label shown on flyer</label><input id='fl' type='text' placeholder='e.g. Weekly Market'><label>When</label><input id='fw' type='text' placeholder='e.g. Saturdays 10am-2pm'><label>Date or recurrence</label><select id='fdate'><option value=''>None</option><option value='today'>Today</option><option value='daily'>Every Day</option><option value='mon'>Mondays</option><option value='tue'>Tuesdays</option><option value='wed'>Wednesdays</option><option value='thu'>Thursdays</option><option value='fri'>Fridays</option><option value='sat'>Saturdays</option><option value='sun'>Sundays</option><option value='monthly'>First Friday Monthly</option></select><label>Address *</label><input id='fa' type='text' placeholder='e.g. 87 N San Pedro St San Jose CA'><label>Phone</label><input id='fph' type='text' placeholder='(408) 555-0100'><label>Website</label><input id='fws' type='text' placeholder='https://'><label>Description</label><textarea id='fd' placeholder='Tell people what this is...'></textarea><label>Tags (comma separated)</label><input id='ft2' type='text' placeholder='Free Family Outdoor'><label>End date (auto-expires)</label><input id='fen' type='date'><label>Parking</label><input id='fpk' type='text' placeholder='e.g. ParkSJ garage 90 min free'><label>Transit</label><input id='ftr' type='text' placeholder='e.g. VTA Route 68, 5 min walk'><label>Accessibility</label><input id='fac' type='text' placeholder='e.g. Fully accessible, wide pathways'><label>Family</label><input id='ffam' type='text' placeholder='e.g. Family friendly, stroller-friendly'><label>Photo (optional)</label><input id='fp2' type='file' accept='image/*'><div class='facts'><button class='bcan' id='frmCan'>Cancel</button><button class='bsub' id='frmSub'>Pin It Up</button></div></div>";
+  if(defCat)document.getElementById("fcat").value=defCat;
+  document.getElementById("frmCan").onclick=cls;
+  document.getElementById("frmSub").onclick=subForm;
+  document.getElementById("frmOv").classList.add("on");
+}
+
+function subForm(){
+  var t=document.getElementById("ft").value.trim();
+  var a=document.getElementById("fa").value.trim();
+  if(!t||!a){alert("Please add a title and address.");return;}
+  var cat=document.getElementById("fcat").value;
+  var eid=document.getElementById("frmPanel").dataset.eid;
+  var hoodEl=document.getElementById("fhood");
+  var ev={id:eid||"u"+Date.now(),cat:cat,hood:hoodEl?hoodEl.value:"",
+    lbl:document.getElementById("fl").value.trim()||(C[cat]?C[cat].l:cat),
+    t:t,w:document.getElementById("fw").value.trim()||"See details",
+    d:document.getElementById("fdate").value||"",a:a,
+    ph:document.getElementById("fph").value.trim(),
+    wb:normalizeUrl(document.getElementById("fws").value),
+    ds:document.getElementById("fd").value.trim(),
+    tags:document.getElementById("ft2").value.split(",").map(function(s){return s.trim();}).filter(Boolean),
+    ed:document.getElementById("fen").value||"",photo:"",g:[],exp:false,ms:"",
+    mx:390+(Math.random()-.5)*100,my:420+(Math.random()-.5)*80,
+    pk:document.getElementById("fpk").value.trim()||"Contact organizer.",
+    tr:document.getElementById("ftr").value.trim()||"Check VTA.org.",
+    ac:document.getElementById("fac").value.trim()||"Contact organizer.",
+    fam:document.getElementById("ffam").value.trim()||"Contact organizer.",
+    fp:"See Google Maps",fd:"See Google Maps",vg:[]};
+  function done(){
+    if(eid){var i=evts.findIndex(function(e){return e.id===eid;});if(i>=0){ev.g=evts[i].g||[];evts[i]=ev;}}
+    else evts.push(ev);
+    expire();save();cls();renderBoards();renderToday();renderPins();
+  }
+  var pf=document.getElementById("fp2").files[0];
+  if(pf){resizeImageFile(pf,1100,0.82,function(dataUrl){ev.photo=dataUrl;done();});}
+  else done();
+}
+
+function renderPins(){
+  var g=document.getElementById("ePins");if(!g)return;g.innerHTML="";
+  evts.filter(function(e){return e.mx&&e.my;}).forEach(function(ev){
+    var col=C[ev.cat]?C[ev.cat].c:"#666",ico=C[ev.cat]?C[ev.cat].i:"&#128204;";
+    var pg=document.createElementNS("http://www.w3.org/2000/svg","g");
+    pg.setAttribute("class","mp");pg.setAttribute("id","pin-"+ev.id);
+    var circ=document.createElementNS("http://www.w3.org/2000/svg","circle");
+    circ.setAttribute("cx",ev.mx);circ.setAttribute("cy",ev.my);circ.setAttribute("r","13");
+    circ.setAttribute("fill",col);circ.setAttribute("stroke","white");circ.setAttribute("stroke-width","2.5");
+    circ.setAttribute("opacity",ev.exp?"0.35":"0.92");
+    var txt=document.createElementNS("http://www.w3.org/2000/svg","text");
+    txt.setAttribute("x",ev.mx);txt.setAttribute("y",ev.my+5);
+    txt.setAttribute("text-anchor","middle");txt.setAttribute("font-size","11");
+    txt.style.pointerEvents="none";txt.innerHTML=ico;
+    pg.appendChild(circ);pg.appendChild(txt);
+    pg.addEventListener("click",(function(id){return function(){openDetail(id);showMap();};})(ev.id));
+    g.appendChild(pg);
+    var lb=document.createElementNS("http://www.w3.org/2000/svg","text");
+    lb.setAttribute("x",ev.mx);lb.setAttribute("y",ev.my+24);
+    lb.setAttribute("text-anchor","middle");lb.setAttribute("font-family","Special Elite,monospace");
+    lb.setAttribute("font-size","8.5");lb.setAttribute("fill","#1a0e00");
+    lb.style.pointerEvents="none";
+    lb.textContent=ev.t.split(" ").slice(0,3).join(" ");
+    g.appendChild(lb);
+  });
+}
+
+function hPin(id){
+  document.querySelectorAll(".mp.pulse").forEach(function(p){p.classList.remove("pulse");});
+  var p=document.getElementById("pin-"+id);if(p)p.classList.add("pulse");
+}
+function zMap(f){
+  var vp=document.getElementById("mvp"),ns=Math.max(.6,Math.min(4,mS*f));
+  var cx=vp.clientWidth/2,cy=vp.clientHeight/2;
+  mX=cx-(cx-mX)*(ns/mS);mY=cy-(cy-mY)*(ns/mS);mS=ns;applyMap();
+}
+function rMap(){mS=1;centerMap();}
+function applyMap(){
+  var m=document.getElementById("mainMap");
+  if(m){m.style.transform="translate("+mX+"px,"+mY+"px) scale("+mS+")";m.style.transformOrigin="0 0";}
+}
+/* Centers the viewport on Plaza de Cesar Chavez (the SVG's main downtown
+   landmark, at 420,470) instead of defaulting to the map's top-left
+   corner - the map used to open needing a lot of manual panning just to
+   find it. */
+function centerMap(){
+  var vp=document.getElementById("mvp");
+  if(!vp||!vp.clientWidth)return;
+  mX=vp.clientWidth/2-420*mS;
+  mY=vp.clientHeight/2-470*mS;
+  applyMap();
+}
+function setupPan(){
+  var vp=document.getElementById("mvp");if(!vp)return;
+  vp.addEventListener("mousedown",function(e){pan=true;ps={x:e.clientX-mX,y:e.clientY-mY};vp.classList.add("gr");e.preventDefault();});
+  window.addEventListener("mousemove",function(e){if(!pan)return;mX=e.clientX-ps.x;mY=e.clientY-ps.y;applyMap();});
+  window.addEventListener("mouseup",function(){pan=false;var v=document.getElementById("mvp");if(v)v.classList.remove("gr");});
+  vp.addEventListener("touchstart",function(e){if(e.touches.length===1){pan=true;ps={x:e.touches[0].clientX-mX,y:e.touches[0].clientY-mY};}},{passive:true});
+  vp.addEventListener("touchmove",function(e){if(!pan||e.touches.length!==1)return;mX=e.touches[0].clientX-ps.x;mY=e.touches[0].clientY-ps.y;applyMap();},{passive:true});
+  vp.addEventListener("touchend",function(){pan=false;});
+}
+function showBoards(){
+  document.getElementById("bView").style.display="block";
+  document.getElementById("tdwrap").style.display="block";
+  document.getElementById("mapSec").style.display="none";
+  document.getElementById("adminSec").style.display="none";
+  document.getElementById("nB").classList.add("on");
+  document.getElementById("nM").classList.remove("on");
+}
+/* The board used to have its own built-in placeholder map (the SVG
+   section still sitting dormant in this file/markup below - kept but
+   unreachable rather than deleted, since every "go to map" entry point
+   already funnels through this one function). Now that the real map
+   lives as its own app right next door, "Map" just takes you there. */
+function showMap(){
+  window.location.href="../map/index.html";
+}
+function scrollToday(){showBoards();document.getElementById("tdwrap").scrollIntoView({behavior:"smooth"});}
+/* The last category board can't always scroll all the way to the top of
+   the viewport - there's not enough page below it for the browser to
+   scroll into - so scrollIntoView silently clamps short, leaving the
+   PREVIOUS board still showing at the top ("category redirects to a
+   different board"). A temporary spacer sized to one viewport gives any
+   section room to reach the top. It's deliberately NOT auto-removed on a
+   timer: removing it shrinks the page and the browser re-clamps the
+   current scroll position right back to where it was before, undoing the
+   fix. Instead it's simply cleared out at the start of the next jump
+   (or scroll-to-top), which is invisible since a new scroll is about to
+   happen anyway. */
+function clearJumpSpacer(){
+  var s=document.getElementById("jumpToSpacer");if(s)s.remove();
+}
+function jumpTo(cat){
+  showBoards();
+  clearJumpSpacer();
+  setTimeout(function(){
+    var t=document.getElementById("board-"+cat);
+    if(!t)return;
+    var spacer=document.createElement("div");
+    spacer.id="jumpToSpacer";
+    spacer.style.height=window.innerHeight+"px";
+    document.body.appendChild(spacer);
+    t.scrollIntoView({behavior:"smooth",block:"start"});
+  },80);
+}
+document.addEventListener("DOMContentLoaded",init);

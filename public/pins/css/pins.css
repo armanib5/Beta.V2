@@ -1,0 +1,6 @@
+#pinMap{height:480px;border-radius:6px;}
+.panel{position:static;background:transparent;border-top:none;box-shadow:none;max-height:none;overflow:visible;margin-top:14px;}
+.panel-inner{padding:0;}
+@media(max-width:640px){
+  #pinMap{height:340px;}
+}

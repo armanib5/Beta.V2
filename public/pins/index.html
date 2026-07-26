@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BayPinned — Add a Pin</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Libre+Franklin:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../map/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="../map/css/style.css">
+<link rel="stylesheet" href="../map/css/admin.css">
+<link rel="stylesheet" href="../shared/supabase-client.css">
+<link rel="stylesheet" href="css/pins.css">
+</head>
+<body>
+<div class="bg"></div>
+<div class="page">
+  <div class="admintop">
+    <div class="logo">&#128204; BayPinned</div>
+    <div class="warn">Drop a pin for your business or event &mdash; an organizer reviews it before it shows up on the map.</div>
+    <a href="../index.html">&#127968; Main</a>
+    <a href="../map/index.html">Map</a>
+    <a href="../board/index.html">Board</a>
+  </div>
+
+  <div id="sbGate"></div>
+
+  <div id="pinApp" class="adminwrap" style="display:none;">
+    <div class="adminhint">
+      <b>1.</b> Tap the map where your pin belongs &mdash; we'll fill in the address, street, and neighborhood for you.
+      <b>2.</b> Say what it's for. <b>3.</b> Submit &mdash; it'll show up on the map once approved.
+    </div>
+
+    <div class="mframe">
+      <div id="pinMap"></div>
+    </div>
+
+    <div class="panel" id="pinPanel" style="display:none;">
+      <div class="panel-inner">
+        <div class="savestatus" id="pinStatus" style="display:none;"></div>
+        <h3>New pin</h3>
+        <div class="modehint" id="locHint">Tap the map above to place your pin.</div>
+        <div class="formgrid">
+          <label>Your name or business
+            <input id="pOwner" type="text" list="pOwnerList" placeholder="e.g. Rosa's Tamales" autocomplete="off">
+            <datalist id="pOwnerList"></datalist>
+          </label>
+          <label>Category
+            <select id="pCat">
+              <option value="market">Markets</option>
+              <option value="foodhall">Food Hall</option>
+              <option value="bars">Bars &amp; Restaurants</option>
+              <option value="artwalk">Art Walk</option>
+              <option value="cityart">City Art</option>
+              <option value="parks">Parks</option>
+              <option value="venue">Theaters</option>
+              <option value="shop">Shops</option>
+            </select>
+          </label>
+          <label>Part of an event? (optional)
+            <select id="pEvent">
+              <option value="">Not tied to an event</option>
+              <option value="mariachi2026">Silicon Valley Mariachi Festival (today)</option>
+            </select>
+          </label>
+          <label class="full">What's here?
+            <input id="pTitle" type="text" list="pTitleList" placeholder="e.g. Tamales and horchata pop-up" autocomplete="off">
+            <datalist id="pTitleList"></datalist>
+          </label>
+          <label class="full">Address (auto-filled from your map tap — edit if it's off)
+            <input id="pAddr" type="text" placeholder="Tap the map first">
+          </label>
+          <label class="full">Note (optional)
+            <input id="pNote" type="text" placeholder="e.g. Cash only, weekends only">
+          </label>
+        </div>
+        <div class="btnrow">
+          <button class="abtn green" id="btnSubmitPin">Submit Pin</button>
+          <button class="abtn outline" id="btnClearPin">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../map/vendor/leaflet/leaflet.js"></script>
+<script src="../map/data/places.js?v=2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/supabase-config.js"></script>
+<script src="../shared/supabase-client.js"></script>
+<script src="js/pins.js?v=2"></script>
+</body>
+</html>

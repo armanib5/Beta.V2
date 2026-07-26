@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { BASE_PATH } from "@/lib/site";
 
 export function MobileNav({
   links,
@@ -27,16 +28,27 @@ export function MobileNav({
       {open && (
         <div className="absolute inset-x-0 top-full border-b border-slate-200 bg-white px-4 py-3 shadow-lg">
           <div className="flex flex-col gap-1">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="rounded-md px-3 py-3 text-base font-medium text-slate-700 hover:bg-slate-50"
-              >
-                {link.label}
-              </Link>
-            ))}
+            {links.map((link) =>
+              link.href.startsWith(BASE_PATH) ? (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className="rounded-md px-3 py-3 text-base font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  {link.label}
+                </a>
+              ) : (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className="rounded-md px-3 py-3 text-base font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  {link.label}
+                </Link>
+              ),
+            )}
             <Link
               href={isSignedIn ? "/vendor/dashboard" : "/vendor/login"}
               onClick={() => setOpen(false)}

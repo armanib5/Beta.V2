@@ -11,6 +11,35 @@ backend server, no API routes, and no secret keys in the deployed app —
 every write is authorized by Postgres Row Level Security. See
 [V2 → V3 upgrade path](#v2--v3-upgrade-path) below for when that changes.
 
+## V1 (BayPinned SJ) is ported in, live, unmodified
+
+`public/board/`, `public/map/`, `public/pins/`, `public/admin/`, and
+`public/shared/` are the **actual files** from the `armanib5/map.board`
+repo, copied over as-is (not rewritten in React) and served as plain
+static pages alongside the Next app — `/board/`, `/map/`, `/pins/`,
+`/admin/`. This preserves V1's exact behavior with zero risk of a
+React-port bug in things like the SVG map math or the promo-booking
+calendar logic, and matches how V1's own root page already worked
+("each still runs standalone from its own folder").
+
+- **They keep talking to V1's own, separate, already-live Supabase
+  project** (`public/shared/supabase-config.js`, unchanged — its anon key
+  is meant to be public, exactly like V2's). This app intentionally runs
+  on **two separate Supabase projects**: V1's (board/map/pins/admin, its
+  own schema — see `armanib5/map.board`'s `supabase/schema.sql`) and V2's
+  (this repo's `supabase/migrations/`, the new paid vendor-account system).
+  They don't share tables or an `admins` list.
+- The only edits made to V1's files: a "🔒 Vendor Login" link added to the
+  board's nav (bridges to V2's new paid account system at `/vendor/login/`)
+  and V2's home page now has a section linking out to `/board/`, `/map/`,
+  and `/pins/`. Everything else — styling, the SVG downtown map, the
+  Leaflet map, flyers, category filters, the free device-local "My
+  Dashboard"/`?admin=1` admin — is byte-for-byte what shipped in V1.
+- `/admin/` (V1's own, Supabase-Auth-gated) and `/admin/board/` (V2's new,
+  `admins`-table-gated booth board) are two different admin surfaces on
+  two different backends — that's intentional, not a bug, per the "keep
+  two separate Supabase projects" decision above.
+
 ## What's built
 
 - **Database schema** (`supabase/migrations/`): vendors, categories,
@@ -108,9 +137,13 @@ ready. When you are:
 4. `.github/workflows/deploy-pages.yml` (already in this repo) builds and
    deploys `out/` automatically on every push to `main` from then on.
 
-The site's `basePath`/`assetPrefix` in `next.config.ts` are hardcoded to
-`/Beta.V2` to match `https://armanib5.github.io/Beta.V2/` — update that if
-the repo is ever renamed.
+The site's `basePath`/`assetPrefix` come from `BASE_PATH` in
+`src/lib/site.ts` (imported by `next.config.ts`), hardcoded to `/Beta.V2`
+to match `https://armanib5.github.io/Beta.V2/`. Update that one constant
+if the repo is ever renamed — it's also what any plain `<a href>` to the
+ported V1 pages (`/board/`, `/map/`, `/pins/`, `/admin/`) needs prefixed
+with by hand, since those are static files outside the Next app and don't
+get `next/link`'s automatic basePath handling.
 
 ## Seeding this month's LOV (List of Vendors & Events)
 

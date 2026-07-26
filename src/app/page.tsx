@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { BASE_PATH } from "@/lib/site";
 import type { Category, PricingTier } from "@/lib/types";
 import { PricingCard } from "@/components/pricing-card";
 
@@ -55,6 +56,49 @@ export default function HomePage() {
             >
               Browse the Vendor Directory
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-amber-50 py-14">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-widest text-amber-700">
+              📌 BayPinned SJ
+            </p>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
+              The live Downtown San Jose board &amp; map
+            </h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600 sm:text-base">
+              Flyers, markets, events, and an interactive map of Downtown San Jose — free for
+              everyone, no account needed.
+            </p>
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <a
+              href={`${BASE_PATH}/board/`}
+              className="rounded-2xl border border-amber-200 bg-white p-5 text-center shadow-sm hover:shadow-md"
+            >
+              <p className="text-2xl">🗒️</p>
+              <p className="mt-2 font-bold text-slate-900">The Board</p>
+              <p className="mt-1 text-sm text-slate-600">Flyers, markets &amp; the Vendor Hub</p>
+            </a>
+            <a
+              href={`${BASE_PATH}/map/`}
+              className="rounded-2xl border border-amber-200 bg-white p-5 text-center shadow-sm hover:shadow-md"
+            >
+              <p className="text-2xl">🗺️</p>
+              <p className="mt-2 font-bold text-slate-900">The Map</p>
+              <p className="mt-1 text-sm text-slate-600">Interactive downtown map with live pins</p>
+            </a>
+            <a
+              href={`${BASE_PATH}/pins/`}
+              className="rounded-2xl border border-amber-200 bg-white p-5 text-center shadow-sm hover:shadow-md"
+            >
+              <p className="text-2xl">📍</p>
+              <p className="mt-2 font-bold text-slate-900">Add a Pin</p>
+              <p className="mt-1 text-sm text-slate-600">Drop a pin for your business or event</p>
+            </a>
           </div>
         </div>
       </section>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BayPinned — Owner Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Libre+Franklin:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../map/css/style.css">
+<link rel="stylesheet" href="../map/css/admin.css">
+<link rel="stylesheet" href="../shared/supabase-client.css">
+</head>
+<body>
+<div class="bg"></div>
+<div class="page">
+  <div class="admintop">
+    <div class="logo">&#128204; BayPinned</div>
+    <div class="warn">Private owner admin — not linked from any public page.</div>
+    <a href="../index.html">&#127968; Main</a>
+  </div>
+
+  <div id="sbGate"></div>
+
+  <div id="loginWrap" class="adminwrap" style="display:none;max-width:420px;">
+    <div class="adminhint">Sign in with the admin account created in Supabase (see <code>supabase/README.md</code> step 4).</div>
+    <div class="formgrid">
+      <label>Email<input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="username"></label>
+      <label>Password<input id="loginPass" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password"></label>
+    </div>
+    <div id="loginErr" style="color:#fca5a5;font-size:12.5px;margin-top:8px;display:none;"></div>
+    <button class="abtn green" id="loginBtn" style="margin-top:10px;">Sign In</button>
+  </div>
+
+  <div id="dashWrap" style="display:none;">
+    <div class="tabrow">
+      <button class="tabbtn on" data-tab="vendors">Vendors</button>
+      <button class="tabbtn" data-tab="bookings">Bookings</button>
+      <button class="tabbtn" data-tab="pins">Pins</button>
+      <button class="tabbtn" data-tab="cities">Cities</button>
+      <button class="tabbtn" data-tab="hours">Event Hours</button>
+      <button class="tabbtn" data-tab="reports">Reports</button>
+    </div>
+    <div class="adminwrap">
+      <div class="adminhint">
+        Signed in as <b id="whoami"></b>.
+        <a href="#" id="signOutBtn" style="color:var(--cl);margin-left:10px;">Sign out</a>
+      </div>
+      <div id="tabContent"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../shared/supabase-config.js"></script>
+<script src="../shared/supabase-client.js"></script>
+<script src="js/admin.js?v=2"></script>
+</body>
+</html>
