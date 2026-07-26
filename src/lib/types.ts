@@ -82,6 +82,7 @@ export interface Booth {
   tier: BoothTier;
   status: BoothStatus;
   vendor_id: string | null;
+  lov_entry_id: string | null;
   x: number | null;
   y: number | null;
   created_at: string;
