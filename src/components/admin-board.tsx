@@ -16,6 +16,12 @@ const STATUS_LABEL: Record<Booth["status"], string> = {
   claimed: "Occupied",
 };
 
+const STATUS_CYCLE: Record<Booth["status"], Booth["status"]> = {
+  open: "reserved",
+  reserved: "claimed",
+  claimed: "open",
+};
+
 export function AdminBoard({ events }: { events: LovEntry[] }) {
   const [eventId, setEventId] = useState(events[0]?.id ?? "");
   const [booths, setBooths] = useState<Booth[]>([]);
@@ -49,30 +55,38 @@ export function AdminBoard({ events }: { events: LovEntry[] }) {
 
   async function toggleBooth(booth: Booth) {
     setError(null);
-    const res = await fetch(`/api/admin/booths/${booth.id}/toggle`, { method: "POST" });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Could not update booth.");
+    const nextStatus = STATUS_CYCLE[booth.status];
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("booths")
+      .update({ status: nextStatus, vendor_id: nextStatus === "open" ? null : undefined })
+      .eq("id", booth.id)
+      .select("*")
+      .single<Booth>();
+
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not update booth.");
       return;
     }
-    setBooths((prev) => prev.map((b) => (b.id === booth.id ? data.booth : b)));
+    setBooths((prev) => prev.map((b) => (b.id === booth.id ? data : b)));
   }
 
   async function addBooth(e: React.FormEvent) {
     e.preventDefault();
     if (!newLabel.trim() || !eventId) return;
     setError(null);
-    const res = await fetch("/api/admin/booths", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventId, label: newLabel.trim(), tier: newTier }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Could not create booth.");
+    const supabase = createClient();
+    const { data, error: insertError } = await supabase
+      .from("booths")
+      .insert({ event_id: eventId, label: newLabel.trim(), tier: newTier })
+      .select("*")
+      .single<Booth>();
+
+    if (insertError || !data) {
+      setError(insertError?.message ?? "Could not create booth.");
       return;
     }
-    setBooths((prev) => [...prev, data.booth].sort((a, b) => a.label.localeCompare(b.label)));
+    setBooths((prev) => [...prev, data].sort((a, b) => a.label.localeCompare(b.label)));
     setNewLabel("");
   }
 

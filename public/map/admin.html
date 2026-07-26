@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BayPinned SJ &mdash; Admin: Pin &amp; Zone Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Libre+Franklin:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="bg"></div>
+<div class="page">
+  <div class="admintop">
+    <div class="logo">&#128204; BayPinned SJ</div>
+    <div class="warn">Admin tool &mdash; not part of the public map, not linked from it. Edits here only change what you export/download.</div>
+    <a href="../index.html">&#127968; Main</a>
+    <a href="vendor.html">Vendor Check-In</a>
+    <a href="index.html">&larr; Back to map</a>
+  </div>
+
+  <div class="tabrow">
+    <button class="tabbtn on" id="tabPins">Pins &amp; Zones</button>
+    <button class="tabbtn" id="tabEvents">Events &amp; Flyers (board prep)</button>
+  </div>
+
+  <div id="pinsSection">
+  <div class="adminwrap">
+    <div class="adminhint">
+      <b>Tap "+ Add New Pin"</b> below for the easiest way to drop a pin (then drag it to the exact spot) &middot;
+      or <b>tap empty map</b> to drop one there directly &middot; <b>drag any pin</b> to reposition it &middot; <b>tap an existing pin</b> to edit it &middot;
+      use <b>Draw Zone</b> below to mark an event's street-closure footprint. Nothing here saves to the live site automatically &mdash;
+      when you're done, use <b>Export</b> at the bottom to copy the updated data and paste it into <code>data/places.js</code> yourself.
+    </div>
+    <div class="mframe">
+      <div id="adminMap"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <div class="panel-inner">
+      <div class="btnrow" style="margin-top:0;margin-bottom:12px;">
+        <button class="abtn gold" id="btnAddHere">+ Add New Pin</button>
+      </div>
+      <div class="savestatus" id="saveStatus">Autosave status will appear here.</div>
+      <h3 id="panelTitle">No pin selected</h3>
+      <div class="modehint" id="modeHint"></div>
+
+      <div class="formgrid" id="formFields">
+        <label>Category
+          <select id="fCat"></select>
+        </label>
+        <label>Neighborhood
+          <select id="fHood"></select>
+        </label>
+        <label>Name
+          <input id="fName" type="text" placeholder="Business or event name">
+        </label>
+        <label>Address
+          <input id="fAddr" type="text" placeholder="Full street address">
+        </label>
+        <label>Latitude
+          <input id="fLat" type="number" step="0.0001">
+        </label>
+        <label>Longitude
+          <input id="fLng" type="number" step="0.0001">
+        </label>
+        <label>When (shown on flyer)
+          <input id="fWhen" type="text" placeholder="e.g. Wednesdays 9am-1:30pm">
+        </label>
+        <label>Recurrence code (optional)
+          <select id="fRecur">
+            <option value="">None (standing location)</option>
+            <option value="daily">Every day</option>
+            <option value="today">Ongoing (date-range event)</option>
+            <option value="monthly">First Friday monthly</option>
+            <option value="sun">Sundays</option>
+            <option value="mon">Mondays</option>
+            <option value="tue">Tuesdays</option>
+            <option value="wed">Wednesdays</option>
+            <option value="thu">Thursdays</option>
+            <option value="fri">Fridays</option>
+            <option value="sat">Saturdays</option>
+          </select>
+        </label>
+        <label>Start hour (24hr, optional)
+          <input id="fSh" type="number" step="0.5" placeholder="e.g. 9">
+        </label>
+        <label>End hour (24hr, optional)
+          <input id="fEh" type="number" step="0.5" placeholder="e.g. 13.5">
+        </label>
+        <label>End date (optional, auto-expires)
+          <input id="fEd" type="date">
+        </label>
+        <label>Website (optional)
+          <input id="fWeb" type="text" placeholder="https://">
+        </label>
+        <label class="full">Description
+          <textarea id="fDesc" placeholder="Short description shown on the flyer"></textarea>
+        </label>
+        <label class="full">Parking note (optional)
+          <input id="fPk" type="text">
+        </label>
+        <label class="full">Transit note (optional)
+          <input id="fTr" type="text">
+        </label>
+      </div>
+
+      <div class="btnrow">
+        <button class="abtn green" id="btnSave">Save Pin</button>
+        <button class="abtn red" id="btnDelete">Delete Pin</button>
+        <button class="abtn gold" id="btnZoneStart">Draw/Edit Zone</button>
+        <button class="abtn gold" id="btnZoneFinish" style="display:none;">Finish Zone</button>
+        <button class="abtn outline" id="btnZoneAddCorner" style="display:none;">+ Add Corner</button>
+        <button class="abtn outline" id="btnZoneDone" style="display:none;">Done Editing Zone</button>
+        <button class="abtn gray" id="btnZoneClear">Clear Zone</button>
+        <button class="abtn outline" id="btnCancel">Cancel / Deselect</button>
+      </div>
+
+      <div class="exportbox">
+        <p class="exporthelp">When you're done fixing pins: click <b>Export</b> below, then paste it directly into your next message to Claude
+          (it copies to your clipboard automatically) &mdash; Claude will commit it to make your changes live for everyone. <b>Download</b> saves
+          the file instead if you'd rather attach it. Neither button touches the live site by itself.</p>
+        <div class="btnrow" style="margin-top:0;">
+          <button class="abtn gold" id="btnExport">Export Updated places.js</button>
+          <button class="abtn outline" id="btnDownload">Download places.js</button>
+          <button class="abtn outline" id="btnResetDraft">Discard My Local Draft</button>
+        </div>
+        <div class="exportconfirm" id="exportConfirm"></div>
+        <div class="pendinglist" id="pendingList"></div>
+        <textarea id="exportOut" readonly></textarea>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div id="eventsSection" class="adminwrap" style="display:none;">
+    <div class="adminhint">
+      This manages event/flyer content for the board (title, schedule, description, tags, accessibility notes)
+      &mdash; the board itself doesn't exist in this repo yet, so this is just getting the data ready ahead of it.
+      An event can optionally link to one of your map pins so they share one location. Nothing here is public
+      or shared with other viewers &mdash; same local-draft-then-export workflow as pins.
+    </div>
+    <div class="savestatus" id="eventSaveStatus">Autosave status will appear here.</div>
+    <div class="btnrow" style="margin-top:0;margin-bottom:14px;">
+      <button class="abtn gold" id="btnAddEvent">+ Add New Event</button>
+    </div>
+    <div id="eventList" class="eventlist"></div>
+
+    <div class="eventform" id="eventForm" style="display:none;">
+      <h3 id="eventFormTitle">New Event</h3>
+      <div class="formgrid">
+        <label>Category
+          <select id="eCat"></select>
+        </label>
+        <label>Linked map pin (optional)
+          <select id="eLinkedPin"><option value="">None</option></select>
+        </label>
+        <label>Title
+          <input id="eTitle" type="text" placeholder="e.g. Japantown Night Market">
+        </label>
+        <label>Short label (shown on flyer)
+          <input id="eLbl" type="text" placeholder="e.g. Weekly Market">
+        </label>
+        <label>When
+          <input id="eWhen" type="text" placeholder="e.g. Wednesdays 9am-1:30pm">
+        </label>
+        <label>Recurrence code (optional)
+          <select id="eRecur">
+            <option value="">None</option>
+            <option value="daily">Every day</option>
+            <option value="today">Ongoing (date-range event)</option>
+            <option value="monthly">First Friday monthly</option>
+            <option value="sun">Sundays</option>
+            <option value="mon">Mondays</option>
+            <option value="tue">Tuesdays</option>
+            <option value="wed">Wednesdays</option>
+            <option value="thu">Thursdays</option>
+            <option value="fri">Fridays</option>
+            <option value="sat">Saturdays</option>
+          </select>
+        </label>
+        <label>Address
+          <input id="eAddr" type="text">
+        </label>
+        <label>Phone
+          <input id="ePhone" type="text">
+        </label>
+        <label>Website
+          <input id="eWeb" type="text" placeholder="https://">
+        </label>
+        <label>End date (optional, auto-expires)
+          <input id="eEd" type="date">
+        </label>
+        <label class="full">Description
+          <textarea id="eDesc"></textarea>
+        </label>
+        <label class="full">Tags (comma separated)
+          <input id="eTags" type="text" placeholder="Free, Family, Outdoor">
+        </label>
+        <label class="full">Parking note (optional)
+          <input id="ePk" type="text">
+        </label>
+        <label class="full">Transit note (optional)
+          <input id="eTr" type="text">
+        </label>
+        <label class="full">Accessibility note (optional)
+          <input id="eAc" type="text">
+        </label>
+        <label class="full">Family-friendly note (optional)
+          <input id="eFam" type="text">
+        </label>
+      </div>
+      <div class="btnrow">
+        <button class="abtn green" id="btnSaveEvent">Save Event</button>
+        <button class="abtn red" id="btnDeleteEvent">Delete Event</button>
+        <button class="abtn outline" id="btnCancelEvent">Cancel / Deselect</button>
+      </div>
+    </div>
+
+    <div class="exportbox">
+      <p class="exporthelp">Same as the pins tab: click <b>Export</b>, paste it into your next message to Claude, and Claude will commit it for you.</p>
+      <div class="btnrow" style="margin-top:0;">
+        <button class="abtn gold" id="btnExportEvents">Export Updated events.js</button>
+        <button class="abtn outline" id="btnDownloadEvents">Download events.js</button>
+        <button class="abtn outline" id="btnResetEventsDraft">Discard My Local Draft</button>
+      </div>
+      <div class="exportconfirm" id="eventsExportConfirm"></div>
+      <div class="pendinglist" id="eventsPendingList"></div>
+      <textarea id="eventsExportOut" readonly></textarea>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="data/places.js?v=8"></script>
+<script src="data/events.js?v=1"></script>
+<script src="js/admin.js?v=10"></script>
+</body>
+</html>

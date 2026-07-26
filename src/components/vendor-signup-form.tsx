@@ -3,16 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { slugify } from "@/lib/slug";
 
-export function VendorSignupForm({
-  sessionId,
-  initialEmail,
-}: {
-  sessionId: string;
-  initialEmail: string;
-}) {
+const SLUG_RETRY_ATTEMPTS = 5;
+
+export function VendorSignupForm() {
   const router = useRouter();
-  const [email, setEmail] = useState(initialEmail);
+  const [businessName, setBusinessName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,6 +20,10 @@ export function VendorSignupForm({
     e.preventDefault();
     setError(null);
 
+    if (!businessName.trim()) {
+      setError("Business name is required.");
+      return;
+    }
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
@@ -40,21 +42,40 @@ export function VendorSignupForm({
         return;
       }
 
-      if (!data.session) {
+      const user = data.user;
+      if (!user || !data.session) {
         setError(
           "Account created — check your email to confirm it, then log in to finish setting up your profile.",
         );
         return;
       }
 
-      const claimRes = await fetch("/api/vendor/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      });
-      const claimData = await claimRes.json();
-      if (!claimRes.ok) {
-        setError(claimData.error ?? "Could not link your payment to this account.");
+      const baseSlug = slugify(businessName);
+      let created = false;
+      let lastError: string | null = null;
+
+      for (let attempt = 0; attempt < SLUG_RETRY_ATTEMPTS && !created; attempt++) {
+        const slug = attempt === 0 ? baseSlug : `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+        const { error: insertError } = await supabase.from("vendors").insert({
+          id: user.id,
+          slug,
+          business_name: businessName,
+          contact_email: email,
+          status: "pending",
+        });
+
+        if (!insertError) {
+          created = true;
+        } else if (insertError.code === "23505") {
+          lastError = insertError.message; // slug collision — retry with a suffix
+        } else {
+          setError(insertError.message);
+          return;
+        }
+      }
+
+      if (!created) {
+        setError(lastError ?? "Could not create your vendor profile. Please try again.");
         return;
       }
 
@@ -69,6 +90,14 @@ export function VendorSignupForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-3">
+      <input
+        type="text"
+        required
+        placeholder="Business name"
+        value={businessName}
+        onChange={(e) => setBusinessName(e.target.value)}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+      />
       <input
         type="email"
         required

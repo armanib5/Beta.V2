@@ -1,24 +1,18 @@
-/** Comma-separated allowlist of admin emails, e.g. "you@example.com,partner@example.com" */
-function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-export function isAdminEmail(email: string | null | undefined): boolean {
-  if (!email) return false;
-  return adminEmails().includes(email.toLowerCase());
-}
-
-/** Server-only: resolves the current Supabase session and checks it against ADMIN_EMAILS. */
-export async function getAdminUser() {
-  const { createClient } = await import("@/lib/supabase/server");
-  const supabase = await createClient();
+/**
+ * Client-only admin check. There's no backend to trust here — this just
+ * asks Postgres "is this signed-in user in the `admins` table?" via RLS
+ * (a user can only ever see their own `admins` row), and every admin write
+ * (booths, vendor approval) is independently re-enforced by its own RLS
+ * policy. This function is a UX convenience, not the security boundary.
+ */
+export async function checkIsAdmin(supabase: SupabaseClient): Promise<boolean> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) return false;
 
-  if (!isAdminEmail(user?.email)) return null;
-  return user;
+  const { data } = await supabase.from("admins").select("id").eq("id", user.id).maybeSingle();
+  return Boolean(data);
 }

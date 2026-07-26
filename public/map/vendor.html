@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BayPinned SJ &mdash; Vendor Check-In</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Libre+Franklin:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="bg"></div>
+<div class="page">
+  <div class="admintop">
+    <div class="logo">&#128204; BayPinned SJ</div>
+    <div class="warn">Vendor Check-In &mdash; add your own pin at a live event. Not part of the public map yet.</div>
+    <a href="../index.html">&#127968; Main</a>
+    <a href="admin.html">Owner Admin</a>
+    <a href="index.html">&larr; Back to map</a>
+  </div>
+
+  <div class="adminwrap">
+    <div class="adminhint">
+      <b>1.</b> Enter your business name below (remembered on this device).
+      <b>2.</b> Pick a currently-live event &mdash; only events actually happening right now show up here.
+      <b>3.</b> Drop your pin near your booth, say what you're offering, and save.
+      Your pin disappears on its own the day after the event ends &mdash; check back in next time it's live.
+      <span class="infobtn" data-info="Nothing here saves to the live map automatically yet - there's no shared database set up. Export your pin below and send it to Claude (or the site owner) to make it official, same as the owner's admin tool. This will become instant once the real backend is ready.">&#9432;</span>
+    </div>
+
+    <div class="formgrid" style="margin-bottom:18px;">
+      <label>Your name or business name
+        <input id="vOwner" type="text" placeholder="e.g. Rosa's Tamales">
+      </label>
+    </div>
+
+    <div id="liveEventsWrap">
+      <h3 class="sectiontitle">Live Right Now</h3>
+      <div id="liveEventsList" class="eventlist"></div>
+    </div>
+
+    <div id="checkinArea" style="display:none;">
+      <h3 class="sectiontitle" id="checkinTitle"></h3>
+      <div class="mframe">
+        <div id="vendorMap"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="vpanel" style="display:none;">
+    <div class="panel-inner">
+      <div class="savestatus" id="vSaveStatus">Autosave status will appear here.</div>
+      <h3 id="vFormTitle">New check-in pin</h3>
+      <div class="formgrid">
+        <label>What are you offering?
+          <input id="vWhat" type="text" placeholder="e.g. Tamales and horchata">
+        </label>
+        <label>Short note (optional)
+          <input id="vNote" type="text" placeholder="e.g. Cash only, booth #4">
+        </label>
+      </div>
+      <div class="btnrow">
+        <button class="abtn green" id="btnSaveVendorPin">Save My Pin</button>
+        <button class="abtn red" id="btnDeleteVendorPin">Delete My Pin</button>
+        <button class="abtn outline" id="btnCancelVendorPin">Cancel</button>
+      </div>
+      <div class="exportbox">
+        <p class="exporthelp">Click <b>Export</b>, paste it into your next message to Claude (or send the event organizer the file), and it'll be made official.</p>
+        <div class="btnrow" style="margin-top:0;">
+          <button class="abtn gold" id="btnExportVendor">Export Updated vendorpins.js</button>
+          <button class="abtn outline" id="btnDownloadVendor">Download vendorpins.js</button>
+        </div>
+        <div class="exportconfirm" id="vExportConfirm"></div>
+        <textarea id="vExportOut" readonly></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="data/places.js?v=8"></script>
+<script src="data/vendorpins.js?v=1"></script>
+<script src="js/vendor.js?v=1"></script>
+</body>
+</html>

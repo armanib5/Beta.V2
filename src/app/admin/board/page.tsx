@@ -1,20 +1,53 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getAdminUser } from "@/lib/admin";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
+import { checkIsAdmin } from "@/lib/admin";
 import type { LovEntry } from "@/lib/types";
 import { AdminBoard } from "@/components/admin-board";
 
-export const dynamic = "force-dynamic";
+export default function AdminBoardPage() {
+  const [status, setStatus] = useState<"loading" | "denied" | "ready">("loading");
+  const [events, setEvents] = useState<LovEntry[]>([]);
 
-export default async function AdminBoardPage() {
-  const admin = await getAdminUser();
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
 
-  if (!admin) {
+    checkIsAdmin(supabase).then(async (isAdmin) => {
+      if (cancelled) return;
+      if (!isAdmin) {
+        setStatus("denied");
+        return;
+      }
+      const { data } = await supabase
+        .from("lov_entries")
+        .select("*")
+        .eq("type", "event")
+        .order("event_date", { ascending: false })
+        .returns<LovEntry[]>();
+      if (cancelled) return;
+      setEvents(data ?? []);
+      setStatus("ready");
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (status === "loading") {
+    return <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
+  }
+
+  if (status === "denied") {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-slate-900">Admin access required</h1>
         <p className="mt-3 text-sm text-slate-600">
-          Log in with an account listed in <code>ADMIN_EMAILS</code> to manage the venue board.
+          Log in with an account listed in the <code>admins</code> table to manage the venue
+          board.
         </p>
         <Link
           href="/vendor/login"
@@ -26,13 +59,5 @@ export default async function AdminBoardPage() {
     );
   }
 
-  const supabase = await createClient();
-  const { data: events } = await supabase
-    .from("lov_entries")
-    .select("*")
-    .eq("type", "event")
-    .order("event_date", { ascending: false })
-    .returns<LovEntry[]>();
-
-  return <AdminBoard events={events ?? []} />;
+  return <AdminBoard events={events} />;
 }

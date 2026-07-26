@@ -12,6 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Ported V1 (BayPinned) static site — plain vanilla JS/HTML served
+    // as-is from public/, not part of the Next/TypeScript app.
+    "public/board/**",
+    "public/map/**",
+    "public/pins/**",
+    "public/admin/**",
+    "public/shared/**",
   ]),
 ]);
 

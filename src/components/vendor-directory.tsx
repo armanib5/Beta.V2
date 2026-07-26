@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import type { LovEntry, Vendor } from "@/lib/types";
 import { formatDistance, haversineDistanceMiles } from "@/lib/geo";
 
@@ -29,7 +30,7 @@ function fromVendor(vendor: Vendor): DirectoryItem {
     isTop10: vendor.is_top10,
     lat: vendor.lat,
     lng: vendor.lng,
-    href: `/vendor/${vendor.slug}`,
+    href: `/vendor?slug=${encodeURIComponent(vendor.slug)}`,
   };
 }
 
@@ -48,13 +49,26 @@ function fromLovEntry(entry: LovEntry): DirectoryItem {
   };
 }
 
-export function VendorDirectory({
-  vendors,
-  guestListings,
-}: {
-  vendors: Vendor[];
-  guestListings: LovEntry[];
-}) {
+export function VendorDirectory() {
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [guestListings, setGuestListings] = useState<LovEntry[]>([]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("vendors")
+      .select("*")
+      .eq("status", "active")
+      .returns<Vendor[]>()
+      .then(({ data }) => setVendors(data ?? []));
+    supabase
+      .from("lov_entries")
+      .select("*")
+      .eq("type", "vendor")
+      .returns<LovEntry[]>()
+      .then(({ data }) => setGuestListings(data ?? []));
+  }, []);
+
   const items = useMemo(
     () => [...vendors.map(fromVendor), ...guestListings.map(fromLovEntry)],
     [vendors, guestListings],

@@ -1,0 +1,75 @@
+.admintop{background:rgba(12,6,0,.97);border-bottom:1px solid rgba(218,184,112,.18);padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.admintop .logo{font-family:'Special Elite',monospace;font-size:18px;color:var(--cl);letter-spacing:1px;}
+.admintop .warn{font-size:11.5px;color:#f59e0b;font-style:italic;}
+.admintop a{margin-left:auto;font-size:12px;color:var(--cl);text-decoration:none;border:1px solid rgba(218,184,112,.35);padding:7px 14px;border-radius:14px;}
+.admintop a:hover{background:rgba(218,184,112,.12);}
+
+.adminwrap{max-width:1100px;margin:0 auto;padding:16px 14px 340px;}
+.adminhint{background:rgba(218,184,112,.1);border:1px solid rgba(218,184,112,.25);border-radius:8px;padding:10px 14px;font-size:12.5px;color:rgba(218,184,112,.9);margin-bottom:14px;}
+.adminhint b{color:var(--cl);}
+
+#adminMap{height:640px;border-radius:6px;}
+
+/* Capped well under viewport height so the map stays mostly clickable
+   underneath it - scroll the page so the map's top meets the viewport
+   top to bring its full height above the panel. Anything that doesn't
+   fit scrolls inside the panel itself. */
+.panel{position:fixed;left:0;right:0;bottom:0;background:#14100a;border-top:2px solid var(--go);box-shadow:0 -12px 30px rgba(0,0,0,.5);z-index:800;max-height:300px;overflow-y:auto;}
+.panel-inner{max-width:1100px;margin:0 auto;padding:12px 20px 18px;}
+.savestatus{font-size:11px;padding:5px 9px;border-radius:4px;margin-bottom:10px;display:inline-block;}
+.savestatus.ok{background:rgba(16,185,129,.15);color:#6ee7b7;}
+.savestatus.bad{background:rgba(220,38,38,.2);color:#fca5a5;font-weight:700;}
+.panel h3{font-family:'Special Elite',monospace;color:var(--cl);font-size:14px;margin-bottom:6px;}
+.panel .modehint{font-size:12px;color:#f59e0b;margin-bottom:8px;}
+
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:7px 12px;}
+.formgrid label{display:flex;flex-direction:column;gap:3px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(218,184,112,.7);}
+.formgrid input, .formgrid select, .formgrid textarea{background:#1f2937;border:1px solid rgba(218,184,112,.28);color:#fff;padding:6px 8px;border-radius:4px;font-size:12.5px;font-family:'Libre Franklin',sans-serif;}
+.formgrid textarea{resize:vertical;min-height:36px;grid-column:1/-1;}
+.formgrid .full{grid-column:1/-1;}
+
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.abtn{font-family:'Special Elite',monospace;font-size:12px;border:none;border-radius:6px;padding:9px 16px;cursor:pointer;color:#fff;}
+.abtn.green{background:var(--g);}
+.abtn.gold{background:var(--go);}
+.abtn.red{background:#c0392b;}
+.abtn.gray{background:#4b5563;}
+.abtn.outline{background:transparent;border:1px solid rgba(218,184,112,.4);color:var(--cl);}
+.abtn:disabled{opacity:.4;cursor:not-allowed;}
+
+.exportbox{margin-top:10px;border-top:1px dashed rgba(218,184,112,.3);padding-top:10px;}
+.exporthelp{font-size:11.5px;line-height:1.5;color:rgba(218,184,112,.75);margin-bottom:10px;}
+.exporthelp b{color:var(--cl);}
+.exportconfirm{font-size:12px;padding:6px 10px;border-radius:4px;margin-top:8px;display:none;}
+.exportconfirm.ok{display:block;background:rgba(16,185,129,.15);color:#6ee7b7;}
+.exportconfirm.bad{display:block;background:rgba(220,38,38,.2);color:#fca5a5;font-weight:700;}
+#exportOut, #eventsExportOut, #vExportOut{width:100%;min-height:160px;font-family:monospace;font-size:11.5px;background:#0d0a06;color:#9fe89f;border:1px solid rgba(218,184,112,.3);border-radius:4px;padding:10px;margin-top:8px;display:none;}
+#exportOut.show, #eventsExportOut.show, #vExportOut.show{display:block;}
+
+.pendinglist{font-size:12px;color:rgba(218,184,112,.7);margin-top:8px;}
+.pendinglist span{background:rgba(218,184,112,.15);border-radius:10px;padding:2px 8px;margin-right:6px;display:inline-block;margin-bottom:4px;}
+
+/* Tab switcher between Pins&Zones and Events&Flyers sections */
+.tabrow{display:flex;gap:8px;max-width:1100px;margin:14px auto 0;padding:0 14px;flex-wrap:wrap;}
+.tabbtn{font-family:'Special Elite',monospace;font-size:12.5px;background:rgba(255,255,255,.05);color:rgba(218,184,112,.75);border:1px solid rgba(218,184,112,.25);padding:9px 16px;border-radius:8px 8px 0 0;cursor:pointer;}
+.tabbtn.on{background:#14100a;color:var(--cl);border-bottom-color:#14100a;}
+
+/* Events & Flyers list */
+.eventlist{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.eventcard{background:rgba(255,255,255,.05);border:1px solid rgba(218,184,112,.22);border-radius:6px;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.eventcard .etitle{min-width:140px;}
+.eventcard:hover{border-color:rgba(218,184,112,.5);}
+.eventcard .ecat{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 7px;border-radius:3px;color:#fff;flex-shrink:0;}
+.eventcard .etitle{font-size:13px;color:#fff;flex:1;}
+.eventcard .ewhen{font-size:11px;color:rgba(218,184,112,.6);}
+.eventempty{font-size:12.5px;color:rgba(218,184,112,.5);font-style:italic;margin-bottom:16px;}
+.eventform{background:rgba(255,255,255,.03);border:1px solid rgba(218,184,112,.2);border-radius:8px;padding:14px 16px;margin-bottom:16px;}
+.eventform h3{font-family:'Special Elite',monospace;color:var(--cl);font-size:14px;margin-bottom:10px;}
+
+/* Vendor check-in page */
+.sectiontitle{font-family:'Special Elite',monospace;color:var(--cl);font-size:14px;margin:16px 0 8px;}
+.infobtn{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:rgba(218,184,112,.22);color:var(--cl);font-size:13px;cursor:pointer;margin-left:6px;vertical-align:middle;}
+.infobtn:hover{background:rgba(218,184,112,.4);}
+#vendorMap{height:420px;border-radius:6px;}
+.vendor-label{background:rgba(20,16,10,.92)!important;border:1px solid rgba(218,184,112,.35)!important;color:#fff!important;font-size:10.5px!important;padding:2px 7px!important;box-shadow:none!important;}
+.vendor-label::before{display:none!important;}

@@ -1,0 +1,161 @@
+:root{
+  --w1:#1e0f00;--w2:#3d1e08;--w3:#5a3010;
+  --cl:#dab870;--cr:#fdf6e0;--cr2:#f0e4c0;--ink:#1a0e00;
+  --g:#3d6b42;--bl:#2c5f8a;--go:#b8860b;--re:#c0392b;
+  --pu:#6a4e7a;--br:#7a5230;--cr8:#8B0000;--wn:#6b1e3c;--gr:#64748b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{overflow-x:hidden;}
+body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800;min-height:100vh;}
+.bg{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at 50% 0%,#3a2008,#150a00 70%);}
+.page{position:relative;z-index:1;}
+
+.topbar{position:sticky;top:0;z-index:900;background:rgba(12,6,0,.97);backdrop-filter:blur(14px);border-bottom:1px solid rgba(218,184,112,.18);display:flex;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap;}
+.topbar .logo{font-family:'Special Elite',monospace;font-size:20px;color:var(--cl);letter-spacing:2px;}
+.topbar .note{font-size:11px;color:rgba(218,184,112,.5);font-style:italic;}
+.topbar .backboard{margin-left:auto;flex-shrink:0;font-family:'Special Elite',monospace;font-size:12px;color:var(--cl);text-decoration:none;border:1px solid rgba(218,184,112,.35);padding:7px 14px;border-radius:14px;white-space:nowrap;transition:background .2s;}
+.topbar .backboard:hover{background:rgba(218,184,112,.12);}
+
+#mapSec{max-width:1100px;margin:0 auto 60px;padding:20px 14px 0;}
+.sh{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.sh h2{font-family:'Special Elite',monospace;font-size:20px;color:var(--cl);letter-spacing:1px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mapnote{font-size:12px;font-style:italic;color:rgba(218,184,112,.55);margin:0 0 14px;}
+
+/* Search bar */
+.mapsearch{position:relative;margin-bottom:14px;}
+.mapsearch .msin{display:flex;align-items:center;gap:8px;background:#1f2937;border:1.5px solid rgba(218,184,112,.28);border-radius:24px;height:48px;padding:0 14px;transition:border-color .2s;}
+.mapsearch .msin:focus-within{border-color:rgba(218,184,112,.7);}
+.mapsearch .msin svg{flex-shrink:0;opacity:.6;}
+.mapsearch input{flex:1;background:none;border:none;outline:none;color:#fff;font-family:'Libre Franklin',sans-serif;font-size:16px;}
+.mapsearch input::placeholder{color:rgba(255,255,255,.4);}
+.mapsearch .msclear{background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:16px;padding:4px 6px;display:none;}
+.mapsearch .msclear.show{display:block;}
+.msresults{position:absolute;top:54px;left:0;right:0;background:#1f2937;border:1px solid rgba(218,184,112,.28);border-radius:10px;max-height:320px;overflow-y:auto;z-index:1200;box-shadow:0 14px 40px rgba(0,0,0,.55);display:none;}
+.msresults.show{display:block;}
+.msrow{display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;cursor:pointer;color:#fff;font-size:13px;border-bottom:1px solid rgba(255,255,255,.06);}
+.msrow:last-child{border-bottom:none;}
+.msrow:hover{background:rgba(255,255,255,.06);}
+.msdot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.msname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mstype{font-size:10px;color:rgba(255,255,255,.4);flex-shrink:0;}
+.msempty{padding:14px;color:rgba(255,255,255,.4);font-size:12.5px;font-style:italic;}
+
+/* Mini city selector */
+.hoodrow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:12px;}
+.hoodrow::-webkit-scrollbar{display:none;}
+.hoodbtn{flex-shrink:0;font-family:'Special Elite',monospace;font-size:12px;background:rgba(255,255,255,.05);color:rgba(218,184,112,.75);border:1px solid rgba(218,184,112,.22);padding:9px 16px;border-radius:18px;cursor:pointer;white-space:nowrap;min-height:44px;transition:all .2s;}
+.hoodbtn:hover{border-color:rgba(218,184,112,.5);}
+.hoodbtn.on{background:var(--go);color:#fff;border-color:var(--go);}
+/* City tabs - always visible, one level above the neighborhood row.
+   Switching cities swaps the whole neighborhood row below it rather
+   than adding a second row alongside the San Jose one. */
+.cityrow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid rgba(218,184,112,.18);}
+.cityrow::-webkit-scrollbar{display:none;}
+.citytab{flex-shrink:0;font-family:'Special Elite',monospace;font-size:12.5px;font-weight:700;background:rgba(255,255,255,.04);color:rgba(218,184,112,.6);border:1px solid rgba(218,184,112,.22);padding:8px 16px;border-radius:16px;cursor:pointer;white-space:nowrap;min-height:40px;transition:all .2s;}
+.citytab:hover{border-color:rgba(218,184,112,.5);}
+.citytab.on{background:var(--go);color:#fff;border-color:var(--go);}
+
+/* Category filters */
+.filtrow{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:16px;}
+.filtrow::-webkit-scrollbar{display:none;}
+.filtbtn{flex-shrink:0;font-size:11.5px;font-weight:700;background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.16);padding:8px 14px;border-radius:14px;cursor:pointer;white-space:nowrap;min-height:44px;display:flex;align-items:center;gap:6px;transition:all .2s;}
+.filtbtn:hover{border-color:rgba(218,184,112,.5);}
+.filtbtn.on{background:var(--go);color:#fff;border-color:var(--go);}
+.filtdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* Map frame - wood/gold vintage container preserved from Baypinned3 */
+.mframe{background:repeating-linear-gradient(180deg,var(--w1) 0,var(--w2) 4px,var(--w1) 7px,var(--w3) 10px);border-radius:7px;padding:14px;box-shadow:0 0 0 3px var(--w3),0 0 0 6px var(--w1),0 22px 55px rgba(0,0,0,.65);}
+.mvp{overflow:hidden;border-radius:3px;height:560px;position:relative;}
+#leafletMap{width:100%;height:100%;background:#e8e2d0;}
+
+.mlg{position:absolute;bottom:12px;right:12px;background:rgba(253,246,220,.95);border:1px solid rgba(90,60,20,.28);border-radius:4px;padding:9px 11px;min-width:120px;z-index:500;}
+.mlg h4{font-family:'Special Elite',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#3a2010;margin-bottom:6px;}
+.li{display:flex;align-items:center;gap:6px;font-size:9px;color:#3a2010;margin-bottom:4px;transition:opacity .2s;}
+.ld{width:15px;height:15px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;font-family:'Special Elite',monospace;}
+.mcomp{position:absolute;bottom:12px;left:12px;width:38px;height:38px;border:2px solid rgba(90,60,20,.45);border-radius:50%;background:rgba(253,246,220,.88);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:700;font-size:14px;color:#3a2010;z-index:500;pointer-events:none;}
+
+.mapctl{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;}
+.mbtn{background:rgba(218,184,112,.14);border:1px solid rgba(218,184,112,.28);color:#dab870;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+.mbtn:hover{background:rgba(218,184,112,.26);}
+.mbtn.wide{width:auto;border-radius:19px;padding:0 16px;font-size:12px;font-family:'Special Elite',monospace;gap:6px;}
+
+/* Custom pin */
+.bp-pin{position:relative;width:34px;height:44px;}
+.bp-pin svg{filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));}
+.bp-glyph{position:absolute;top:6px;left:0;width:34px;height:22px;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;pointer-events:none;}
+.bp-cluster{display:flex;align-items:center;justify-content:center;background:var(--w2);border:2.5px solid rgba(218,184,112,.7);border-radius:50%;color:#fff;font-family:'Special Elite',monospace;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.5);}
+.bp-cluster.small{width:40px;height:40px;font-size:13px;}
+.bp-cluster.medium{width:50px;height:50px;font-size:15px;}
+.bp-cluster.large{width:60px;height:60px;font-size:17px;}
+
+/* Live-now indicator: a soft pulsing ring behind the pin plus a small
+   blinking dot, only rendered for places whose schedule says they're
+   actually active right now. */
+@keyframes bpPulseRing{0%{transform:scale(.8);opacity:.6;}75%{transform:scale(1.9);opacity:0;}100%{opacity:0;}}
+@keyframes bpBlink{0%,100%{opacity:1;}50%{opacity:.4;}}
+.bp-livering{position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:rgba(16,185,129,.55);animation:bpPulseRing 1.8s ease-out infinite;z-index:0;}
+.bp-livedot{position:absolute;top:2px;right:2px;width:9px;height:9px;border-radius:50%;background:#10b981;border:2px solid #fff;animation:bpBlink 1.4s ease-in-out infinite;z-index:2;}
+.bp-livebadge{font-family:'Special Elite',monospace;font-size:8.5px;font-weight:700;letter-spacing:1px;background:#10b981;color:#fff;padding:3px 7px;border-radius:2px;display:inline-block;margin-bottom:7px;animation:bpBlink 1.4s ease-in-out infinite;}
+
+/* Hanging flyer info card - clothespinned to a string near the top of the
+   map, standing in for a default Leaflet popup so pin info behaves the
+   same and stays visible/closable on both desktop and mobile. */
+.mapstring{position:absolute;left:10%;right:10%;top:34px;height:2px;z-index:600;background:linear-gradient(90deg,#5a3408,#b07028 8%,#e0a840 25%,#c8903a 50%,#dca838 78%,#b07028 94%,#5a3408);box-shadow:0 2px 5px rgba(0,0,0,.5);pointer-events:none;}
+.mapflyerwrap{position:absolute;top:34px;left:50%;transform:translateX(-50%);z-index:650;display:none;flex-direction:column;align-items:center;max-width:90%;}
+.mapflyerwrap.show{display:flex;}
+.mapclip{width:13px;height:24px;background:linear-gradient(90deg,#c9a06a,#a97c48 46%,#8a6236 50%,#a97c48 54%,#c9a06a);border-radius:3px;box-shadow:0 2px 4px rgba(0,0,0,.45);margin-bottom:-5px;position:relative;z-index:2;flex-shrink:0;}
+.mapflyer{width:270px;max-width:100%;background:linear-gradient(158deg,#fdf6e0,#f0e2ba);border-top:4px solid var(--go);border-radius:6px;box-shadow:0 18px 40px rgba(0,0,0,.55);position:relative;}
+.mapflyer .mfx{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:#c0392b;color:#fff;border:2px solid #fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:3;}
+.bp-card{padding:14px 16px 16px;}
+.bp-cat{font-family:'Special Elite',monospace;font-size:8.5px;text-transform:uppercase;letter-spacing:1.4px;padding:3px 8px;color:#fff;display:inline-block;margin-bottom:7px;border-radius:2px;}
+.bp-card h3{font-family:'Special Elite',monospace;font-size:15px;color:#1a0800;line-height:1.3;margin-bottom:5px;}
+.bp-desc{font-size:12px;color:#3a2810;line-height:1.5;margin-bottom:9px;white-space:pre-line;}
+.bp-meta{font-size:11px;color:#5a4030;line-height:1.6;margin-bottom:11px;}
+.bp-meta b{color:#3a2010;}
+.bp-btnrow{display:flex;gap:6px;flex-wrap:wrap;}
+.bp-btn{flex:1;min-width:80px;text-align:center;padding:8px 6px;border-radius:5px;font-size:10.5px;font-weight:700;text-decoration:none;color:#fff;cursor:pointer;border:none;}
+.bp-btn.blue{background:var(--bl);}
+.bp-btn.gold{background:var(--go);}
+.bp-btn.purple{background:var(--pu);}
+
+/* Full Details overlay - a bigger vintage card with everything the flyer
+   has, plus more breathing room. Reached from the flyer's Full Details
+   button. */
+.detailov{position:fixed;inset:0;background:rgba(6,3,0,.88);display:none;align-items:center;justify-content:center;padding:16px;z-index:2000;backdrop-filter:blur(6px);}
+.detailov.on{display:flex;}
+.detailpanel{background:linear-gradient(158deg,#fdf6e0,#f0e2ba);max-width:480px;width:100%;max-height:88vh;overflow-y:auto;border-radius:8px;position:relative;box-shadow:0 32px 80px rgba(0,0,0,.7);border-top:4px solid var(--go);padding:24px 22px 26px;}
+.detailpanel .xbtn{position:absolute;top:11px;right:11px;width:35px;height:35px;border-radius:50%;background:#c0392b;color:#fff;border:3px solid #fff;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;}
+.detailpanel .dcat{font-family:'Special Elite',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;padding:3px 9px;color:#fff;display:inline-block;border-radius:2px;}
+.detailpanel h2{font-family:'Special Elite',monospace;font-size:22px;color:#1a0800;margin:9px 0 6px;line-height:1.25;}
+.detailpanel .dwhen{font-weight:700;font-size:13.5px;color:#8B2500;margin-bottom:8px;}
+.detailpanel .ddesc{font-size:14px;line-height:1.65;color:#2a1800;margin-bottom:16px;white-space:pre-line;}
+.detailpanel .digrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px;}
+.detailpanel .dibox{background:rgba(0,0,0,.04);border:1px solid rgba(90,65,30,.14);border-radius:4px;padding:10px;}
+.detailpanel .dibox h4{font-family:'Special Elite',monospace;font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#8a6030;margin-bottom:4px;}
+.detailpanel .dibox p{font-size:11.5px;color:#3a2810;line-height:1.5;}
+.detailpanel .dbtnrow{display:flex;gap:8px;flex-wrap:wrap;}
+.detailpanel .dbtnrow .bp-btn{padding:10px 14px;font-size:12px;}
+
+.mysink{position:absolute;top:12px;right:12px;z-index:500;}
+
+footer{text-align:center;color:rgba(200,160,70,.35);font-size:12px;padding:20px 14px 42px;border-top:1px solid rgba(255,255,255,.04);}
+
+@media(max-width:640px){
+  .topbar .note{display:none;}
+  .topbar .backboard{font-size:11px;padding:6px 11px;}
+  .sh h2{font-size:16px;}
+  .citytab{font-size:11px;padding:7px 12px;}
+  .mvp{height:60vh;min-height:360px;}
+  .mbtn{width:48px;height:48px;font-size:20px;}
+  .mysink{top:8px;right:8px;}
+  #mapSec{padding:14px 8px 0;}
+  .mframe{padding:8px;}
+  .mlg{padding:6px 8px;min-width:88px;bottom:8px;right:8px;}
+  .mlg h4{font-size:7.5px;margin-bottom:4px;}
+  .li{font-size:7.5px;margin-bottom:2px;gap:4px;}
+  .ld{width:12px;height:12px;font-size:6.5px;}
+  .mcomp{width:30px;height:30px;font-size:11px;bottom:8px;left:8px;}
+  .mapstring{top:20px;left:6%;right:6%;}
+  .mapflyerwrap{top:20px;max-width:94%;}
+  .mapflyer{width:250px;}
+}

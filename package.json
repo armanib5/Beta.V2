@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "preview": "npx serve out",
     "lint": "eslint",
-    "seed:lov": "tsx scripts/seed-lov.ts"
+    "seed:lov": "tsx scripts/seed-lov.ts",
+    "geocode:lov": "tsx scripts/geocode-lov.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
@@ -16,7 +17,6 @@
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "stripe": "^22.3.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

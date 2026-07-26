@@ -9,7 +9,9 @@
     "category": "Farmers Market",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": "https://www.pcfma.org/visit/meet-vendors"
+    "website_url": "https://www.pcfma.org/visit/meet-vendors",
+    "lat": 37.336053,
+    "lng": -121.8937742
   },
   {
     "type": "event",
@@ -21,7 +23,9 @@
     "category": "Art Walk",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": "https://www.southfirstfridays.com/participate/"
+    "website_url": "https://www.southfirstfridays.com/participate/",
+    "lat": 37.3302325,
+    "lng": -121.8864802
   },
   {
     "type": "event",
@@ -33,7 +37,9 @@
     "category": "Farmers Market",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": "https://gordonbiersch.com/series/the-japantown-farmers-market/"
+    "website_url": "https://gordonbiersch.com/series/the-japantown-farmers-market/",
+    "lat": 37.3533052,
+    "lng": -121.8925223
   },
   {
     "type": "event",
@@ -45,7 +51,9 @@
     "category": "Farmers Market",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": "https://www.cafarmersmkts.com/santanarow-farmers-market"
+    "website_url": "https://www.cafarmersmkts.com/santanarow-farmers-market",
+    "lat": 37.3209796,
+    "lng": -121.9486002
   },
   {
     "type": "event",
@@ -57,7 +65,9 @@
     "category": "Farmers Market",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": "https://www.wcfma.org/vendors"
+    "website_url": "https://www.wcfma.org/vendors",
+    "lat": 37.3151936,
+    "lng": -121.9332862
   },
   {
     "type": "event",
@@ -69,49 +79,417 @@
     "category": "Farmers Market",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": "http://www.uvfm.org/vendor-information"
+    "website_url": "http://www.uvfm.org/vendor-information",
+    "lat": 37.2870626,
+    "lng": -121.944881
   },
-
-  { "type": "vendor", "name": "2GoodFarm", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Açai Brasil SJ", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "ACE Dumpling", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Ace Fresh Produce", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Adorable Bakery", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Afghan Dumplings", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Beckmann's Bakery", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm); Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "BR Beef", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "California Bakeshop", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm); Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Celio Farms", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Clara's Egg Farm", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Cortez Farms", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Dayrit Seafood", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm); Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Diaz Farms", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Hummus Heaven", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm); Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "J&J Ramos Farms", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "J&M Farms", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Jacob's Farm", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "KettlePop", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Lopez Farm", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Lujan Farm", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Ohana Bros. Chips", "date": null, "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-
-  { "type": "vendor", "name": "Angelicakes", "date": null, "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Bunbao", "date": null, "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "California Specialty Ranch", "date": null, "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Ed's Honey Company", "date": null, "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Eizel's Bakery", "date": null, "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Gordon Biersch Brew Co.", "date": null, "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-
-  { "type": "vendor", "name": "P&K Farms (Strawberries)", "date": null, "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Triple Delight (Blueberries)", "date": null, "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Gotelli Farms (Cherries)", "date": null, "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Groundswell Farm (Organic Produce)", "date": null, "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Roli Roti", "date": null, "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Oaxacan Kitchen", "date": null, "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Zaida's Oaxacan Cafe", "date": null, "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "YY Noodle", "date": null, "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-  { "type": "vendor", "name": "Little Sky Bakery", "date": null, "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)", "instagram_handle": null, "category": "Farmers Market Vendor", "booth_tier": "regular" },
-
+  {
+    "type": "vendor",
+    "name": "2GoodFarm",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Açai Brasil SJ",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "ACE Dumpling",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Ace Fresh Produce",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Adorable Bakery",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Afghan Dumplings",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Beckmann's Bakery",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm); Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "BR Beef",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "California Bakeshop",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm); Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Celio Farms",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Clara's Egg Farm",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Cortez Farms",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Dayrit Seafood",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm); Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Diaz Farms",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Hummus Heaven",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm); Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "J&J Ramos Farms",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "J&M Farms",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Jacob's Farm",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "KettlePop",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Lopez Farm",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Lujan Farm",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Ohana Bros. Chips",
+    "date": null,
+    "location": "Downtown San Jose Farmers Market — San Pedro Square, San Jose, CA (Wed 9am–1:30pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.336053,
+    "lng": -121.8937742
+  },
+  {
+    "type": "vendor",
+    "name": "Angelicakes",
+    "date": null,
+    "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3533052,
+    "lng": -121.8925223
+  },
+  {
+    "type": "vendor",
+    "name": "Bunbao",
+    "date": null,
+    "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3533052,
+    "lng": -121.8925223
+  },
+  {
+    "type": "vendor",
+    "name": "California Specialty Ranch",
+    "date": null,
+    "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3533052,
+    "lng": -121.8925223
+  },
+  {
+    "type": "vendor",
+    "name": "Ed's Honey Company",
+    "date": null,
+    "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3533052,
+    "lng": -121.8925223
+  },
+  {
+    "type": "vendor",
+    "name": "Eizel's Bakery",
+    "date": null,
+    "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3533052,
+    "lng": -121.8925223
+  },
+  {
+    "type": "vendor",
+    "name": "Gordon Biersch Brew Co.",
+    "date": null,
+    "location": "Japantown Farmers Market — 357 E. Taylor St, San Jose, CA (Sun 8am–12pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3533052,
+    "lng": -121.8925223
+  },
+  {
+    "type": "vendor",
+    "name": "P&K Farms (Strawberries)",
+    "date": null,
+    "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3209796,
+    "lng": -121.9486002
+  },
+  {
+    "type": "vendor",
+    "name": "Triple Delight (Blueberries)",
+    "date": null,
+    "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3209796,
+    "lng": -121.9486002
+  },
+  {
+    "type": "vendor",
+    "name": "Gotelli Farms (Cherries)",
+    "date": null,
+    "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3209796,
+    "lng": -121.9486002
+  },
+  {
+    "type": "vendor",
+    "name": "Groundswell Farm (Organic Produce)",
+    "date": null,
+    "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3209796,
+    "lng": -121.9486002
+  },
+  {
+    "type": "vendor",
+    "name": "Roli Roti",
+    "date": null,
+    "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3209796,
+    "lng": -121.9486002
+  },
+  {
+    "type": "vendor",
+    "name": "Oaxacan Kitchen",
+    "date": null,
+    "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3209796,
+    "lng": -121.9486002
+  },
+  {
+    "type": "vendor",
+    "name": "Zaida's Oaxacan Cafe",
+    "date": null,
+    "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3209796,
+    "lng": -121.9486002
+  },
+  {
+    "type": "vendor",
+    "name": "YY Noodle",
+    "date": null,
+    "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3209796,
+    "lng": -121.9486002
+  },
+  {
+    "type": "vendor",
+    "name": "Little Sky Bakery",
+    "date": null,
+    "location": "Santana Row Farmers Market — Santana Row, San Jose, CA (Wed 4-8pm)",
+    "instagram_handle": null,
+    "category": "Farmers Market Vendor",
+    "booth_tier": "regular",
+    "lat": 37.3209796,
+    "lng": -121.9486002
+  },
   {
     "type": "event",
     "name": "Santa Clara County Fair 2026",
@@ -122,7 +500,9 @@
     "category": "Fair",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.2999593,
+    "lng": -121.8511955
   },
   {
     "type": "event",
@@ -134,7 +514,9 @@
     "category": "Maker Market",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.4043966,
+    "lng": -121.9750519
   },
   {
     "type": "event",
@@ -146,7 +528,9 @@
     "category": "Music Festival",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3359328,
+    "lng": -121.8910932
   },
   {
     "type": "event",
@@ -158,7 +542,9 @@
     "category": "Cultural Festival",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3200358,
+    "lng": -121.8582235
   },
   {
     "type": "event",
@@ -170,7 +556,9 @@
     "category": "Art Walk",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3302325,
+    "lng": -121.8864802
   },
   {
     "type": "event",
@@ -182,7 +570,9 @@
     "category": "Night Market",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3489602,
+    "lng": -121.8942303
   },
   {
     "type": "event",
@@ -194,7 +584,9 @@
     "category": "Night Market",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3850513,
+    "lng": -121.8603799
   },
   {
     "type": "event",
@@ -206,7 +598,9 @@
     "category": "Community Event",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3334355,
+    "lng": -121.8896659
   },
   {
     "type": "event",
@@ -218,7 +612,9 @@
     "category": "Gaming Festival",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3717781,
+    "lng": -121.9226864
   },
   {
     "type": "event",
@@ -230,7 +626,9 @@
     "category": "Comedy Show",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3307938,
+    "lng": -121.8897013
   },
   {
     "type": "event",
@@ -242,7 +640,9 @@
     "category": "Live Show",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3309355,
+    "lng": -121.889297
   },
   {
     "type": "event",
@@ -254,6 +654,8 @@
     "category": "Outdoor Movie",
     "booth_tier": "regular",
     "flyer_image_url": null,
-    "website_url": null
+    "website_url": null,
+    "lat": 37.3391616,
+    "lng": -121.8906764
   }
 ]
