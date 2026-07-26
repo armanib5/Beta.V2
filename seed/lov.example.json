@@ -1,0 +1,30 @@
+[
+  {
+    "type": "event",
+    "name": "Downtown Night Market",
+    "date": "2026-08-15",
+    "location": "Plaza de Cesar Chavez, San Jose, CA",
+    "instagram_handle": "@citypinned",
+    "category": "Food Truck",
+    "booth_tier": "top",
+    "flyer_image_url": "https://example.com/flyers/downtown-night-market.jpg"
+  },
+  {
+    "type": "vendor",
+    "name": "Maria's Tamales",
+    "date": null,
+    "location": "San Jose, CA",
+    "instagram_handle": "@mariastamales",
+    "category": "Home Cook",
+    "booth_tier": "regular"
+  },
+  {
+    "type": "vendor",
+    "name": "Golden Hour Ceramics",
+    "date": null,
+    "location": "Santa Clara, CA",
+    "instagram_handle": "@goldenhourceramics",
+    "category": "Artisan Crafts",
+    "booth_tier": "top"
+  }
+]

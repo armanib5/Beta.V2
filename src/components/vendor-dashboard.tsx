@@ -28,10 +28,34 @@ export function VendorDashboard({
     website_url: vendor.website_url ?? "",
     short_description: vendor.short_description ?? "",
   });
+  const [location, setLocation] = useState<{ lat: number | null; lng: number | null }>({
+    lat: vendor.lat,
+    lng: vendor.lng,
+  });
+  const [locating, setLocating] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState(new Set(selectedCategoryIds));
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setError("Geolocation isn't supported on this device.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        setLocating(false);
+      },
+      () => {
+        setError("Couldn't get your location — check location permissions.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  }
 
   function updateField<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -54,6 +78,8 @@ export function VendorDashboard({
           instagram_handle: form.instagram_handle || null,
           website_url: form.website_url || null,
           short_description: form.short_description || null,
+          lat: location.lat,
+          lng: location.lng,
         })
         .eq("id", vendor.id);
       if (profileError) throw profileError;
@@ -197,6 +223,28 @@ export function VendorDashboard({
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
           </Field>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Location</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Powers &quot;Near You&quot; sorting on the Vendor Directory.
+          </p>
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={useCurrentLocation}
+              disabled={locating}
+              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {locating ? "Locating…" : "📍 Use My Current Location"}
+            </button>
+            {location.lat !== null && location.lng !== null && (
+              <span className="text-xs text-slate-500">
+                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+              </span>
+            )}
+          </div>
         </div>
 
         <div>
