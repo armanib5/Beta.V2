@@ -1,17 +1,23 @@
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import type { LovEntry } from "@/lib/types";
 import { EventCalendar } from "@/components/event-calendar";
 
-export const dynamic = "force-dynamic";
+export default function CalendarPage() {
+  const [events, setEvents] = useState<LovEntry[]>([]);
 
-export default async function CalendarPage() {
-  const supabase = await createClient();
-  const { data: events } = await supabase
-    .from("lov_entries")
-    .select("*")
-    .eq("type", "event")
-    .order("event_date")
-    .returns<LovEntry[]>();
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("lov_entries")
+      .select("*")
+      .eq("type", "event")
+      .order("event_date")
+      .returns<LovEntry[]>()
+      .then(({ data }) => setEvents(data ?? []));
+  }, []);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -19,7 +25,7 @@ export default async function CalendarPage() {
       <p className="mt-2 text-sm text-slate-600">
         Tap a day with events to see its flyer and details.
       </p>
-      <EventCalendar events={events ?? []} />
+      <EventCalendar events={events} />
     </div>
   );
 }

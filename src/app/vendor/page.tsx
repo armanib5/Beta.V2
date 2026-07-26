@@ -1,42 +1,81 @@
-import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import type { Category, Vendor, VendorPhoto } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+export default function VendorProfilePage() {
+  return (
+    <Suspense fallback={null}>
+      <VendorProfile />
+    </Suspense>
+  );
+}
 
-export default async function VendorProfilePage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const supabase = await createClient();
+function VendorProfile() {
+  const slug = useSearchParams().get("slug");
+  const [status, setStatus] = useState<"loading" | "not-found" | "ready">(slug ? "loading" : "not-found");
+  const [vendor, setVendor] = useState<Vendor | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [photos, setPhotos] = useState<VendorPhoto[]>([]);
 
-  const { data: vendor } = await supabase
-    .from("vendors")
-    .select("*")
-    .eq("slug", slug)
-    .eq("status", "active")
-    .maybeSingle<Vendor>();
+  useEffect(() => {
+    if (!slug) return;
+    let cancelled = false;
+    const supabase = createClient();
 
-  if (!vendor) notFound();
-
-  const [{ data: categoryLinks }, { data: photos }] = await Promise.all([
     supabase
-      .from("vendor_categories")
-      .select("categories(*)")
-      .eq("vendor_id", vendor.id),
-    supabase
-      .from("vendor_photos")
+      .from("vendors")
       .select("*")
-      .eq("vendor_id", vendor.id)
-      .order("sort_order")
-      .returns<VendorPhoto[]>(),
-  ]);
+      .eq("slug", slug)
+      .eq("status", "active")
+      .maybeSingle<Vendor>()
+      .then(async ({ data: vendorRow }) => {
+        if (cancelled) return;
+        if (!vendorRow) {
+          setStatus("not-found");
+          return;
+        }
+        setVendor(vendorRow);
 
-  const categories = (categoryLinks ?? [])
-    .map((row) => row.categories as unknown as Category)
-    .filter(Boolean);
+        const [{ data: categoryLinks }, { data: photoRows }] = await Promise.all([
+          supabase.from("vendor_categories").select("categories(*)").eq("vendor_id", vendorRow.id),
+          supabase
+            .from("vendor_photos")
+            .select("*")
+            .eq("vendor_id", vendorRow.id)
+            .order("sort_order")
+            .returns<VendorPhoto[]>(),
+        ]);
+        if (cancelled) return;
+        setCategories(
+          (categoryLinks ?? []).map((row) => row.categories as unknown as Category).filter(Boolean),
+        );
+        setPhotos(photoRows ?? []);
+        setStatus("ready");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  if (status === "loading") {
+    return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500">Loading…</div>;
+  }
+
+  if (status === "not-found" || !vendor) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-bold text-slate-900">Vendor not found</h1>
+        <Link href="/vendors" className="mt-4 inline-block text-sm font-semibold text-slate-900 underline">
+          Back to the Vendor Directory
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -103,7 +142,7 @@ export default async function VendorProfilePage({
         )}
       </div>
 
-      {photos && photos.length > 0 && (
+      {photos.length > 0 && (
         <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {photos.map((photo) => (
             // eslint-disable-next-line @next/next/no-img-element

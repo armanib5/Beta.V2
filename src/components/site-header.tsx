@@ -1,18 +1,29 @@
+"use client";
+
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { MobileNav } from "@/components/mobile-nav";
 
-export async function SiteHeader() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+const links = [
+  { href: "/vendors", label: "Vendor Directory" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/#pricing", label: "Become a Vendor" },
+];
 
-  const links = [
-    { href: "/vendors", label: "Vendor Directory" },
-    { href: "/calendar", label: "Calendar" },
-    { href: "/#pricing", label: "Become a Vendor" },
-  ];
+export function SiteHeader() {
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setIsSignedIn(Boolean(data.user)));
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsSignedIn(Boolean(session?.user));
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -33,14 +44,14 @@ export async function SiteHeader() {
             </Link>
           ))}
           <Link
-            href={user ? "/vendor/dashboard" : "/vendor/login"}
+            href={isSignedIn ? "/vendor/dashboard" : "/vendor/login"}
             className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
           >
-            {user ? "My Dashboard" : "Vendor Login"}
+            {isSignedIn ? "My Dashboard" : "Vendor Login"}
           </Link>
         </nav>
 
-        <MobileNav links={links} isSignedIn={Boolean(user)} />
+        <MobileNav links={links} isSignedIn={isSignedIn} />
       </div>
     </header>
   );

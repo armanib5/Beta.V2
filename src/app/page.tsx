@@ -1,26 +1,31 @@
+"use client";
+
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import type { Category, PricingTier } from "@/lib/types";
 import { PricingCard } from "@/components/pricing-card";
 
-export const dynamic = "force-dynamic";
+export default function HomePage() {
+  const [tiers, setTiers] = useState<PricingTier[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
-export default async function HomePage() {
-  const supabase = await createClient();
-
-  const [{ data: tiers }, { data: categories }] = await Promise.all([
+  useEffect(() => {
+    const supabase = createClient();
     supabase
       .from("pricing_tiers")
       .select("*")
       .eq("is_active", true)
       .order("sort_order")
-      .returns<PricingTier[]>(),
+      .returns<PricingTier[]>()
+      .then(({ data }) => setTiers(data ?? []));
     supabase
       .from("categories")
       .select("*")
       .order("sort_order")
-      .returns<Category[]>(),
-  ]);
+      .returns<Category[]>()
+      .then(({ data }) => setCategories(data ?? []));
+  }, []);
 
   return (
     <div>
@@ -60,14 +65,16 @@ export default async function HomePage() {
             Secure your permanent vendor account
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600 sm:text-base">
-            One-time payment. No subscription. Pay online, or hand your phone/iPad to a vendor at
-            your next event and let them scan a QR code to pay in person.
+            One-time payment via Stripe. Pay online, or hand your phone/iPad to a vendor at your
+            next event and let them scan a QR code to pay in person.
           </p>
         </div>
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2">
-          {tiers?.map((tier) => <PricingCard key={tier.id} tier={tier} />)}
-          {!tiers?.length && (
+          {tiers.map((tier) => (
+            <PricingCard key={tier.id} tier={tier} />
+          ))}
+          {!tiers.length && (
             <p className="col-span-2 text-center text-sm text-slate-500">
               Pricing tiers are being set up — check back soon.
             </p>
@@ -81,7 +88,7 @@ export default async function HomePage() {
             Every kind of local vendor, welcome
           </h2>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            {categories?.map((category) => (
+            {categories.map((category) => (
               <span
                 key={category.id}
                 className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700"

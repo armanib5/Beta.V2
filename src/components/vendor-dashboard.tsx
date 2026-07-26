@@ -129,6 +129,17 @@ export function VendorDashboard({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
+      {vendor.status === "pending" && (
+        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong>Pending review.</strong> We&apos;ll activate your account after confirming your
+          payment — finish setting up your profile below in the meantime.
+        </div>
+      )}
+      {vendor.status === "suspended" && (
+        <div className="mb-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+          Your account is currently suspended. Contact us if you think this is a mistake.
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -146,8 +157,8 @@ export function VendorDashboard({
           </div>
           <p className="mt-1 text-sm text-slate-500">
             Public profile:{" "}
-            <Link href={`/vendor/${vendor.slug}`} className="underline">
-              /vendor/{vendor.slug}
+            <Link href={`/vendor?slug=${encodeURIComponent(vendor.slug)}`} className="underline">
+              /vendor?slug={vendor.slug}
             </Link>
           </p>
         </div>
