@@ -1,7 +1,10 @@
 {
   // Tells Wrangler's unified `wrangler deploy` command this is a Cloudflare
-  // Pages static-asset project (built by `npm run build` into out/), not a
-  // Worker script — without this, `wrangler deploy` has no way to know
-  // where the static export lives and fails trying to process it as one.
-  "pages_build_output_dir": "out"
+  // Workers with static assets project (built by `npm run build` into out/),
+  // not a plain Worker script — this tells it where to find the assets.
+  "name": "beta-v2",
+  "compatibility_date": "2024-07-26",
+  "assets": {
+    "directory": "out"
+  }
 }
