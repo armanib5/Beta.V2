@@ -1,7 +1,10 @@
 {
-  // Tells Wrangler's unified `wrangler deploy` command this is a Cloudflare
-  // Pages static-asset project (built by `npm run build` into out/), not a
-  // Worker script — without this, `wrangler deploy` has no way to know
-  // where the static export lives and fails trying to process it as one.
-  "pages_build_output_dir": "out"
+  // Lets Cloudflare's existing "npx wrangler deploy" command serve the
+  // static export directly (Workers with static assets), so no change to
+  // the Cloudflare project's dashboard settings is needed.
+  "name": "citypinned-v2",
+  "compatibility_date": "2026-07-26",
+  "assets": {
+    "directory": "out"
+  }
 }
