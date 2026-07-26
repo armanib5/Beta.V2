@@ -7,11 +7,9 @@
  *   (defaults to seed/lov.json if no path is given)
  *
  * Paste your month's raw list into a JSON file matching the shape in
- * seed/lov.example.json, then run this script. Safe to re-run: event rows
- * are matched by (type, name, date) and updated in place. Vendor-type rows
- * without a date are always inserted fresh (Postgres treats NULL as
- * distinct in the unique constraint), so dedupe vendor-only lists by hand
- * before re-running, or give them a date.
+ * seed/lov.example.json, then run this script. Safe to re-run: rows are
+ * matched by (type, name, date) — or just (type, name) for recurring rows
+ * with no fixed date, like a weekly farmers market — and updated in place.
  */
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
@@ -31,6 +29,8 @@ const lovRowSchema = z.object({
   category: z.string().nullable().optional(),
   booth_tier: z.enum(["top", "regular"]).default("regular"),
   flyer_image_url: z.string().nullable().optional(),
+  recurrence: z.string().nullable().optional(),
+  website_url: z.string().nullable().optional(),
 });
 
 function slugify(input: string): string {
@@ -107,11 +107,13 @@ async function main() {
       category_id: categoryId,
       booth_tier: row.booth_tier,
       flyer_image_url: row.flyer_image_url ?? null,
+      recurrence: row.recurrence ?? null,
+      website_url: row.website_url ?? null,
     };
 
     const { error } = await supabase
       .from("lov_entries")
-      .upsert(record, { onConflict: "type,name,event_date" });
+      .upsert(record, { onConflict: "type,name,event_date_key" });
 
     if (error) {
       failed++;

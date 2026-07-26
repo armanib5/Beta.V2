@@ -68,6 +68,8 @@ export interface LovEntry {
   booth_tier: BoothTier;
   flyer_image_url: string | null;
   vendor_id: string | null;
+  recurrence: string | null;
+  website_url: string | null;
   created_at: string;
   updated_at: string;
 }

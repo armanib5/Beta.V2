@@ -90,19 +90,21 @@ Stack: **Next.js (App Router, TypeScript) + Tailwind CSS + Supabase
 
 ## Seeding this month's LOV (List of Vendors & Events)
 
-1. Copy `seed/lov.example.json` to `seed/lov.json` and replace it with your
-   real list. Each row is:
+1. Edit `seed/lov.json` (already populated below) or start from
+   `seed/lov.example.json`. Each row is:
 
    ```json
    {
      "type": "event",            // or "vendor"
      "name": "Downtown Night Market",
-     "date": "2026-08-15",       // YYYY-MM-DD, or null for a vendor with no fixed date
+     "date": "2026-08-15",       // YYYY-MM-DD, or null for something with no single fixed date
+     "recurrence": null,         // e.g. "Wednesdays, 9am-1:30pm (May-Nov)" for a weekly market
      "location": "Plaza de Cesar Chavez, San Jose, CA",
      "instagram_handle": "@citypinned",
      "category": "Food Truck",   // matched case-insensitively; created if new
      "booth_tier": "top",        // or "regular"
-     "flyer_image_url": "https://…"   // event flyers only
+     "flyer_image_url": "https://…",  // event flyers only
+     "website_url": "https://…"       // organizer/vendor-directory link
    }
    ```
 
@@ -112,14 +114,24 @@ Stack: **Next.js (App Router, TypeScript) + Tailwind CSS + Supabase
    npm run seed:lov -- seed/lov.json
    ```
 
-   Categories are created automatically if they don't exist yet. Event
-   rows are matched/updated by `(type, name, date)` so re-running the
-   script is safe; vendor rows without a date are inserted fresh each run
-   (dedupe those by hand, or give them a date).
+   Categories are created automatically if they don't exist yet. Rows are
+   matched/updated by `(type, name, date)` — or by `(type, name)` alone for
+   recurring rows with no date (e.g. a weekly farmers market) — so
+   re-running the script is safe.
 
-   Seeded `event` rows show up on `/calendar`; seeded `vendor` rows show up
-   on `/vendors` as "Guest Listing" cards alongside full paid vendor
+   Seeded `event` rows show up on `/calendar` (dated ones on their day,
+   recurring ones in the "Recurring Markets & Events" list below the
+   grid); seeded `vendor` rows show up on `/vendors` as "Guest Listing"
+   cards alongside full paid vendor
    accounts.
+
+`seed/lov.json` currently has the first real batch: 6 San Jose-area
+recurring farmers markets/art walk (Downtown SJ, First Friday Art Walk,
+Japantown, Santana Row, Santa Clara Valley Medical Center, Downtown
+Campbell) plus their 37 named vendors, deduped where a vendor appears at
+more than one market. None of these have `lat`/`lng` or Instagram handles
+yet (not in the source list) — add them as you get them so "Near You"
+sorting picks these up too.
 
 ## Roadmap (not yet built — tracked for the next iterations)
 

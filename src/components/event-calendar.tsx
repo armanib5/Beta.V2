@@ -30,6 +30,8 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
     return map;
   }, [events]);
 
+  const recurringEvents = useMemo(() => events.filter((event) => !event.event_date), [events]);
+
   const todayKey = toDateKey(today.getFullYear(), today.getMonth(), today.getDate());
   const firstOfMonth = new Date(cursor.year, cursor.month, 1);
   const daysInMonth = new Date(cursor.year, cursor.month + 1, 0).getDate();
@@ -114,40 +116,75 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
       {selectedDate && (
         <div className="mt-6 space-y-4">
           {selectedEvents.map((event) => (
-            <div key={event.id} className="flex gap-4 rounded-2xl border border-slate-200 bg-white p-4">
-              {event.flyer_image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={event.flyer_image_url}
-                  alt={event.name}
-                  className="h-28 w-28 shrink-0 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-3xl">
-                  📅
-                </div>
-              )}
-              <div>
-                <p className="font-bold text-slate-900">{event.name}</p>
-                {event.location && <p className="text-sm text-slate-600">{event.location}</p>}
-                {event.instagram_handle && (
-                  <a
-                    href={`https://instagram.com/${event.instagram_handle.replace(/^@/, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 inline-block text-sm font-medium text-slate-900 underline"
-                  >
-                    📷 {event.instagram_handle}
-                  </a>
-                )}
-                {event.booth_tier === "top" && (
-                  <span className="mt-1 block text-xs font-semibold text-amber-600">🏆 Top Booth event</span>
-                )}
-              </div>
-            </div>
+            <EventCard key={event.id} event={event} />
           ))}
         </div>
       )}
+
+      {recurringEvents.length > 0 && (
+        <div className="mt-10">
+          <h3 className="text-lg font-bold text-slate-900">Recurring Markets &amp; Events</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Ongoing on a weekly or monthly schedule rather than a single date.
+          </p>
+          <div className="mt-4 space-y-4">
+            {recurringEvents.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventCard({ event }: { event: LovEntry }) {
+  return (
+    <div className="flex gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+      {event.flyer_image_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={event.flyer_image_url}
+          alt={event.name}
+          className="h-28 w-28 shrink-0 rounded-lg object-cover"
+        />
+      ) : (
+        <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-3xl">
+          📅
+        </div>
+      )}
+      <div>
+        <p className="font-bold text-slate-900">{event.name}</p>
+        {event.recurrence && (
+          <p className="text-sm font-medium text-slate-700">{event.recurrence}</p>
+        )}
+        {event.location && <p className="text-sm text-slate-600">{event.location}</p>}
+        <div className="mt-1 flex flex-wrap gap-3">
+          {event.instagram_handle && (
+            <a
+              href={`https://instagram.com/${event.instagram_handle.replace(/^@/, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-sm font-medium text-slate-900 underline"
+            >
+              📷 {event.instagram_handle}
+            </a>
+          )}
+          {event.website_url && (
+            <a
+              href={event.website_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-sm font-medium text-slate-900 underline"
+            >
+              🌐 Website
+            </a>
+          )}
+        </div>
+        {event.booth_tier === "top" && (
+          <span className="mt-1 block text-xs font-semibold text-amber-600">🏆 Top Booth event</span>
+        )}
+      </div>
     </div>
   );
 }
