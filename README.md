@@ -137,10 +137,15 @@ Stack: **Next.js (App Router, TypeScript) + Tailwind CSS + Supabase
   recurring ones (Gordon Biersch Night Market, El Mercadito Night Market,
   Starlight Saturdays) in the recurring list.
 
-None of this data has `lat`/`lng`, Instagram handles, flyer images, or
-ticketing/info URLs — none of those were in the source lists, so they were
-left `null` rather than guessed. Add them as you get them so "Near You"
-sorting and flyer thumbnails pick these up too.
+Every row now has `lat`/`lng` — run via `npx tsx scripts/geocode-lov.ts
+seed/lov.json`, which geocodes each row's `location` through Nominatim
+(OpenStreetMap, no API key) and only falls back to a central-San-Jose
+coordinate (37.3382, -121.8863) if a real address genuinely can't be
+resolved. Re-run it any time you add rows with new locations — it
+overwrites `lat`/`lng` on every row in the file, so it's safe to run
+repeatedly. Instagram handles, flyer images, and ticketing/info URLs are
+still `null` where the source list didn't include them — add them as you
+get them.
 
 ## Roadmap (not yet built — tracked for the next iterations)
 
