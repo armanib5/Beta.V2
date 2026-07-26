@@ -10,6 +10,7 @@ export async function SiteHeader() {
 
   const links = [
     { href: "/vendors", label: "Vendor Directory" },
+    { href: "/calendar", label: "Calendar" },
     { href: "/#pricing", label: "Become a Vendor" },
   ];
 

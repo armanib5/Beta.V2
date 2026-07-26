@@ -44,7 +44,46 @@ export interface Vendor {
   is_founding_vendor: boolean;
   is_top10: boolean;
   tier_id: string | null;
+  lat: number | null;
+  lng: number | null;
   onboarded_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type LovEntryType = "event" | "vendor";
+export type BoothTier = "top" | "regular";
+export type BoothStatus = "open" | "reserved" | "claimed";
+
+export interface LovEntry {
+  id: string;
+  type: LovEntryType;
+  name: string;
+  event_date: string | null;
+  end_date: string | null;
+  location: string | null;
+  lat: number | null;
+  lng: number | null;
+  instagram_handle: string | null;
+  category_id: string | null;
+  booth_tier: BoothTier;
+  flyer_image_url: string | null;
+  vendor_id: string | null;
+  recurrence: string | null;
+  website_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Booth {
+  id: string;
+  event_id: string;
+  label: string;
+  tier: BoothTier;
+  status: BoothStatus;
+  vendor_id: string | null;
+  x: number | null;
+  y: number | null;
   created_at: string;
   updated_at: string;
 }
