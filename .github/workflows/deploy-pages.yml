@@ -1,11 +1,12 @@
 name: Deploy to GitHub Pages
 
-# Dormant until this branch is merged to main AND the repo's Settings ->
-# Pages -> Source is set to "GitHub Actions". Until then this workflow
-# only exists in the repo history; it never runs on a feature branch.
+# Not currently in use — hosting moved to Cloudflare Pages (wrangler.jsonc).
+# This used to auto-run on every push to main and fail every time (a stuck
+# GitHub Pages Environment/permissions issue was never resolved), sending a
+# failure-notification email on every unrelated push. Manual-only now so it
+# stops doing that; run it by hand from the Actions tab if GitHub Pages is
+# ever revisited.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

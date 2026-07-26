@@ -2,7 +2,7 @@
   // Lets Cloudflare's existing "npx wrangler deploy" command serve the
   // static export directly (Workers with static assets), so no change to
   // the Cloudflare project's dashboard settings is needed.
-  "name": "citypinned-v2",
+  "name": "beta-v2",
   "compatibility_date": "2026-07-26",
   "assets": {
     "directory": "out"
