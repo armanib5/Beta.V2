@@ -13,6 +13,36 @@ function toDateKey(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function formatDateKey(key: string): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** Every "YYYY-MM-DD" day from start through end (inclusive), in UTC to avoid local-timezone drift. */
+function expandDateRange(start: string, end: string | null): string[] {
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const startMs = Date.UTC(sy, sm - 1, sd);
+  const endMs = end
+    ? (() => {
+        const [ey, em, ed] = end.split("-").map(Number);
+        return Date.UTC(ey, em - 1, ed);
+      })()
+    : startMs;
+
+  const days: string[] = [];
+  const maxSpanMs = startMs + 60 * 24 * 60 * 60 * 1000; // cap runaway ranges at ~60 days
+  for (let ms = startMs; ms <= Math.min(endMs, maxSpanMs); ms += 24 * 60 * 60 * 1000) {
+    const d = new Date(ms);
+    days.push(toDateKey(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  }
+  return days;
+}
+
 export function EventCalendar({ events }: { events: LovEntry[] }) {
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
@@ -22,10 +52,11 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
     const map = new Map<string, LovEntry[]>();
     for (const event of events) {
       if (!event.event_date) continue;
-      const key = event.event_date.slice(0, 10);
-      const list = map.get(key) ?? [];
-      list.push(event);
-      map.set(key, list);
+      for (const key of expandDateRange(event.event_date.slice(0, 10), event.end_date?.slice(0, 10) ?? null)) {
+        const list = map.get(key) ?? [];
+        list.push(event);
+        map.set(key, list);
+      }
     }
     return map;
   }, [events]);
@@ -155,6 +186,11 @@ function EventCard({ event }: { event: LovEntry }) {
       )}
       <div>
         <p className="font-bold text-slate-900">{event.name}</p>
+        {event.event_date && event.end_date && event.end_date !== event.event_date && (
+          <p className="text-sm font-medium text-slate-700">
+            {formatDateKey(event.event_date.slice(0, 10))} – {formatDateKey(event.end_date.slice(0, 10))}
+          </p>
+        )}
         {event.recurrence && (
           <p className="text-sm font-medium text-slate-700">{event.recurrence}</p>
         )}

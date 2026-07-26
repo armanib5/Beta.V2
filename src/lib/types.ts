@@ -60,6 +60,7 @@ export interface LovEntry {
   type: LovEntryType;
   name: string;
   event_date: string | null;
+  end_date: string | null;
   location: string | null;
   lat: number | null;
   lng: number | null;

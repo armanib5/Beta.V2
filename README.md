@@ -98,6 +98,7 @@ Stack: **Next.js (App Router, TypeScript) + Tailwind CSS + Supabase
      "type": "event",            // or "vendor"
      "name": "Downtown Night Market",
      "date": "2026-08-15",       // YYYY-MM-DD, or null for something with no single fixed date
+     "end_date": null,           // set for multi-day events (e.g. a 5-day fair); must be >= date
      "recurrence": null,         // e.g. "Wednesdays, 9am-1:30pm (May-Nov)" for a weekly market
      "location": "Plaza de Cesar Chavez, San Jose, CA",
      "instagram_handle": "@citypinned",
@@ -125,13 +126,21 @@ Stack: **Next.js (App Router, TypeScript) + Tailwind CSS + Supabase
    cards alongside full paid vendor
    accounts.
 
-`seed/lov.json` currently has the first real batch: 6 San Jose-area
-recurring farmers markets/art walk (Downtown SJ, First Friday Art Walk,
-Japantown, Santana Row, Santa Clara Valley Medical Center, Downtown
-Campbell) plus their 37 named vendors, deduped where a vendor appears at
-more than one market. None of these have `lat`/`lng` or Instagram handles
-yet (not in the source list) — add them as you get them so "Near You"
-sorting picks these up too.
+`seed/lov.json` currently has:
+- 6 San Jose-area recurring farmers markets/art walk (Downtown SJ, First
+  Friday Art Walk, Japantown, Santana Row, Santa Clara Valley Medical
+  Center, Downtown Campbell) plus their 37 named vendors, deduped where a
+  vendor appears at more than one market.
+- 12 August 2026 San Jose-area events, including 4 multi-day ones (Santa
+  Clara County Fair, SJMADE Summer Fair, SJ Jazz Summer Fest, MAGWest) that
+  use `end_date` and show on every day of their run on `/calendar`, plus 3
+  recurring ones (Gordon Biersch Night Market, El Mercadito Night Market,
+  Starlight Saturdays) in the recurring list.
+
+None of this data has `lat`/`lng`, Instagram handles, flyer images, or
+ticketing/info URLs — none of those were in the source lists, so they were
+left `null` rather than guessed. Add them as you get them so "Near You"
+sorting and flyer thumbnails pick these up too.
 
 ## Roadmap (not yet built — tracked for the next iterations)
 
