@@ -9,14 +9,14 @@
    confirmed single-business addresses — swap in real data before launch. */
 
 var CATS = {
-  "market": { "l": "Markets", "c": "#3d6b42", "icon": "leaf" },
+  "market": { "l": "Farmers Market", "c": "#3d6b42", "icon": "leaf" },
   "foodhall": { "l": "Food Hall / Market", "c": "#b8860b", "icon": "fork" },
   "restaurants": { "l": "Restaurants", "c": "#e0662f", "icon": "plate" },
   "bars": { "l": "Bars", "c": "#6b1e3c", "icon": "cup" },
   "artwalk": { "l": "Arts", "c": "#2c5f8a", "icon": "palette" },
   "cityart": { "l": "Community Art", "c": "#6a4e7a", "icon": "art" },
   "venue": { "l": "Theaters", "c": "#7a5230", "icon": "mask" },
-  "holiday": { "l": "Holiday", "c": "#8B0000", "icon": "star" },
+  "seasonal": { "l": "Seasonal", "c": "#8B0000", "icon": "star" },
   "shop": { "l": "Shops", "c": "#c0392b", "icon": "bag" },
   "parking": { "l": "Parking", "c": "#2c5f8a", "icon": "P" },
   "restrooms": { "l": "Restrooms", "c": "#64748b", "icon": "restroom" },
@@ -28,7 +28,7 @@ var CATS = {
 };
 
 /* Order controls the category filter row. */
-var CAT_ORDER = ["market","foodhall","restaurants","bars","artwalk","cityart","venue","holiday","shop","parking","restrooms","transit","schools","hospitals","churches","hotels"];
+var CAT_ORDER = ["market","foodhall","restaurants","bars","artwalk","cityart","venue","seasonal","shop","parking","restrooms","transit","schools","hospitals","churches","hotels"];
 
 var HOODS = [
   { "id": "downtown", "l": "Downtown San Jose", "lat": 37.3382, "lng": -121.8863, "zoom": 15 },
@@ -108,7 +108,7 @@ var PLACES = [
     "wb": "https://sofamarketsj.com"
   },
   {
-    "id": "wc", "cat": "holiday", "hood": "downtown",
+    "id": "wc", "cat": "seasonal", "hood": "downtown",
     "t": "Soccer Celebration - World Cup Watch Party", "w": "June 11 - July 19, all matches live", "d": "today", "ed": "2026-07-19",
     "a": "San Pedro Square Market, 87 N San Pedro St, San Jose, CA 95110",
     "lat": 37.3365, "lng": -121.8943,
@@ -212,7 +212,7 @@ var PLACES = [
   { "id": "es2", "cat": "cityart", "hood": "east", "t": "East Side Community Mural", "a": "King Rd, San Jose, CA", "lat": 37.3465, "lng": -121.8362, "ds": "Community mural celebrating East San Jose." },
   { "id": "u1783435013531", "cat": "restaurants", "hood": "downtown", "t": "Eos & Nyx", "a": "201 S Second St #120, San Jose, CA 95113", "lat": 37.3332, "lng": -121.8872, "w": "tue-fri 5pm-9pm", "sh": 17, "eh": 21, "wb": "https://www.eosnyxsj.com/", "ds": "" },
   {
-    "id": "u1783885081451", "cat": "holiday", "hood": "downtown",
+    "id": "u1783885081451", "cat": "seasonal", "hood": "downtown",
     "t": "Mariachi Festival", "w": "Today 1pm - 8pm", "d": "2026-07-12", "sh": 13, "eh": 20, "ed": "2026-07-12",
     "a": "Plaza de Cesar Chavez, San Jose, CA 95113",
     "lat": 37.3323, "lng": -121.8897,

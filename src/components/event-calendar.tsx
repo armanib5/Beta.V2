@@ -83,6 +83,13 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
     });
   }
 
+  function jumpToToday() {
+    setCursor({ year: today.getFullYear(), month: today.getMonth() });
+    setSelectedDate(todayKey);
+  }
+
+  const onCurrentMonth = cursor.year === today.getFullYear() && cursor.month === today.getMonth();
+
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between">
@@ -94,9 +101,20 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
         >
           ‹
         </button>
-        <h2 className="text-lg font-bold text-slate-900">
-          {MONTH_NAMES[cursor.month]} {cursor.year}
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-slate-900">
+            {MONTH_NAMES[cursor.month]} {cursor.year}
+          </h2>
+          {!onCurrentMonth && (
+            <button
+              type="button"
+              onClick={jumpToToday}
+              className="rounded-full border border-green-400 px-2.5 py-1 text-xs font-semibold text-green-700 hover:bg-green-50"
+            >
+              Today
+            </button>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => changeMonth(1)}
@@ -124,12 +142,12 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
             <button
               key={key}
               type="button"
-              onClick={() => setSelectedDate(dayEvents.length ? key : null)}
-              className={`flex aspect-square flex-col items-center justify-center rounded-lg border text-sm ${
+              onClick={() => setSelectedDate(key)}
+              className={`flex aspect-square flex-col items-center justify-center rounded-lg border-2 text-sm ${
                 isSelected
                   ? "border-slate-900 bg-slate-900 text-white"
                   : isToday
-                    ? "border-slate-900 text-slate-900"
+                    ? "live-pulse text-slate-900"
                     : "border-slate-200 text-slate-700"
               } ${dayEvents.length ? "font-semibold" : "text-slate-400"}`}
             >
@@ -145,10 +163,25 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
       </div>
 
       {selectedDate && (
-        <div className="mt-6 space-y-4">
-          {selectedEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
+        <div className="mt-6">
+          <p className="text-sm font-semibold text-slate-500">
+            {formatDateKey(selectedDate)}
+            {selectedDate === todayKey && (
+              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-800">
+                <span className="live-pulse h-2 w-2 rounded-full border-2 border-green-600" />
+                Today
+              </span>
+            )}
+          </p>
+          {selectedEvents.length > 0 ? (
+            <div className="mt-3 space-y-4">
+              {selectedEvents.map((event) => (
+                <EventCard key={event.id} event={event} />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-slate-500">Nothing scheduled for this day.</p>
+          )}
         </div>
       )}
 

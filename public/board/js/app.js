@@ -1,15 +1,15 @@
 var C={
-  market:{l:"Markets",i:"&#127805;",c:"#3d6b42"},
+  market:{l:"Farmers Market",i:"&#127805;",c:"#3d6b42"},
   foodhall:{l:"Food Hall",i:"&#127869;",c:"#b8860b"},
   bars:{l:"Bars & Restaurants",i:"&#127864;",c:"#6b1e3c"},
   artwalk:{l:"Art Walk",i:"&#127912;",c:"#2c5f8a"},
   cityart:{l:"City Art",i:"&#127917;",c:"#6a4e7a"},
   parks:{l:"Parks",i:"&#127795;",c:"#5a8c3a"},
   venue:{l:"Theaters",i:"&#127963;",c:"#7a5230"},
-  holiday:{l:"Holiday",i:"&#9917;",c:"#8B0000"},
+  seasonal:{l:"Seasonal",i:"&#9917;",c:"#8B0000"},
   shop:{l:"Shops",i:"&#128717;",c:"#c0392b"}
 };
-var ORD=["holiday","market","foodhall","bars","artwalk","cityart","parks","venue","shop"];
+var ORD=["seasonal","market","foodhall","bars","artwalk","cityart","parks","venue","shop"];
 var CN={sj:"San Jose, CA",sc:"Santa Clara, CA",sv:"Sunnyvale, CA",mv:"Mountain View, CA",camp:"Campbell, CA"};
 var CITY_ABBR={sj:"SJ",sc:"SC",sv:"SV",mv:"MV",camp:"Camp"};
 function setBrand(v){
@@ -34,7 +34,7 @@ var HOODS_SJ=[
 ];
 var curHood="downtown";
 var DEF=[
-{id:"mariachi2026",cat:"holiday",lbl:"Live Festival",exp:false,mapId:"u1783885081451",
+{id:"mariachi2026",cat:"seasonal",lbl:"Live Festival",exp:false,mapId:"u1783885081451",
  t:"Silicon Valley Mariachi Festival",w:"Today 1pm - 8pm",d:"2026-07-12",sh:13,eh:20,
  a:"Plaza de Cesar Chavez, San Jose, CA 95113",ph:"",wb:"https://tr.ee/6G_IJFtshX",
  ds:"Silicon Valley Mariachi Festival at Plaza de Cesar Chavez, 1-8pm today - live music with vendors along the street. Supported in part by a Cultural Affairs grant from the City of San Jose.",
@@ -71,7 +71,7 @@ var DEF=[
   {g:"Restaurants",items:["Vietnoms - pho banh mi Vietnamese Ste 121","3 Hermanos Mexican - tacos burritos cocktail bar 105","Pizzeria Rosa Maria - wood-fired pizza 104","Umi Hand Roll Bar - sushi outdoor seating","Habana Cuba Restaurant - Cuban classics closed Mondays","Iscu Tea - temporarily closed"]},
   {g:"Bar",items:["Fountainhead Bar - craft cocktails back of SoFA Noon-9pm"]}
  ]},
-{id:"wc",cat:"holiday",lbl:"World Cup Free",exp:false,
+{id:"wc",cat:"seasonal",lbl:"World Cup Free",exp:false,
  t:"Soccer Celebration - World Cup Watch Party",w:"June 11 - July 19 All 104 matches live",d:"today",
  a:"San Pedro Square Market, 87 N San Pedro St, San Jose, CA 95110",ph:"(408) 792-3033",wb:"https://sanpedrosquaremarket.com",
  ds:"Bay Areas largest free World Cup watch party. All 104 FIFA World Cup 2026 matches live on multiple jumbo screens. Official San Jose USA Soccer watch party location.",
@@ -97,11 +97,11 @@ var DEF=[
  pk:"Market Street garage one block north.",tr:"VTA Convention Center stop 2 min walk.",
  ac:"Fully accessible outdoor plaza.",fam:"Very family friendly.",
  fp:"1 min walk adjacent",fd:"20 min walk or 5 min ride",vg:[]},
-{id:"j4",cat:"holiday",lbl:"4th of July",exp:false,
+{id:"j4",cat:"seasonal",lbl:"4th of July",exp:false,
  t:"4th of July Downtown Events",w:"Friday July 4 2026 Various times",d:"2026-07-04",
  a:"Downtown San Jose, CA Multiple Locations",ph:"",wb:"https://www.sanjoseca.gov",
  ds:"Independence Day celebrations across downtown San Jose. Fireworks live music food vendors and family activities.",
- tags:["Holiday","Fireworks","Free","Annual","Family"],photo:"",g:[],mx:420,my:468,ed:"2026-07-04",
+ tags:["Seasonal","Fireworks","Free","Annual","Family"],photo:"",g:[],mx:420,my:468,ed:"2026-07-04",
  ms:"Full schedule not confirmed. Check sanjoseca.gov.",
  pk:"Arrive early. Many garages free on holiday.",tr:"Take VTA extra service on holiday.",
  ac:"Most venues accessible.",fam:"Perfect for families.",

@@ -16,3 +16,21 @@ body {
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
+
+/* Today's cell on the calendar, and anything else "happening live right
+   now" — a slow pulse instead of a static highlight, so it reads as "this
+   one's active" rather than just "this one's selected." */
+@keyframes live-pulse-border {
+  0%, 100% {
+    border-color: #16a34a;
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.35);
+  }
+  50% {
+    border-color: #86efac;
+    box-shadow: 0 0 0 4px rgba(22, 163, 74, 0);
+  }
+}
+
+.live-pulse {
+  animation: live-pulse-border 2.4s ease-in-out infinite;
+}

@@ -1,7 +1,7 @@
 /* Seed vendor data — drawn from the vendor names already listed inside
    existing event detail pages (fm = Farmers Market, sm = SoFA Market), so
    the new Vendor Hub isn't empty on first load. Reuses the same category
-   keys (market/foodhall/artwalk/cityart/venue/holiday/shop) as events so
+   keys (market/foodhall/artwalk/cityart/venue/seasonal/shop) as events so
    colors, ribbons, and filter pills stay consistent across the site.
 
    boost{} mirrors a Flash/Anchor/Neighborhood tier model (inert placeholder
