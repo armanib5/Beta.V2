@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { LovEntry } from "@/lib/types";
+import type { Category, LovEntry } from "@/lib/types";
 import { EventCalendar } from "@/components/event-calendar";
 
 export default function CalendarPage() {
   const [events, setEvents] = useState<LovEntry[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -17,6 +18,11 @@ export default function CalendarPage() {
       .order("event_date")
       .returns<LovEntry[]>()
       .then(({ data }) => setEvents(data ?? []));
+    supabase
+      .from("categories")
+      .select("*")
+      .returns<Category[]>()
+      .then(({ data }) => setCategories(data ?? []));
   }, []);
 
   return (
@@ -25,7 +31,7 @@ export default function CalendarPage() {
       <p className="mt-2 text-sm text-slate-600">
         Tap a day with events to see its flyer and details.
       </p>
-      <EventCalendar events={events} />
+      <EventCalendar events={events} categories={categories} />
     </div>
   );
 }

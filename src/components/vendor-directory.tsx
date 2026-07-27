@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { LovEntry, Vendor } from "@/lib/types";
+import type { Category, LovEntry, Vendor } from "@/lib/types";
 import { calculateProximity, formatDistance, getAnchor, setAnchor, type Anchor } from "@/lib/geo";
+import { FlyerPlaceholder } from "@/components/flyer-placeholder";
 
 interface DirectoryItem {
   id: string;
   kind: "account" | "guest";
   name: string;
   logoUrl: string | null;
+  categoryId: string | null;
   description: string | null;
   instagram: string | null;
   isTop10: boolean;
@@ -25,6 +27,7 @@ function fromVendor(vendor: Vendor): DirectoryItem {
     kind: "account",
     name: vendor.business_name,
     logoUrl: vendor.logo_url,
+    categoryId: null,
     description: vendor.short_description,
     instagram: vendor.instagram_handle,
     isTop10: vendor.is_top10,
@@ -40,6 +43,7 @@ function fromLovEntry(entry: LovEntry): DirectoryItem {
     kind: "guest",
     name: entry.name,
     logoUrl: null,
+    categoryId: entry.category_id,
     description: entry.location,
     instagram: entry.instagram_handle,
     isTop10: entry.booth_tier === "top",
@@ -52,6 +56,7 @@ function fromLovEntry(entry: LovEntry): DirectoryItem {
 export function VendorDirectory() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [guestListings, setGuestListings] = useState<LovEntry[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -67,7 +72,14 @@ export function VendorDirectory() {
       .eq("type", "vendor")
       .returns<LovEntry[]>()
       .then(({ data }) => setGuestListings(data ?? []));
+    supabase
+      .from("categories")
+      .select("*")
+      .returns<Category[]>()
+      .then(({ data }) => setCategories(data ?? []));
   }, []);
+
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   const items = useMemo(
     () => [...vendors.map(fromVendor), ...guestListings.map(fromLovEntry)],
@@ -156,12 +168,16 @@ export function VendorDirectory() {
             const cardBody = (
               <>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-slate-200">
                     {entry.logoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={entry.logoUrl} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-xl">🏪</span>
+                      <FlyerPlaceholder
+                        seed={entry.name}
+                        icon={categoryById.get(entry.categoryId ?? "")?.icon ?? "🏪"}
+                        className="h-full w-full"
+                      />
                     )}
                   </div>
                   <div>

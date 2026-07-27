@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { LovEntry } from "@/lib/types";
+import type { Category, LovEntry } from "@/lib/types";
+import { FlyerPlaceholder } from "@/components/flyer-placeholder";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -43,7 +44,8 @@ function expandDateRange(start: string, end: string | null): string[] {
   return days;
 }
 
-export function EventCalendar({ events }: { events: LovEntry[] }) {
+export function EventCalendar({ events, categories = [] }: { events: LovEntry[]; categories?: Category[] }) {
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -176,7 +178,7 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
           {selectedEvents.length > 0 ? (
             <div className="mt-3 space-y-4">
               {selectedEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard key={event.id} event={event} category={categoryById.get(event.category_id ?? "")} />
               ))}
             </div>
           ) : (
@@ -193,7 +195,7 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
           </p>
           <div className="mt-4 space-y-4">
             {recurringEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
+              <EventCard key={event.id} event={event} category={categoryById.get(event.category_id ?? "")} />
             ))}
           </div>
         </div>
@@ -202,7 +204,7 @@ export function EventCalendar({ events }: { events: LovEntry[] }) {
   );
 }
 
-function EventCard({ event }: { event: LovEntry }) {
+function EventCard({ event, category }: { event: LovEntry; category?: Category }) {
   return (
     <div className="flex gap-4 rounded-2xl border border-slate-200 bg-white p-4">
       {event.flyer_image_url ? (
@@ -213,9 +215,12 @@ function EventCard({ event }: { event: LovEntry }) {
           className="h-28 w-28 shrink-0 rounded-lg object-cover"
         />
       ) : (
-        <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-3xl">
-          📅
-        </div>
+        <FlyerPlaceholder
+          seed={event.name}
+          icon={category?.icon}
+          label={category?.name}
+          className="h-28 w-28 shrink-0 rounded-lg"
+        />
       )}
       <div>
         <p className="font-bold text-slate-900">{event.name}</p>
