@@ -23,10 +23,13 @@ export function VendorLoginForm() {
   // vendor/admin doesn't retype it every time — never the password/PIN
   // itself, just what to log in as.
   useEffect(() => {
+    // localStorage only exists post-hydration on a static export — this
+    // intentionally re-renders once the remembered value is known.
     try {
       const raw = window.localStorage.getItem(REMEMBER_KEY);
       if (!raw) return;
       const remembered = JSON.parse(raw) as { mode: Mode; email?: string; businessId?: string };
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMode(remembered.mode);
       if (remembered.email) setEmail(remembered.email);
       if (remembered.businessId) setBusinessId(remembered.businessId);

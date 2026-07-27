@@ -95,6 +95,11 @@ export function VendorDirectory() {
   const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Reads localStorage, so it can only run post-hydration (the static
+    // export's server-rendered HTML always starts anchor-less) — an
+    // intentional second render, not one the lint rule's "avoid setState
+    // in an effect" guidance is meant to catch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAnchorState(getAnchor());
   }, []);
 

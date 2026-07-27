@@ -341,7 +341,7 @@ function AccountLoginSettings({ currentEmail }: { currentEmail: string }) {
       <h2 className="text-lg font-bold text-slate-900">Account Login</h2>
       <p className="mt-1 text-sm text-slate-600">
         Currently signed in as <span className="font-medium">{currentEmail}</span>. Set your own
-        email and password here whenever you're ready — you don't have to keep using a PIN.
+        email and password here whenever you&rsquo;re ready — you don&rsquo;t have to keep using a PIN.
       </p>
       <form onSubmit={handleSubmit} className="mt-4 max-w-sm space-y-3">
         <input
