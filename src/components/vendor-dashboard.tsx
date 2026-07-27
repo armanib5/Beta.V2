@@ -292,6 +292,82 @@ export function VendorDashboard({
           {saving ? "Saving…" : "Save Changes"}
         </button>
       </form>
+
+      <AccountLoginSettings currentEmail={vendor.contact_email} />
+    </div>
+  );
+}
+
+/** Lets a vendor set up their own real email/password — for accounts the
+ * admin comped with a PIN and a placeholder @vendor.citypinned.app
+ * address, this is how they take over their own login going forward. */
+function AccountLoginSettings({ currentEmail }: { currentEmail: string }) {
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    if (!newEmail && !newPassword) return;
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const update: { email?: string; password?: string } = {};
+      if (newEmail) update.email = newEmail;
+      if (newPassword) update.password = newPassword;
+      const { error: updateError } = await supabase.auth.updateUser(update);
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+      setMessage(
+        newEmail
+          ? "Check your new email for a confirmation link to finish the switch."
+          : "Password updated.",
+      );
+      setNewEmail("");
+      setNewPassword("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-10 border-t border-slate-200 pt-6">
+      <h2 className="text-lg font-bold text-slate-900">Account Login</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Currently signed in as <span className="font-medium">{currentEmail}</span>. Set your own
+        email and password here whenever you're ready — you don't have to keep using a PIN.
+      </p>
+      <form onSubmit={handleSubmit} className="mt-4 max-w-sm space-y-3">
+        <input
+          type="email"
+          placeholder="New email (optional)"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+        />
+        <input
+          type="password"
+          placeholder="New password (optional)"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+        />
+        {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+        {message && <p className="text-sm font-medium text-green-600">{message}</p>}
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+        >
+          {saving ? "Saving…" : "Update Login"}
+        </button>
+      </form>
     </div>
   );
 }

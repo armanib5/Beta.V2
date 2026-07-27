@@ -644,6 +644,7 @@ function initMap() {
   document.getElementById("zIn").onclick = function () { map.stop(); map.zoomIn(); };
   document.getElementById("zOut").onclick = function () { map.stop(); map.zoomOut(); };
   document.getElementById("zReset").onclick = function () { flyTo(start.lat, start.lng, start.zoom); };
+  setupFullScreenToggle();
   document.getElementById("myLoc").onclick = locateUser;
   document.getElementById("flyerClose").onclick = hideFlyer;
   map.on("click", hideFlyer);
@@ -707,6 +708,25 @@ function openPlaceFromQuery() {
   flyTo(p.lat, p.lng, 18);
   setTimeout(function () { showFlyer(p); }, 400);
   return true;
+}
+
+/* Full-screen toggle - the map viewport fills the whole screen (no page
+   scroll fighting the map's own pan/zoom underneath it), closed via the
+   same button, the Escape key, or navigating away. */
+function setupFullScreenToggle() {
+  var btn = document.getElementById("fsToggle"), vp = document.getElementById("mvp");
+  if (!btn || !vp) return;
+  function setFullScreen(on) {
+    vp.classList.toggle("fullscreen", on);
+    document.body.classList.toggle("map-fullscreen-open", on);
+    btn.classList.toggle("on", on);
+    btn.innerHTML = on ? "&#9974; Exit Full Screen" : "&#9974; Full Screen";
+    setTimeout(function () { if (map) map.invalidateSize(); }, 50);
+  }
+  btn.onclick = function () { setFullScreen(!vp.classList.contains("fullscreen")); };
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && vp.classList.contains("fullscreen")) setFullScreen(false);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", initMap);
