@@ -342,9 +342,40 @@ function recurrenceToDayCode(recurrence){
    (mkTCard/openDetail already do this for any event with no ev.photo) —
    missing coordinates aren't relevant here, the Board files by hood name
    not lat/lng. */
+/* Real category (Farmers Market, Comedy Show, Music Festival, ...) maps
+   to a board category key - "everything non-recurring is seasonal" was
+   too crude and put comedy/music shows in the wrong board entirely
+   instead of Theaters. Falls back to seasonal for anything unmapped. */
+var LOV_CAT_SLUG_TO_BOARD={
+  "farmers-market":"market","farmers-market-vendor":"market","fair":"market",
+  "maker-market":"market","night-market":"market","art-walk":"seasonal",
+  "music-festival":"venue","comedy-show":"venue","live-show":"venue",
+  "cultural-festival":"venue","gaming-festival":"venue","outdoor-movie":"venue",
+  "community-event":"seasonal","restaurant":"bars","bar":"bars"
+};
+/* Resolves a real city+hood from the row's own lat/lng (every seeded row
+   has one) instead of only trusting section_zone, which is null on every
+   row seeded so far - that bug was why every farmers market/event showed
+   up filed under Downtown San Jose regardless of its real city. */
+function cityHoodFromRow(r){
+  if(r.section_zone&&typeof CITY_CENTERS!=="undefined"){
+    var bySection=CITY_CENTERS.find(function(c){return c.section===r.section_zone;});
+    if(bySection){
+      var p=bySection.id.split("-")[0];
+      return {city:CN[p]?p:"sj",hood:bySection.id.slice(p.length+1)};
+    }
+  }
+  if(r.lat!=null&&r.lng!=null&&typeof nearestCityCenter==="function"){
+    var nearest=nearestCityCenter(r.lat,r.lng);
+    var prefix=nearest.id.split("-")[0];
+    return {city:CN[prefix]?prefix:"sj",hood:nearest.id.slice(prefix.length+1)};
+  }
+  return {city:"sj",hood:"downtown"};
+}
+
 function loadLovEvents(){
   if(typeof V2_SUPABASE_URL==="undefined")return;
-  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*&type=eq.event&or=(publish_at.is.null,publish_at.lte."+encodeURIComponent(new Date().toISOString())+")",{
+  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*,categories(slug)&type=eq.event&or=(publish_at.is.null,publish_at.lte."+encodeURIComponent(new Date().toISOString())+")",{
     headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
   }).then(function(res){return res.json();}).then(function(rows){
     if(!Array.isArray(rows))return;
@@ -352,19 +383,13 @@ function loadLovEvents(){
     rows.forEach(function(r){
       var id="lov-"+r.id;
       if(existingIds.indexOf(id)>=0)return;
-      var city="sj",hood="downtown";
-      if(r.section_zone&&typeof CITY_CENTERS!=="undefined"){
-        var match=CITY_CENTERS.find(function(c){return c.section===r.section_zone;});
-        if(match){
-          var prefix=match.id.split("-")[0];
-          city=CN[prefix]?prefix:"sj";
-          hood=match.id.slice(prefix.length+1);
-        }
-      }
+      var loc=cityHoodFromRow(r);
+      var slug=r.categories?r.categories.slug:null;
+      var cat=(slug&&LOV_CAT_SLUG_TO_BOARD[slug])||(r.recurrence?"market":"seasonal");
       var d=r.event_date?r.event_date.slice(0,10):recurrenceToDayCode(r.recurrence);
       evts.push({
-        id:id,cat:r.recurrence?"market":"seasonal",lbl:r.recurrence?"Recurring":"Live Festival",
-        exp:false,city:city,hood:hood,
+        id:id,cat:cat,lbl:r.recurrence?"Recurring":"Live Festival",
+        exp:false,city:loc.city,hood:loc.hood,
         t:r.name,w:r.recurrence||(r.event_date?r.event_date.slice(0,10):""),d:d,
         a:r.location||"",ph:"",wb:r.website_url||"",ds:r.recurrence||"",
         photo:r.flyer_image_url||"",ed:r.end_date?r.end_date.slice(0,10):undefined
@@ -394,6 +419,7 @@ function loadLovVendors(){
     rows.forEach(function(r){
       var id="lov-"+r.id;
       if(existingIds.indexOf(id)>=0)return;
+      var loc=cityHoodFromRow(r);
       vendors.push({
         id:id,name:r.name,cat:"market",
         desc:r.location||"",menu:"",address:r.location||"",
@@ -402,7 +428,7 @@ function loadLovVendors(){
         hours:{mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""},
         featured:false,verified:false,
         boost:{tier:null,active:false,until:"",radius:null},
-        mx:0,my:0,city:"sj",events:[],gallery:[],logo:"",cover:r.flyer_image_url||"",status:"approved"
+        mx:0,my:0,city:loc.city,hood:loc.hood,events:[],gallery:[],logo:"",cover:r.flyer_image_url||"",status:"approved"
       });
     });
     if(typeof renderPins==="function")renderPins();
@@ -415,7 +441,10 @@ var BOARD_CAT_SLUGS={restaurant:"bars",bar:"bars"};
    loadLovVendors, sourced from the actual vendor accounts instead of the
    LOV guest listings, so a vendor who's actually signed up (or been
    comped a tier by the admin) shows up in the Vendor Hub with their real
-   profile photo/website, not just a name. */
+   profile photo/website, not just a name. Also pushed into evts as a
+   real flyer in their category board (e.g. Bars & Restaurants) - being
+   in the Vendor Hub alone didn't make a paid vendor actually visible
+   anywhere on the board itself. */
 function loadRealVendors(){
   if(typeof V2_SUPABASE_URL==="undefined")return;
   fetch(V2_SUPABASE_URL+"/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active",{
@@ -423,22 +452,39 @@ function loadRealVendors(){
   }).then(function(res){return res.json();}).then(function(rows){
     if(!Array.isArray(rows)||typeof vendors==="undefined")return;
     var existingIds=vendors.map(function(v){return v.id;});
+    var existingEvtIds=evts.map(function(e){return e.id;});
     rows.forEach(function(r){
       var id="vendor-"+r.id;
-      if(existingIds.indexOf(id)>=0)return;
       var slug=(r.vendor_categories&&r.vendor_categories[0]&&r.vendor_categories[0].categories)?r.vendor_categories[0].categories.slug:null;
-      vendors.push({
-        id:id,name:r.business_name,cat:(slug&&BOARD_CAT_SLUGS[slug])||"shop",
-        desc:r.short_description||"",menu:"",address:"",
-        contact:{phone:r.phone||"",email:""},website:r.website_url||"",
-        social:{instagram:r.instagram_handle||""},
-        hours:{mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""},
-        featured:!!r.is_founding_vendor,verified:true,
-        boost:{tier:r.is_top10?"anchor":null,active:!!r.is_top10,until:"",radius:null},
-        mx:0,my:0,city:"sj",events:[],gallery:[],logo:r.logo_url||"",cover:r.logo_url||"",status:"approved"
-      });
+      var cat=(slug&&BOARD_CAT_SLUGS[slug])||"shop";
+      var loc=(r.lat!=null&&r.lng!=null&&typeof nearestCityCenter==="function")
+        ? (function(){var n=nearestCityCenter(r.lat,r.lng);var p=n.id.split("-")[0];return {city:CN[p]?p:"sj",hood:n.id.slice(p.length+1)};})()
+        : {city:"sj",hood:"downtown"};
+      if(existingIds.indexOf(id)<0){
+        vendors.push({
+          id:id,name:r.business_name,cat:cat,
+          desc:r.short_description||"",menu:"",address:"",
+          contact:{phone:r.phone||"",email:""},website:r.website_url||"",
+          social:{instagram:r.instagram_handle||""},
+          hours:{mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""},
+          featured:!!r.is_founding_vendor,verified:true,
+          boost:{tier:r.is_top10?"anchor":null,active:!!r.is_top10,until:"",radius:null},
+          mx:0,my:0,city:loc.city,hood:loc.hood,events:[],gallery:[],logo:r.logo_url||"",cover:r.logo_url||"",status:"approved"
+        });
+      }
+      if(existingEvtIds.indexOf(id)<0){
+        evts.push({
+          id:id,cat:cat,lbl:r.is_top10?"Top 10":(r.is_founding_vendor?"Founding Vendor":"Vendor"),
+          exp:false,city:loc.city,hood:loc.hood,
+          t:r.business_name+(r.is_top10?" ⭐":""),w:"",d:"daily",
+          a:"",ph:"",wb:r.website_url||"",ds:r.short_description||"",
+          photo:r.logo_url||""
+        });
+      }
     });
     if(typeof renderPins==="function")renderPins();
+    if(typeof renderToday==="function")renderToday();
+    if(typeof renderBoards==="function")renderBoards();
     openVendorFromQuery();
   }).catch(function(){});
 }

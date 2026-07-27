@@ -234,9 +234,20 @@ function loadApprovedPins() {
    otherwise falls back to the nearest hood by coordinates, and to this
    city's default center when the event has no lat/lng of its own at all
    (an event without a location shouldn't just disappear from the map). */
+/* Real category (Farmers Market, Comedy Show, ...) maps to a Map
+   category key - "everything non-recurring is seasonal" put shows/fairs
+   in the wrong bucket instead of Theaters/Farmers Market. */
+var LOV_CAT_SLUG_TO_MAP = {
+  "farmers-market": "market", "farmers-market-vendor": "market", "fair": "market",
+  "maker-market": "market", "night-market": "market", "art-walk": "seasonal",
+  "music-festival": "venue", "comedy-show": "venue", "live-show": "venue",
+  "cultural-festival": "venue", "gaming-festival": "venue", "outdoor-movie": "venue",
+  "community-event": "seasonal", "restaurant": "restaurants", "bar": "bars"
+};
+
 function loadLovEvents() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
-  return fetch(V2_SUPABASE_URL + "/rest/v1/lov_entries?select=*&type=eq.event&or=(publish_at.is.null,publish_at.lte." + encodeURIComponent(new Date().toISOString()) + ")", {
+  return fetch(V2_SUPABASE_URL + "/rest/v1/lov_entries?select=*,categories(slug)&type=eq.event&or=(publish_at.is.null,publish_at.lte." + encodeURIComponent(new Date().toISOString()) + ")", {
     headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
   }).then(function (res) { return res.json(); }).then(function (rows) {
     if (!Array.isArray(rows)) return;
@@ -251,8 +262,10 @@ function loadLovEvents() {
       } else {
         lat = HOODS[0].lat; lng = HOODS[0].lng; hood = HOODS[0].id; // city-center fallback
       }
+      var slug = r.categories ? r.categories.slug : null;
+      var cat = (slug && LOV_CAT_SLUG_TO_MAP[slug]) || (r.recurrence ? "market" : "seasonal");
       var place = {
-        id: "lov-" + r.id, cat: r.recurrence ? "market" : "seasonal", hood: hood,
+        id: "lov-" + r.id, cat: cat, hood: hood,
         t: r.name, a: r.location || "", ds: r.recurrence || "",
         lat: lat, lng: lng, wb: r.website_url || undefined,
         flyer: r.flyer_image_url || null

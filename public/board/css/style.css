@@ -53,9 +53,13 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:.6;}}
 .tscr{display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;padding:3px 2px 14px;}
 .tscr::-webkit-scrollbar{display:none;}
-.weekdays{display:flex;flex-direction:column;gap:6px;}
-.wkday{padding:2px 0;}
-.wkday-hd{font-family:'Special Elite',monospace;font-size:11px;color:rgba(218,184,112,.85);margin-bottom:6px;letter-spacing:.5px;}
+.weekdays{display:flex;flex-direction:row;gap:14px;overflow-x:auto;scrollbar-width:none;padding:3px 2px 14px;}
+.weekdays::-webkit-scrollbar{display:none;}
+.wkday{flex-shrink:0;width:190px;padding:2px 0;border-right:1px solid rgba(218,184,112,.16);padding-right:14px;}
+.wkday:last-child{border-right:none;}
+.wkday-hd{font-family:'Special Elite',monospace;font-size:11px;color:rgba(218,184,112,.85);margin-bottom:6px;letter-spacing:.5px;white-space:nowrap;}
+.wkday .tscr{flex-direction:column;overflow-x:visible;}
+.wkday .tc{width:100%;}
 .tc.nothing{cursor:default;}
 .tc.nothing:hover{transform:none;}
 .tc.nothing .tcimg{font-size:20px;}
