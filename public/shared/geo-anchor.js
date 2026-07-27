@@ -22,7 +22,9 @@ var CITY_CENTERS = [
   { id: "mv-downtown", city: "Mountain View", section: "Downtown", label: "Downtown Mountain View", lat: 37.3894, lng: -122.0832 },
   { id: "mv-shoreline", city: "Mountain View", section: "Shoreline", label: "Shoreline", lat: 37.4048, lng: -122.0784 },
   { id: "camp-downtown", city: "Campbell", section: "Downtown", label: "Downtown Campbell", lat: 37.2872, lng: -121.95 },
-  { id: "camp-pruneyard", city: "Campbell", section: "Pruneyard", label: "Pruneyard", lat: 37.2932, lng: -121.9447 }
+  { id: "camp-pruneyard", city: "Campbell", section: "Pruneyard", label: "Pruneyard", lat: 37.2932, lng: -121.9447 },
+  { id: "gil-downtown", city: "Gilroy", section: "Downtown", label: "Downtown Gilroy", lat: 37.0058, lng: -121.5683 },
+  { id: "gil-outlets", city: "Gilroy", section: "Outlets", label: "Gilroy Premium Outlets", lat: 37.0136, lng: -121.5758 }
 ];
 
 var ANCHOR_STORAGE_KEY = "citypinned_anchor";

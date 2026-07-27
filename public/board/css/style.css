@@ -7,9 +7,12 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 .nav{position:sticky;top:0;z-index:900;background:rgba(12,6,0,.97);backdrop-filter:blur(14px);border-bottom:1px solid rgba(218,184,112,.18);display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap;}
 .logo{font-family:'Special Elite',monospace;font-size:22px;color:var(--cl);letter-spacing:2px;flex-shrink:0;display:flex;align-items:center;gap:7px;}
 .logo .pinicon{flex-shrink:0;}
-.navbtns{display:flex;gap:5px;flex-wrap:wrap;}
+.navbtns{display:flex;gap:5px;flex-wrap:wrap;width:100%;order:99;margin-top:8px;padding-top:8px;border-top:1px solid rgba(218,184,112,.18);}
+.navbtns[hidden]{display:none;}
 .nb{font-family:'Special Elite',monospace;font-size:11px;background:rgba(255,255,255,.07);color:rgba(218,184,112,.8);border:1px solid rgba(218,184,112,.22);padding:6px 14px;border-radius:16px;cursor:pointer;transition:all .2s;}
 .nb:hover,.nb.on{background:var(--go);color:#fff;border-color:var(--go);}
+.wafflebtn{font-size:18px;background:rgba(255,255,255,.07);color:var(--cl);border:1px solid rgba(218,184,112,.22);width:36px;height:36px;border-radius:10px;cursor:pointer;flex-shrink:0;}
+.wafflebtn:hover,.wafflebtn.on{background:var(--go);color:#fff;border-color:var(--go);}
 .csel{margin-left:auto;position:relative;flex-shrink:0;}
 .csel select{font-family:'Special Elite',monospace;font-size:12px;background:rgba(218,184,112,.12);color:var(--cl);border:1px solid rgba(218,184,112,.3);padding:7px 28px 7px 12px;border-radius:16px;cursor:pointer;outline:none;appearance:none;}
 .carr{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--cl);pointer-events:none;font-size:10px;}

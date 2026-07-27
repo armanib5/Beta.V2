@@ -71,6 +71,7 @@ export interface LovEntry {
   vendor_id: string | null;
   recurrence: string | null;
   website_url: string | null;
+  section_zone: string | null;
   created_at: string;
   updated_at: string;
 }

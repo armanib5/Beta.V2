@@ -24,11 +24,12 @@ var CATS = {
   "schools": { "l": "Schools", "c": "#0ea5e9", "icon": "school" },
   "hospitals": { "l": "Hospitals", "c": "#dc2626", "icon": "hospital" },
   "churches": { "l": "Churches", "c": "#7c3aed", "icon": "church" },
-  "hotels": { "l": "Hotels", "c": "#0f766e", "icon": "hotel" }
+  "hotels": { "l": "Hotels", "c": "#0f766e", "icon": "hotel" },
+  "centers": { "l": "Centers", "c": "#0d6b4f", "icon": "building" }
 };
 
 /* Order controls the category filter row. */
-var CAT_ORDER = ["market","foodhall","restaurants","bars","artwalk","cityart","venue","seasonal","shop","parking","restrooms","transit","schools","hospitals","churches","hotels"];
+var CAT_ORDER = ["market","foodhall","restaurants","bars","artwalk","cityart","venue","seasonal","centers","shop","parking","restrooms","transit","schools","hospitals","churches","hotels"];
 
 var HOODS = [
   { "id": "downtown", "l": "Downtown San Jose", "lat": 37.3382, "lng": -121.8863, "zoom": 15 },
@@ -59,6 +60,10 @@ var HOODS_CAMP = [
   { id: "camp-downtown",  l: "Downtown Campbell", lat: 37.2872, lng: -121.9500, zoom: 15 },
   { id: "camp-pruneyard", l: "Pruneyard",          lat: 37.2932, lng: -121.9447, zoom: 15 }
 ];
+var HOODS_GIL = [
+  { id: "gil-downtown", l: "Downtown Gilroy",         lat: 37.0058, lng: -121.5683, zoom: 15 },
+  { id: "gil-outlets",  l: "Gilroy Premium Outlets",  lat: 37.0136, lng: -121.5758, zoom: 15 }
+];
 
 /* Top-level city switcher - each city carries its own list of mini
    cities/neighborhoods, so picking a different city swaps the whole
@@ -68,7 +73,8 @@ var CITIES = [
   { id: "sc",   l: "Santa Clara",    hoods: HOODS_SC },
   { id: "sv",   l: "Sunnyvale",      hoods: HOODS_SV },
   { id: "mv",   l: "Mountain View",  hoods: HOODS_MV },
-  { id: "camp", l: "Campbell",       hoods: HOODS_CAMP }
+  { id: "camp", l: "Campbell",       hoods: HOODS_CAMP },
+  { id: "gil",  l: "Gilroy",         hoods: HOODS_GIL }
 ];
 
 var PLACES = [
@@ -228,5 +234,11 @@ var PLACES = [
   { "id": "jt-fm", "cat": "market", "hood": "japantown", "t": "Japantown Farmers Market", "a": "357 E. Taylor St (Gordon Biersch Brewery parking lot), San Jose, CA", "lat": 37.3533052, "lng": -121.8925223, "w": "Sundays, 8:00am - 12:00pm (May - Oct)", "d": "sun", "sh": 8, "eh": 12, "ds": "Organized by the Japantown Farmers Market Committee / Gordon Biersch." },
   { "id": "sr-fm", "cat": "market", "hood": "santana", "t": "Santana Row Farmers Market", "a": "Santana Row (between Olin Ave & Olsen Dr), San Jose, CA", "lat": 37.3209796, "lng": -121.9486002, "w": "Wednesdays, 4:00pm - 8:00pm (May - Sept)", "d": "wed", "sh": 16, "eh": 20, "ds": "Organized by the California Farmers' Markets Association (CFMA)." },
   { "id": "vmc-fm", "cat": "market", "hood": "santana", "t": "Santa Clara Valley Medical Center Farmers Market", "a": "751 S. Bascom Ave (hospital parking lot), San Jose, CA", "lat": 37.3151936, "lng": -121.9332862, "w": "Wednesdays, 9:00am - 1:00pm (May - Nov)", "d": "wed", "sh": 9, "eh": 13, "ds": "Organized by West Coast Farmers Markets (WCFMA)." },
-  { "id": "camp-fm", "cat": "market", "hood": "camp-downtown", "t": "Downtown Campbell Farmers Market", "a": "E. Campbell Ave & N. 1st St, Downtown Campbell, CA", "lat": 37.2870626, "lng": -121.944881, "w": "Sundays, 9:00am - 1:00pm (year-round)", "d": "sun", "sh": 9, "eh": 13, "ds": "Organized by the Urban Village Farmers' Market Association (UVFM)." }
+  { "id": "camp-fm", "cat": "market", "hood": "camp-downtown", "t": "Downtown Campbell Farmers Market", "a": "E. Campbell Ave & N. 1st St, Downtown Campbell, CA", "lat": 37.2870626, "lng": -121.944881, "w": "Sundays, 9:00am - 1:00pm (year-round)", "d": "sun", "sh": 9, "eh": 13, "ds": "Organized by the Urban Village Farmers' Market Association (UVFM)." },
+  { "id": "ctr-sj", "cat": "centers", "hood": "downtown", "t": "San Jose City Hall", "a": "200 E Santa Clara St, San Jose, CA 95113", "lat": 37.3373, "lng": -121.8875, "ds": "Civic center — City Council chambers and public services." },
+  { "id": "ctr-sc", "cat": "centers", "hood": "sc-downtown", "t": "Santa Clara City Hall", "a": "1500 Warburton Ave, Santa Clara, CA 95050", "lat": 37.3541, "lng": -121.9552, "ds": "Civic center for the City of Santa Clara." },
+  { "id": "ctr-sv", "cat": "centers", "hood": "sv-downtown", "t": "Sunnyvale Civic Center", "a": "456 W Olive Ave, Sunnyvale, CA 94086", "lat": 37.3697, "lng": -122.0372, "ds": "City Hall, Community Center, and Senior Center complex." },
+  { "id": "ctr-mv", "cat": "centers", "hood": "mv-downtown", "t": "Mountain View Civic Center", "a": "500 Castro St, Mountain View, CA 94041", "lat": 37.3894, "lng": -122.0819, "ds": "City Hall, library, and Center for the Performing Arts." },
+  { "id": "ctr-camp", "cat": "centers", "hood": "camp-downtown", "t": "Campbell Community Center", "a": "1 W Campbell Ave, Campbell, CA 95008", "lat": 37.2872, "lng": -121.9497, "ds": "Community center and public services for the City of Campbell." },
+  { "id": "ctr-gil", "cat": "centers", "hood": "gil-downtown", "t": "Gilroy City Hall", "a": "7351 Rosanna St, Gilroy, CA 95020", "lat": 37.0046, "lng": -121.568, "ds": "Civic center for the City of Gilroy." }
 ];

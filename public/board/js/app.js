@@ -7,11 +7,12 @@ var C={
   parks:{l:"Parks",i:"&#127795;",c:"#5a8c3a"},
   venue:{l:"Theaters",i:"&#127963;",c:"#7a5230"},
   seasonal:{l:"Seasonal",i:"&#9917;",c:"#8B0000"},
+  centers:{l:"Centers",i:"&#127970;",c:"#0d6b4f"},
   shop:{l:"Shops",i:"&#128717;",c:"#c0392b"}
 };
-var ORD=["seasonal","market","foodhall","bars","artwalk","cityart","parks","venue","shop"];
-var CN={sj:"San Jose, CA",sc:"Santa Clara, CA",sv:"Sunnyvale, CA",mv:"Mountain View, CA",camp:"Campbell, CA"};
-var CITY_ABBR={sj:"SJ",sc:"SC",sv:"SV",mv:"MV",camp:"Camp"};
+var ORD=["seasonal","market","foodhall","bars","artwalk","cityart","parks","venue","centers","shop"];
+var CN={sj:"San Jose, CA",sc:"Santa Clara, CA",sv:"Sunnyvale, CA",mv:"Mountain View, CA",camp:"Campbell, CA",gil:"Gilroy, CA"};
+var CITY_ABBR={sj:"SJ",sc:"SC",sv:"SV",mv:"MV",camp:"Camp",gil:"Gil"};
 function setBrand(v){
   var name="BayPinned "+(CITY_ABBR[v]||v.toUpperCase());
   var el=document.getElementById("brandName");
@@ -22,8 +23,7 @@ function setBrand(v){
    HOODS array in baypinnedmap1/data/places.js, so a flyer's hood tag
    lines up with that map's pins once the two sites combine. Events
    with no hood field are treated as "downtown" (all of today's seed
-   data is downtown San Jose). Only San Jose has this wired up for now;
-   other cities keep their existing single-board "coming soon" view. */
+   data is downtown San Jose). */
 var HOODS_SJ=[
   {id:"downtown",l:"Downtown San Jose"},
   {id:"japantown",l:"Japantown"},
@@ -33,6 +33,43 @@ var HOODS_SJ=[
   {id:"east",l:"East San Jose"}
 ];
 var curHood="downtown";
+
+/* Every city now gets a real board with its own sections, not just San
+   Jose - Santa Clara/Sunnyvale/Mountain View/Campbell/Gilroy's sections
+   come from CITY_CENTERS (shared/geo-anchor.js), the same list the Map
+   and the shared anchor already use, so "Downtown Campbell" means the
+   same place everywhere instead of three different definitions. */
+function hoodsForCity(cityAbbr){
+  if(cityAbbr==="sj")return HOODS_SJ;
+  if(typeof CITY_CENTERS==="undefined")return [];
+  var prefix=cityAbbr+"-";
+  return CITY_CENTERS.filter(function(c){return c.id.indexOf(prefix)===0;})
+    .map(function(c){return {id:c.id.slice(prefix.length),l:c.section};});
+}
+
+/* This city's own representative coordinate (its first/downtown section),
+   for sorting the city picker and the hood row closest-first. */
+function cityCoords(cityAbbr){
+  var hoods=hoodsForCity(cityAbbr);
+  if(!hoods.length||typeof CITY_CENTERS==="undefined")return null;
+  var prefix=cityAbbr+"-";
+  return CITY_CENTERS.find(function(c){return c.id===prefix+hoods[0].id;}) || null;
+}
+
+/* City/hood tabs sorted closest-first once an anchor exists (GPS fix or a
+   city/section picked anywhere - Map, Board, Vendor Directory all share
+   it), instead of the fixed San-Jose-always-first order. No-op with no
+   anchor set (or before geo-anchor.js has loaded). */
+function sortByProximity(list,getLat,getLng){
+  if(typeof getAnchor!=="function"||typeof haversine!=="function")return list;
+  var anchor=getAnchor();
+  if(!anchor)return list;
+  return list.slice().sort(function(a,b){
+    var la=getLat(a),lb=getLat(b);
+    if(la==null||lb==null)return 0;
+    return haversine(anchor.lat,anchor.lng,la,getLng(a))-haversine(anchor.lat,anchor.lng,lb,getLng(b));
+  });
+}
 var DEF=[
 {id:"mariachi2026",cat:"seasonal",lbl:"Live Festival",exp:false,mapId:"u1783885081451",
  t:"Silicon Valley Mariachi Festival",w:"Today 1pm - 8pm",d:"2026-07-12",sh:13,eh:20,
@@ -133,6 +170,10 @@ var DEF=[
 ];
 
 var KEY="pinnedsj-v9",evts=[],mS=1,mX=0,mY=0,pan=false,ps={x:0,y:0};
+/* Public flyer self-submission turned off for now (per request) - the
+   openForm()/mkVendorForm() machinery is untouched underneath, so this is
+   one flag to flip back on rather than deleted functionality. */
+var SHOW_POST_FLYER=false;
 
 /* Shared legal/safety copy - used on the Report form and the payment
    disclaimer gate, so the wording stays identical everywhere it appears. */
@@ -163,6 +204,7 @@ document.getElementById("postBtn2").onclick=function(){openForm("");};
 function init(){
   load();
   applySharedAnchorOnLoad();
+  sortCitySelect();
   setBrand(curCity);
   renderHoodRow();
   renderToday();
@@ -177,6 +219,22 @@ function init(){
   openFlyerFromQuery();
   loadLovEvents();
   loadLovVendors();
+  setupWaffleMenu();
+}
+
+/* Nav buttons (Main/Boards/Map/Today/Dashboard/Admin/Login/Background)
+   collapse behind a single ☰ menu instead of sitting as a loose row of
+   buttons across the top - same idea as the main site's mobile menu. */
+function setupWaffleMenu(){
+  var btn=document.getElementById("waffleBtn"),panel=document.getElementById("navbtns");
+  if(!btn||!panel)return;
+  btn.addEventListener("click",function(){
+    var open=panel.hasAttribute("hidden");
+    if(open)panel.removeAttribute("hidden");else panel.setAttribute("hidden","");
+    btn.classList.toggle("on",open);
+    btn.setAttribute("aria-expanded",open?"true":"false");
+    syncStickyOffsets();
+  });
 }
 
 /* An anchor already set on another page (city/section picked on the Map,
@@ -296,11 +354,19 @@ function loadLovEvents(){
     rows.forEach(function(r){
       var id="lov-"+r.id;
       if(existingIds.indexOf(id)>=0)return;
-      var hood=r.section_zone?(HOODS_SJ.find(function(h){return h.l===r.section_zone||h.id===r.section_zone;})||{}).id:"downtown";
+      var city="sj",hood="downtown";
+      if(r.section_zone&&typeof CITY_CENTERS!=="undefined"){
+        var match=CITY_CENTERS.find(function(c){return c.section===r.section_zone;});
+        if(match){
+          var prefix=match.id.split("-")[0];
+          city=CN[prefix]?prefix:"sj";
+          hood=match.id.slice(prefix.length+1);
+        }
+      }
       var d=r.event_date?r.event_date.slice(0,10):recurrenceToDayCode(r.recurrence);
       evts.push({
         id:id,cat:r.recurrence?"market":"seasonal",lbl:r.recurrence?"Recurring":"Live Festival",
-        exp:false,hood:hood||"downtown",
+        exp:false,city:city,hood:hood,
         t:r.name,w:r.recurrence||(r.event_date?r.event_date.slice(0,10):""),d:d,
         a:r.location||"",ph:"",wb:r.website_url||"",ds:r.recurrence||"",
         photo:r.flyer_image_url||"",ed:r.end_date?r.end_date.slice(0,10):undefined
@@ -390,6 +456,22 @@ function isToday(ev){
 }
 function isWeek(ev){return!isToday(ev)&&!ev.exp&&["daily","wed","thu","fri","sat","sun","mon","tue","monthly"].indexOf(ev.d)>=0;}
 
+/* Flyers within a category board sort soonest-upcoming-first, past events
+   pushed toward the back (most-recently-past before older-past) instead
+   of just sitting in whatever order they were posted. Recurring/no-fixed-
+   date flyers ("daily","wed",...,"monthly") count as always-relevant and
+   float to the very front, same rank as "happening today". */
+function eventSortKey(ev){
+  if(ev.exp)return Infinity;
+  if(ev.d&&ev.d.length===10){
+    var p=ev.d.split("-").map(Number);
+    var diff=new Date(p[0],p[1]-1,p[2]).getTime()-todayMs();
+    return diff<0?(1000000-diff):diff;
+  }
+  return -1;
+}
+function todayMs(){var d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();}
+
 /* "Live now" (blinking green border, sorted first) - not just "happening
    today" but actually inside its sh/eh hour window right now, same idea
    as the map's isLive(). Events with no sh/eh are treated as live all day
@@ -414,7 +496,7 @@ function isLiveNow(ev){
 var CITY_BG={sj:"img/background.jpg",sc:"img/bg-sc.jpg",sv:"img/bg-sv.jpg",mv:"img/bg-mv.jpg",camp:"img/bg-camp.jpg"};
 var curCity="sj";
 function customBgKey(city,hood){return hood?("citybg-"+city+"-"+hood):("citybg-"+city);}
-function hoodLabel(id){var h=HOODS_SJ.find(function(x){return x.id===id;});return h?h.l:id;}
+function hoodLabel(id){var h=hoodsForCity(curCity).find(function(x){return x.id===id;});return h?h.l:id;}
 function setCityBg(city,hood){
   var bg=document.querySelector(".bg");if(!bg)return;
   var custom=Storage.get(customBgKey(city,hood),null);
@@ -423,12 +505,20 @@ function setCityBg(city,hood){
      already-uploaded photo doesn't quietly vanish now that downtown is
      also a hood. */
   if(!custom&&hood==="downtown")custom=Storage.get(customBgKey(city),null);
-  var file=custom||CITY_BG[city]||CITY_BG.sj;
-  bg.style.backgroundImage="linear-gradient(180deg,rgba(15,8,0,.5),rgba(20,10,0,.28) 50%,rgba(12,6,0,.52)),url('"+file+"')";
+  /* White by default (matching the main site) instead of a stock photo -
+     the upload button still works so a real photo can go up whenever
+     there's one to use, it's just not defaulting to one anymore. */
+  if(custom){
+    bg.style.backgroundImage="linear-gradient(180deg,rgba(15,8,0,.5),rgba(20,10,0,.28) 50%,rgba(12,6,0,.52)),url('"+custom+"')";
+    bg.style.backgroundColor="";
+  }else{
+    bg.style.backgroundImage="none";
+    bg.style.backgroundColor="#fff";
+  }
   var bgBtn=document.getElementById("bgBtn"),bgReset=document.getElementById("bgResetBtn");
   if(bgBtn)bgBtn.classList.toggle("custom",!!custom);
   if(bgReset)bgReset.classList.toggle("hidden",!custom);
-  var label=city==="sj"&&hood?hoodLabel(hood):(CN[city]||city);
+  var label=hood?hoodLabel(hood):(CN[city]||city);
   if(bgBtn){bgBtn.title="Change background photo for "+label;bgBtn.setAttribute("aria-label","Change background photo for "+label);}
   if(bgReset){bgReset.title="Reset "+label+"'s background photo";bgReset.setAttribute("aria-label","Reset "+label+"'s background photo");}
 }
@@ -440,7 +530,7 @@ function setupBgUpload(){
   file.addEventListener("change",function(){
     var f=file.files[0];file.value="";
     if(!f)return;
-    var hood=curCity==="sj"?curHood:null;
+    var hood=curHood;
     resizeImageFile(f,1600,0.85,function(dataUrl){
       if(!Storage.set(customBgKey(curCity,hood),dataUrl)){
         alert("This photo couldn't be saved - your browser's local storage is full. Try removing an old flyer or photo, then try again.");
@@ -450,8 +540,8 @@ function setupBgUpload(){
     });
   });
   if(reset)reset.addEventListener("click",function(){
-    var hood=curCity==="sj"?curHood:null;
-    var label=curCity==="sj"&&hood?hoodLabel(hood):(CN[curCity]||curCity);
+    var hood=curHood;
+    var label=hood?hoodLabel(hood):(CN[curCity]||curCity);
     if(!confirm("Remove the custom background photo for "+label+" and go back to the default?"))return;
     Storage.remove(customBgKey(curCity,hood));
     if(hood==="downtown")Storage.remove(customBgKey(curCity));
@@ -468,8 +558,11 @@ function renderHoodRow(){
   var row=document.getElementById("hoodRow");
   if(!row)return;
   row.innerHTML="";
-  if(curCity!=="sj")return;
-  HOODS_SJ.forEach(function(h){
+  var prefix=curCity+"-";
+  var hoods=sortByProximity(hoodsForCity(curCity),
+    function(h){var c=hoodCoords(curCity,h.id);return c?c.lat:null;},
+    function(h){var c=hoodCoords(curCity,h.id);return c?c.lng:null;});
+  hoods.forEach(function(h){
     var b=document.createElement("button");
     b.className="hoodbtn"+(h.id===curHood?" on":"");
     b.dataset.hoodId=h.id;
@@ -484,7 +577,7 @@ function goToHood(hoodId){
   clearJumpSpacer();
   curHood=hoodId;
   document.querySelectorAll(".hoodbtn").forEach(function(b){b.classList.toggle("on",b.dataset.hoodId===hoodId);});
-  document.getElementById("citylbl").textContent=(CN.sj||"San Jose, CA")+(hoodId!=="downtown"?" · "+hoodLabel(hoodId):"");
+  document.getElementById("citylbl").textContent=(CN[curCity]||curCity)+(hoodId!=="downtown"?" · "+hoodLabel(hoodId):"");
   setCityBg(curCity,curHood);
   renderBoards();
   renderToday();
@@ -497,19 +590,14 @@ function goToHood(hoodId){
 function setCity(v){
   clearJumpSpacer();
   curCity=v;
-  curHood=v==="sj"?"downtown":null;
+  var hoods=hoodsForCity(v);
+  curHood=hoods.length?hoods[0].id:null;
   document.getElementById("citylbl").textContent=CN[v]||v;
   setBrand(v);
   renderHoodRow();
   setCityBg(v,curHood);
-  var bv=document.getElementById("bView");
-  if(v!=="sj"){
-    bv.innerHTML="<div class='soon'>"+(CN[v]||v)+"<p>Events coming soon. Be the first to post a flyer!</p></div>";
-    document.getElementById("tdwrap").style.display="none";
-  }else{
-    document.getElementById("tdwrap").style.display="block";
-    renderBoards();
-  }
+  document.getElementById("tdwrap").style.display="block";
+  renderBoards();
   renderToday();
   if(typeof setAnchor==="function"&&typeof hoodCoords==="function"){
     var c=hoodCoords(v,curHood);
@@ -517,11 +605,32 @@ function setCity(v){
   }
 }
 
+/* City picker sorted closest-first once an anchor exists, same idea as
+   renderHoodRow - a <select>'s options can't highlight like button tabs,
+   but they can still be reordered so the nearest city is what you see
+   first when you open the dropdown. */
+function sortCitySelect(){
+  var sel=document.querySelector(".csel select");
+  if(!sel||typeof getAnchor!=="function")return;
+  var anchor=getAnchor();
+  if(!anchor)return;
+  var opts=Array.prototype.slice.call(sel.options);
+  opts.sort(function(a,b){
+    var ca=cityCoords(a.value),cb=cityCoords(b.value);
+    if(!ca||!cb)return 0;
+    return haversine(anchor.lat,anchor.lng,ca.lat,ca.lng)-haversine(anchor.lat,anchor.lng,cb.lat,cb.lng);
+  });
+  var curVal=sel.value;
+  opts.forEach(function(o){sel.appendChild(o);});
+  sel.value=curVal;
+}
+
 function renderToday(){
   var tc=document.getElementById("tdCrds"),wc=document.getElementById("wkCrds");
   if(!tc||!wc)return;
-  var hood=curCity==="sj"?curHood:null;
-  var pool=hood?evts.filter(function(e){return(e.hood||"downtown")===hood;}):evts;
+  var hood=curHood;
+  var cityEvts=evts.filter(function(e){return eventInCity(e,curCity);});
+  var pool=hood?cityEvts.filter(function(e){return(e.hood||"downtown")===hood;}):cityEvts;
   var td=pool.filter(function(e){return isToday(e)&&!e.exp;});
   td.sort(function(a,b){return (isLiveNow(b)?1:0)-(isLiveNow(a)?1:0);});
   var wk=pool.filter(function(e){return isWeek(e);});
@@ -547,17 +656,24 @@ function mkTCard(ev){
   return d;
 }
 
+/* "downtown" (and other hood ids) are reused across every city on purpose
+   - matches only within the current city, via (e.city||"sj"), so San
+   Jose's downtown flyers don't leak onto Santa Clara's downtown board
+   just because they share the same hood id. */
+function eventInCity(e,cityAbbr){return(e.city||"sj")===cityAbbr;}
+
 function renderBoards(){
   var bv=document.getElementById("bView");
   bv.innerHTML="";
-  var hood=curCity==="sj"?curHood:null;
+  var hood=curHood;
+  var cityEvts=evts.filter(function(e){return eventInCity(e,curCity);});
   /* Every neighborhood except downtown starts with zero seed flyers -
      show all category boards there (not just venue/shop/bars) so
      residents have somewhere to post the first one instead of hitting
      what looks like a dead end. */
   var alwaysShow=hood&&hood!=="downtown";
   ORD.forEach(function(cat){
-    var items=evts.filter(function(e){return e.cat===cat&&(!hood||(e.hood||"downtown")===hood);});
+    var items=cityEvts.filter(function(e){return e.cat===cat&&(!hood||(e.hood||"downtown")===hood);});
     if(!items.length&&!alwaysShow&&cat!=="venue"&&cat!=="shop"&&cat!=="bars"&&cat!=="parks")return;
     bv.appendChild(mkBoard(cat,items));
   });
@@ -624,21 +740,27 @@ function mkBoard(cat,items){
   sec.appendChild(lbl);sec.appendChild(frame);
 
   var slotIdx=0;
-  items.slice().sort(function(a,b){return (isLiveNow(b)?1:0)-(isLiveNow(a)?1:0);}).forEach(function(ev){
+  items.slice().sort(function(a,b){
+    var live=(isLiveNow(b)?1:0)-(isLiveNow(a)?1:0);
+    if(live)return live;
+    return eventSortKey(a)-eventSortKey(b);
+  }).forEach(function(ev){
     fstrip.appendChild(mkPinSlot(mkFlyer(ev),slotIdx++));
   });
 
-  var afc=document.createElement("div");afc.className="afc";
-  var ap=document.createElement("div");ap.className="ap";ap.textContent="+";
-  var al=document.createElement("div");al.className="al";al.textContent="Post a Flyer";
-  afc.appendChild(ap);afc.appendChild(al);
-  afc.addEventListener("click",(function(c){return function(){openForm(c);};})(cat));
-  fstrip.appendChild(mkPinSlot(afc,slotIdx++));
+  if(SHOW_POST_FLYER){
+    var afc=document.createElement("div");afc.className="afc";
+    var ap=document.createElement("div");ap.className="ap";ap.textContent="+";
+    var al=document.createElement("div");al.className="al";al.textContent="Post a Flyer";
+    afc.appendChild(ap);afc.appendChild(al);
+    afc.addEventListener("click",(function(c){return function(){openForm(c);};})(cat));
+    fstrip.appendChild(mkPinSlot(afc,slotIdx++));
 
-  while(slotIdx<4){
-    var empty=document.createElement("div");empty.className="fc-empty";
-    empty.addEventListener("click",(function(c){return function(){openForm(c);};})(cat));
-    fstrip.appendChild(mkPinSlot(empty,slotIdx++));
+    while(slotIdx<4){
+      var empty=document.createElement("div");empty.className="fc-empty";
+      empty.addEventListener("click",(function(c){return function(){openForm(c);};})(cat));
+      fstrip.appendChild(mkPinSlot(empty,slotIdx++));
+    }
   }
 
   bindStripParallax(fstrip);

@@ -12,15 +12,6 @@
 <div class="page">
 <nav class="nav">
   <div class="logo"><svg class="pinicon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg><span id="brandName">BayPinned SJ</span><span style="font-family:'Special Elite',monospace;font-size:9px;letter-spacing:1px;color:#dab870;background:rgba(184,134,11,.18);border:1px solid rgba(218,184,112,.4);padding:2px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;">BETA</span></div>
-  <div class="navbtns">
-    <a class="nb" href="../index.html" title="Main Page" style="display:inline-block;text-decoration:none;">&#127968; Main</a>
-    <button class="nb on" id="nB" onclick="showBoards()">Boards</button>
-    <button class="nb" id="nM" onclick="showMap()">Map</button>
-    <button class="nb" onclick="scrollToday()">Today</button>
-    <button class="nb" id="nDash" style="display:none;" onclick="openVendorDashboard()">My Dashboard</button>
-    <button class="nb" id="nAdmin" style="display:none;" onclick="showAdmin()">Admin</button>
-    <a class="nb" href="../vendor/login/" title="Permanent vendor account (paid, separate from free listings above)" style="display:inline-block;text-decoration:none;">&#128274; Vendor Login</a>
-  </div>
   <div class="csel">
     <select onchange="setCity(this.value)">
       <option value="sj">San Jose</option>
@@ -28,15 +19,26 @@
       <option value="sv">Sunnyvale</option>
       <option value="mv">Mountain View</option>
       <option value="camp">Campbell</option>
+      <option value="gil">Gilroy</option>
     </select>
     <span class="carr">&#9660;</span>
   </div>
-  <div class="bgctrl">
-    <button class="bgbtn" id="bgBtn" type="button" title="Change background photo for this city" aria-label="Change background photo for this city">&#128247;</button>
-    <button class="bgxbtn hidden" id="bgResetBtn" type="button" title="Reset to default background photo" aria-label="Reset to default background photo">&#10005;</button>
+  <button class="wafflebtn" id="waffleBtn" type="button" aria-label="Menu" aria-expanded="false">&#9776;</button>
+  <div class="navbtns" id="navbtns" hidden>
+    <a class="nb" href="../index.html" title="Main Page" style="display:inline-block;text-decoration:none;">&#127968; Main</a>
+    <button class="nb on" id="nB" onclick="showBoards()">Boards</button>
+    <button class="nb" id="nM" onclick="showMap()">Map</button>
+    <button class="nb" onclick="scrollToday()">Today</button>
+    <button class="nb" id="nDash" style="display:none;" onclick="openVendorDashboard()">My Dashboard</button>
+    <button class="nb" id="nAdmin" style="display:none;" onclick="showAdmin()">Admin</button>
+    <a class="nb" href="../vendor/login/" title="Permanent vendor account (paid, separate from free listings above)" style="display:inline-block;text-decoration:none;">&#128274; Vendor Login</a>
+    <div class="bgctrl">
+      <button class="bgbtn" id="bgBtn" type="button" title="Change background photo for this city" aria-label="Change background photo for this city">&#128247; Background</button>
+      <button class="bgxbtn hidden" id="bgResetBtn" type="button" title="Reset to default background photo" aria-label="Reset to default background photo">&#10005;</button>
+    </div>
   </div>
   <input type="file" id="bgFile" accept="image/*" style="display:none;">
-  <button class="pbtn" id="postBtn">+ Post Flyer</button>
+  <button class="pbtn" id="postBtn" style="display:none;">+ Post Flyer</button>
 </nav>
 <div class="hoodrow" id="hoodRow"></div>
 <div class="cnav">
@@ -49,7 +51,7 @@
   <button class="cc parks" data-cat="parks" onclick="jumpTo('parks')">Parks</button>
   <button class="cc venue" data-cat="venue" onclick="jumpTo('venue')">Theaters</button>
   <button class="cc shop" data-cat="shop" onclick="jumpTo('shop')">Shops</button>
-  <button class="cc" style="background:#4a3520;" id="postBtn2">+ Post Flyer</button>
+  <button class="cc" style="background:#4a3520;display:none;" id="postBtn2">+ Post Flyer</button>
 </div>
 <div class="hero">
   <h1>Pinned SJ</h1>
