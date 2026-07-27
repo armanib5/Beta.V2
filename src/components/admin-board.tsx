@@ -9,19 +9,19 @@ import { logActivity } from "@/lib/activity";
 const STATUS_STYLES: Record<Booth["status"], string> = {
   open: "bg-green-50 border-green-300 text-green-800",
   reserved: "bg-amber-50 border-amber-400 text-amber-800",
-  claimed: "bg-red-50 border-red-400 text-red-800",
+  occupied: "bg-red-50 border-red-400 text-red-800",
 };
 
 const STATUS_LABEL: Record<Booth["status"], string> = {
   open: "Open",
   reserved: "Reserved",
-  claimed: "Occupied",
+  occupied: "Occupied",
 };
 
 const STATUS_CYCLE: Record<Booth["status"], Booth["status"]> = {
   open: "reserved",
-  reserved: "claimed",
-  claimed: "open",
+  reserved: "occupied",
+  occupied: "open",
 };
 
 /** A flyer a booth can show: either a full paid vendor account or a guest
@@ -48,7 +48,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
   const [error, setError] = useState<string | null>(null);
 
   const [newLabel, setNewLabel] = useState("");
-  const [newTier, setNewTier] = useState<Booth["tier"]>("regular");
+  const [newTier, setNewTier] = useState<Booth["tier"]>("standard");
   const [newBoothFlyer, setNewBoothFlyer] = useState("");
 
   const [newEventName, setNewEventName] = useState("");
@@ -265,9 +265,14 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Venue Board (Admin)</h1>
-        <Link href="/admin/vendors" className="text-sm font-semibold text-slate-700 underline">
-          Vendor Approvals →
-        </Link>
+        <div className="flex gap-4">
+          <Link href="/admin/zones" className="text-sm font-semibold text-slate-700 underline">
+            Zone Map →
+          </Link>
+          <Link href="/admin/vendors" className="text-sm font-semibold text-slate-700 underline">
+            Vendor Approvals →
+          </Link>
+        </div>
       </div>
       <p className="mt-1 text-sm text-slate-600">
         Tap a booth to cycle Open → Reserved → Occupied. Private — not visible to vendors.
@@ -429,7 +434,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
               onChange={(e) => setNewTier(e.target.value as Booth["tier"])}
               className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
             >
-              <option value="regular">Regular</option>
+              <option value="standard">Standard</option>
               <option value="top">Top Booth</option>
             </select>
           </div>

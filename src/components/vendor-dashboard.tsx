@@ -161,6 +161,11 @@ export function VendorDashboard({
               /vendor?slug={vendor.slug}
             </Link>
           </p>
+          <p className="mt-1 text-sm text-slate-500">
+            <Link href="/vendor/zones" className="underline">
+              Claim a booth at an upcoming event →
+            </Link>
+          </p>
         </div>
         <button
           type="button"

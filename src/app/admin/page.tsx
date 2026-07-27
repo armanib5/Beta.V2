@@ -61,6 +61,15 @@ export default function AdminHubPage() {
           <p className="mt-1 text-sm text-slate-600">Create events, booths, and vendor flyers.</p>
         </Link>
         <Link
+          href="/admin/zones"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">Event Zone Map</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Interactive booth grid with fences, gates, exits, and vendor-area boundaries.
+          </p>
+        </Link>
+        <Link
           href="/admin/legacy"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >
