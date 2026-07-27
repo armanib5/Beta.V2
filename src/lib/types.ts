@@ -1,5 +1,7 @@
 export type VendorStatus = "pending" | "active" | "suspended";
 export type RegistrationStatus = "pending" | "paid" | "failed" | "refunded";
+export type EntityType = "vendor" | "restaurant" | "bar";
+export type CategoryTier = "top_10" | "featured" | "standard";
 
 export interface Category {
   id: string;
@@ -47,6 +49,11 @@ export interface Vendor {
   lat: number | null;
   lng: number | null;
   onboarded_at: string | null;
+  entity_type: EntityType;
+  category_tier: CategoryTier;
+  operating_hours: Record<string, string> | null;
+  happy_hour_specials: string | null;
+  menu_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +80,7 @@ export interface LovEntry {
   website_url: string | null;
   section_zone: string | null;
   publish_at: string | null;
+  category_tier: CategoryTier;
   created_at: string;
   updated_at: string;
 }
