@@ -2,7 +2,6 @@ var C={
   market:{l:"Farmers Market",i:"&#127805;",c:"#3d6b42"},
   foodhall:{l:"Food Hall",i:"&#127869;",c:"#b8860b"},
   bars:{l:"Bars & Restaurants",i:"&#127864;",c:"#6b1e3c"},
-  artwalk:{l:"Art Walk",i:"&#127912;",c:"#2c5f8a"},
   cityart:{l:"City Art",i:"&#127917;",c:"#6a4e7a"},
   parks:{l:"Parks",i:"&#127795;",c:"#5a8c3a"},
   venue:{l:"Theaters",i:"&#127963;",c:"#7a5230"},
@@ -10,7 +9,7 @@ var C={
   centers:{l:"Centers",i:"&#127970;",c:"#0d6b4f"},
   shop:{l:"Shops",i:"&#128717;",c:"#c0392b"}
 };
-var ORD=["seasonal","market","foodhall","bars","artwalk","cityart","parks","venue","centers","shop"];
+var ORD=["seasonal","market","foodhall","bars","cityart","parks","venue","centers","shop"];
 var CN={sj:"San Jose, CA",sc:"Santa Clara, CA",sv:"Sunnyvale, CA",mv:"Mountain View, CA",camp:"Campbell, CA",gil:"Gilroy, CA"};
 var CITY_ABBR={sj:"SJ",sc:"SC",sv:"SV",mv:"MV",camp:"Camp",gil:"Gil"};
 function setBrand(v){
@@ -116,7 +115,7 @@ var DEF=[
  pk:"San Pedro Street garage nearby.",tr:"VTA Route 522 on Santa Clara.",
  ac:"Accessible open air market.",fam:"Very family friendly all ages welcome.",
  fp:"12 min walk north",fd:"22 min walk or 6 min ride",vg:[]},
-{id:"aw",cat:"artwalk",lbl:"Monthly Art Walk",exp:false,
+{id:"aw",cat:"seasonal",lbl:"Monthly Art Walk",exp:false,
  t:"South First Fridays ArtWalk",w:"First Friday Monthly 5pm - 9pm",d:"monthly",
  a:"South 1st Street, SoFA District, San Jose, CA",ph:"",wb:"https://southfirstfridays.com",
  ds:"Free self-guided evening art walk through downtown galleries museums live music and pop-up art installations.",
@@ -657,19 +656,67 @@ function sortCitySelect(){
   sel.value=curVal;
 }
 
+var WEEKDAY_NAMES=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+function pad2(n){return n<10?"0"+n:""+n;}
+function dateKeyOf(d){return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());}
+function isFirstFridayOfMonth(d){
+  if(d.getDay()!==5)return false;
+  var f=new Date(d.getFullYear(),d.getMonth(),1);
+  while(f.getDay()!==5)f.setDate(f.getDate()+1);
+  return d.getDate()===f.getDate();
+}
+/* Whether an event happens on this *specific* calendar date - not just
+   "matches this weekday in general" - so This Week can show each of the
+   next 7 real dates instead of a single pooled, date-less list. */
+function eventOnDate(ev,d){
+  if(ev.exp)return false;
+  var key=dateKeyOf(d);
+  if(ev.ed&&ev.ed<key)return false;
+  if(ev.d==="daily")return true;
+  if(ev.d==="monthly")return isFirstFridayOfMonth(d);
+  if(ev.d&&ev.d.length===10)return ev.d===key;
+  return ev.d===["sun","mon","tue","wed","thu","fri","sat"][d.getDay()];
+}
+
 function renderToday(){
   var tc=document.getElementById("tdCrds"),wc=document.getElementById("wkCrds");
   if(!tc||!wc)return;
   var hood=curHood;
   var cityEvts=evts.filter(function(e){return eventInCity(e,curCity);});
   var pool=hood?cityEvts.filter(function(e){return(e.hood||"downtown")===hood;}):cityEvts;
-  var td=pool.filter(function(e){return isToday(e)&&!e.exp;});
+
+  var today=new Date();
+  var td=pool.filter(function(e){return eventOnDate(e,today);});
   td.sort(function(a,b){return (isLiveNow(b)?1:0)-(isLiveNow(a)?1:0);});
-  var wk=pool.filter(function(e){return isWeek(e);});
-  var none="<div style='color:rgba(218,184,112,.35);padding:16px;font-size:13px;'>Nothing confirmed yet</div>";
-  tc.innerHTML=none;wc.innerHTML=none;
-  if(td.length){tc.innerHTML="";td.forEach(function(ev){tc.appendChild(mkTCard(ev));});}
-  if(wk.length){wc.innerHTML="";wk.forEach(function(ev){wc.appendChild(mkTCard(ev));});}
+  tc.innerHTML="";
+  if(td.length){
+    td.forEach(function(ev){tc.appendChild(mkTCard(ev));});
+  }else{
+    tc.appendChild(mkNothingCard("Nothing happening today — check back soon!"));
+  }
+
+  wc.className="weekdays";
+  wc.innerHTML="";
+  for(var i=0;i<7;i++){
+    var d=new Date(today.getFullYear(),today.getMonth(),today.getDate()+i);
+    var dayEvts=pool.filter(function(e){return eventOnDate(e,d);});
+    var block=document.createElement("div");
+    block.className="wkday";
+    var label=(i===0?"Today, ":i===1?"Tomorrow, ":WEEKDAY_NAMES[d.getDay()]+", ")+
+      (d.getMonth()+1)+"/"+d.getDate();
+    var hd=document.createElement("div");
+    hd.className="wkday-hd";
+    hd.textContent=label;
+    var strip=document.createElement("div");
+    strip.className="tscr";
+    if(dayEvts.length){
+      dayEvts.forEach(function(ev){strip.appendChild(mkTCard(ev));});
+    }else{
+      strip.appendChild(mkNothingCard("Nothing happening " + (i===0?"today":i===1?"tomorrow":"this day") + " yet."));
+    }
+    block.appendChild(hd);block.appendChild(strip);
+    wc.appendChild(block);
+  }
 }
 
 function mkTCard(ev){
@@ -685,6 +732,21 @@ function mkTCard(ev){
   body.innerHTML="<h4>"+ev.t+"</h4><div class='tw'>"+ev.w+"</div>";
   d.appendChild(imgDiv);d.appendChild(body);
   d.addEventListener("click",function(){openDetail(ev.id);});
+  return d;
+}
+
+/* Polite empty-state card, styled like a real flyer instead of plain
+   text, for a day (or Today) with nothing posted yet. */
+function mkNothingCard(message){
+  var d=document.createElement("div");
+  d.className="tc nothing";
+  var imgDiv=document.createElement("div");
+  imgDiv.className="tcimg";
+  imgDiv.innerHTML="&#128197;";
+  var body=document.createElement("div");
+  body.className="tcbody";
+  body.innerHTML="<h4>"+message+"</h4>";
+  d.appendChild(imgDiv);d.appendChild(body);
   return d;
 }
 

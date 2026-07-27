@@ -411,17 +411,33 @@ function findCityForHood(hoodId) {
 }
 function hoodHasPlaces(hoodId) { return PLACES.some(function (p) { return p.hood === hoodId; }); }
 
+/* Picking a section filters to just its pins (applyFilters) and now also
+   jumps straight to the closest one and opens its flyer - relative to
+   your real location if known, otherwise the section's own center -
+   instead of just centering on the section with nothing selected. */
 function goToHood(h) {
   document.querySelectorAll(".hoodbtn").forEach(function (x) { x.classList.remove("on"); });
   var btn = document.querySelector('.hoodbtn[data-hood-id="' + h.id + '"]');
   if (btn) btn.classList.add("on");
   activeHood = h.id;
   setAreaLabel(h.l, hoodHasPlaces(h.id));
-  flyTo(h.lat, h.lng, h.zoom);
   applyFilters();
   hideFlyer();
   if (typeof setAnchor === "function") {
     setAnchor({ lat: h.lat, lng: h.lng, label: h.l, source: "section" });
+  }
+  var anchor = userLoc || { lat: h.lat, lng: h.lng };
+  var candidates = PLACES.filter(function (p) { return p.hood === h.id && (activeCat === "all" || p.cat === activeCat); });
+  if (candidates.length) {
+    var nearest = null, nearestDist = Infinity;
+    candidates.forEach(function (p) {
+      var d = haversine(anchor.lat, anchor.lng, p.lat, p.lng);
+      if (d < nearestDist) { nearestDist = d; nearest = p; }
+    });
+    flyTo(nearest.lat, nearest.lng, Math.max(map.getZoom(), 17));
+    setTimeout(function () { showFlyer(nearest); }, 350);
+  } else {
+    flyTo(h.lat, h.lng, h.zoom);
   }
 }
 
@@ -645,6 +661,7 @@ function initMap() {
   document.getElementById("zOut").onclick = function () { map.stop(); map.zoomOut(); };
   document.getElementById("zReset").onclick = function () { flyTo(start.lat, start.lng, start.zoom); };
   setupFullScreenToggle();
+  setupKeyToggle();
   document.getElementById("myLoc").onclick = locateUser;
   document.getElementById("flyerClose").onclick = hideFlyer;
   map.on("click", hideFlyer);
@@ -713,20 +730,42 @@ function openPlaceFromQuery() {
 /* Full-screen toggle - the map viewport fills the whole screen (no page
    scroll fighting the map's own pan/zoom underneath it), closed via the
    same button, the Escape key, or navigating away. */
+/* The old exit path (re-clicking the same button) lived in .mapctl,
+   outside .mvp - once .mvp goes position:fixed and covers the whole
+   screen at z-index 2000, .mapctl (a normal-flow sibling elsewhere on
+   the page) ends up hidden behind it, so there was no reachable way out
+   except the Escape key. #fsExitBtn lives inside .mvp itself so it's
+   always on top and visible while fullscreen is active. */
 function setupFullScreenToggle() {
   var btn = document.getElementById("fsToggle"), vp = document.getElementById("mvp");
+  var exitBtn = document.getElementById("fsExitBtn");
   if (!btn || !vp) return;
   function setFullScreen(on) {
     vp.classList.toggle("fullscreen", on);
     document.body.classList.toggle("map-fullscreen-open", on);
     btn.classList.toggle("on", on);
     btn.innerHTML = on ? "&#9974; Exit Full Screen" : "&#9974; Full Screen";
+    if (exitBtn) exitBtn.hidden = !on;
     setTimeout(function () { if (map) map.invalidateSize(); }, 50);
   }
   btn.onclick = function () { setFullScreen(!vp.classList.contains("fullscreen")); };
+  if (exitBtn) exitBtn.onclick = function () { setFullScreen(false); };
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && vp.classList.contains("fullscreen")) setFullScreen(false);
   });
+}
+
+function setupKeyToggle() {
+  var toggle = document.getElementById("mkeyToggle"), legend = document.getElementById("mapLegend"),
+    closeBtn = document.getElementById("mlgClose");
+  if (!toggle || !legend) return;
+  function setOpen(on) {
+    legend.hidden = !on;
+    toggle.hidden = on;
+    toggle.setAttribute("aria-expanded", on ? "true" : "false");
+  }
+  toggle.onclick = function () { setOpen(true); };
+  if (closeBtn) closeBtn.onclick = function () { setOpen(false); };
 }
 
 document.addEventListener("DOMContentLoaded", initMap);

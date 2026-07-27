@@ -13,7 +13,6 @@ var CATS = {
   "foodhall": { "l": "Food Hall / Market", "c": "#b8860b", "icon": "fork" },
   "restaurants": { "l": "Restaurants", "c": "#e0662f", "icon": "plate" },
   "bars": { "l": "Bars", "c": "#6b1e3c", "icon": "cup" },
-  "artwalk": { "l": "Arts", "c": "#2c5f8a", "icon": "palette" },
   "cityart": { "l": "Community Art", "c": "#6a4e7a", "icon": "art" },
   "venue": { "l": "Theaters", "c": "#7a5230", "icon": "mask" },
   "seasonal": { "l": "Seasonal", "c": "#8B0000", "icon": "star" },
@@ -29,7 +28,7 @@ var CATS = {
 };
 
 /* Order controls the category filter row. */
-var CAT_ORDER = ["market","foodhall","restaurants","bars","artwalk","cityart","venue","seasonal","centers","shop","parking","restrooms","transit","schools","hospitals","churches","hotels"];
+var CAT_ORDER = ["market","foodhall","restaurants","bars","cityart","venue","seasonal","centers","shop","parking","restrooms","transit","schools","hospitals","churches","hotels"];
 
 var HOODS = [
   { "id": "downtown", "l": "Downtown San Jose", "lat": 37.3382, "lng": -121.8863, "zoom": 15 },
@@ -124,7 +123,7 @@ var PLACES = [
     "wb": "https://sanpedrosquaremarket.com"
   },
   {
-    "id": "aw", "cat": "artwalk", "hood": "downtown",
+    "id": "aw", "cat": "seasonal", "hood": "downtown",
     "t": "South First Fridays ArtWalk",
     "a": "South 1st Street, SoFA District, San Jose, CA",
     "lat": 37.3313, "lng": -121.8869,

@@ -52,13 +52,16 @@
           </div>
         </div>
 
-        <div class="mlg" id="mapLegend">
+        <button class="mkeytoggle" id="mkeyToggle" title="Show Map Key" aria-label="Show Map Key" aria-expanded="false">&#128273; Key</button>
+        <div class="mlg" id="mapLegend" hidden>
+          <button class="mlgclose" id="mlgClose" aria-label="Close Map Key">&times;</button>
           <h4>Map Key</h4>
         </div>
         <div class="mcomp">N</div>
         <div class="mysink">
           <button class="mbtn wide" id="myLoc" title="Locate Me" aria-label="Locate Me">&#128205; Locate Me</button>
         </div>
+        <button class="fsExitBtn" id="fsExitBtn" hidden title="Exit Full Screen" aria-label="Exit Full Screen">&#10005; Exit Full Screen</button>
       </div>
       <div class="mapctl">
         <button class="mbtn" id="zIn" title="Zoom in">+</button>

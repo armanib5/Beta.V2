@@ -53,6 +53,13 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:.6;}}
 .tscr{display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;padding:3px 2px 14px;}
 .tscr::-webkit-scrollbar{display:none;}
+.weekdays{display:flex;flex-direction:column;gap:6px;}
+.wkday{padding:2px 0;}
+.wkday-hd{font-family:'Special Elite',monospace;font-size:11px;color:rgba(218,184,112,.85);margin-bottom:6px;letter-spacing:.5px;}
+.tc.nothing{cursor:default;}
+.tc.nothing:hover{transform:none;}
+.tc.nothing .tcimg{font-size:20px;}
+.tc.nothing .tcbody h4{color:rgba(26,14,0,.55);font-weight:400;}
 .tc{flex-shrink:0;width:180px;background:linear-gradient(145deg,var(--cr),var(--cr2));border-radius:5px;overflow:hidden;cursor:pointer;box-shadow:0 5px 18px rgba(0,0,0,.42);transition:transform .2s;}
 .tc:hover{transform:translateY(-4px);}
 .tcimg{width:100%;height:90px;background:linear-gradient(135deg,#e8d8a0,#d0c080);background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:28px;}
