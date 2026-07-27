@@ -170,10 +170,8 @@ var DEF=[
 ];
 
 var KEY="pinnedsj-v9",evts=[],mS=1,mX=0,mY=0,pan=false,ps={x:0,y:0};
-/* Public flyer self-submission turned off for now (per request) - the
-   openForm()/mkVendorForm() machinery is untouched underneath, so this is
-   one flag to flip back on rather than deleted functionality. */
-var SHOW_POST_FLYER=false;
+/* Public flyer self-submission - one flag, easy to toggle either way. */
+var SHOW_POST_FLYER=true;
 
 /* Shared legal/safety copy - used on the Report form and the payment
    disclaimer gate, so the wording stays identical everywhere it appears. */
@@ -219,6 +217,7 @@ function init(){
   openFlyerFromQuery();
   loadLovEvents();
   loadLovVendors();
+  loadRealVendors();
   setupWaffleMenu();
 }
 
@@ -405,6 +404,39 @@ function loadLovVendors(){
         featured:false,verified:false,
         boost:{tier:null,active:false,until:"",radius:null},
         mx:0,my:0,city:"sj",events:[],gallery:[],logo:"",cover:r.flyer_image_url||"",status:"approved"
+      });
+    });
+    if(typeof renderPins==="function")renderPins();
+    openVendorFromQuery();
+  }).catch(function(){});
+}
+
+var BOARD_CAT_SLUGS={restaurant:"bars",bar:"bars"};
+/* Real paid/comped vendor accounts (V2's `vendors` table) - same merge as
+   loadLovVendors, sourced from the actual vendor accounts instead of the
+   LOV guest listings, so a vendor who's actually signed up (or been
+   comped a tier by the admin) shows up in the Vendor Hub with their real
+   profile photo/website, not just a name. */
+function loadRealVendors(){
+  if(typeof V2_SUPABASE_URL==="undefined")return;
+  fetch(V2_SUPABASE_URL+"/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active",{
+    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
+  }).then(function(res){return res.json();}).then(function(rows){
+    if(!Array.isArray(rows)||typeof vendors==="undefined")return;
+    var existingIds=vendors.map(function(v){return v.id;});
+    rows.forEach(function(r){
+      var id="vendor-"+r.id;
+      if(existingIds.indexOf(id)>=0)return;
+      var slug=(r.vendor_categories&&r.vendor_categories[0]&&r.vendor_categories[0].categories)?r.vendor_categories[0].categories.slug:null;
+      vendors.push({
+        id:id,name:r.business_name,cat:(slug&&BOARD_CAT_SLUGS[slug])||"shop",
+        desc:r.short_description||"",menu:"",address:"",
+        contact:{phone:r.phone||"",email:""},website:r.website_url||"",
+        social:{instagram:r.instagram_handle||""},
+        hours:{mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""},
+        featured:!!r.is_founding_vendor,verified:true,
+        boost:{tier:r.is_top10?"anchor":null,active:!!r.is_top10,until:"",radius:null},
+        mx:0,my:0,city:"sj",events:[],gallery:[],logo:r.logo_url||"",cover:r.logo_url||"",status:"approved"
       });
     });
     if(typeof renderPins==="function")renderPins();

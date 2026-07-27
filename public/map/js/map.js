@@ -265,6 +265,39 @@ function loadLovEvents() {
   }).catch(function () {});
 }
 
+/* Real paid/comped vendor accounts (V2's `vendors` table, not the LOV
+   guest listings loadLovEvents pulls in) with a real lat/lng set - same
+   merge pattern, live from the same project. Category comes from the
+   vendor's first tagged category (vendor_categories join); anything not
+   already a Map category key falls back to "shop" rather than vanishing. */
+var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars" };
+function loadVendorPins() {
+  if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
+  return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&lat=not.is.null&lng=not.is.null", {
+    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
+  }).then(function (res) { return res.json(); }).then(function (rows) {
+    if (!Array.isArray(rows)) return;
+    rows.forEach(function (r) {
+      var id = "vendor-" + r.id;
+      if (PLACES.some(function (p) { return p.id === id; })) return;
+      var slug = (r.vendor_categories && r.vendor_categories[0] && r.vendor_categories[0].categories)
+        ? r.vendor_categories[0].categories.slug : null;
+      var cat = (slug && MAP_CAT_SLUGS[slug]) || "shop";
+      var loc = nearestHood(r.lat, r.lng);
+      var place = {
+        id: id, cat: cat, hood: loc.hood,
+        t: r.business_name + (r.is_top10 ? " 🏆" : ""), a: "", ds: r.short_description || "",
+        lat: r.lat, lng: r.lng, wb: r.website_url || undefined,
+        flyer: r.logo_url || null
+      };
+      PLACES.push(place);
+      addPlaceMarker(place);
+    });
+    updateLegendCounts();
+    applyFilters();
+  }).catch(function () {});
+}
+
 /* A vendor's "Find on Our Map" button lands here with ?q=<name> instead
    of jumping straight to /pins/ to create a new pin - this runs the same
    search the search box does (now that live-approved pins are loaded)
@@ -606,6 +639,7 @@ function initMap() {
   initSearch();
   loadApprovedPins().then(handleSearchQuery);
   loadLovEvents();
+  loadVendorPins();
 
   document.getElementById("zIn").onclick = function () { map.stop(); map.zoomIn(); };
   document.getElementById("zOut").onclick = function () { map.stop(); map.zoomOut(); };

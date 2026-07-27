@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "CityPinned — Find Local Vendors Near You",
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
         <SiteHeader />
         <main className="flex-1">{children}</main>
+        <SiteFooter />
       </body>
     </html>
   );

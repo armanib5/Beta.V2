@@ -57,11 +57,15 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      <div className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2 text-lg font-bold text-slate-900">
           <span aria-hidden="true">📍</span>
           CityPinned
         </Link>
+
+        <span className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 sm:block">
+          Beta V2
+        </span>
 
         <nav className="hidden items-center gap-6 md:flex">
           {boardLinks.map((link) => (

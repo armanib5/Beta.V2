@@ -124,6 +124,15 @@ export default function HomePage() {
             </p>
           )}
         </div>
+
+        <p className="mx-auto mt-8 max-w-2xl text-center text-[11px] leading-relaxed text-slate-400">
+          Please note: CityPinned and its sister city networks (including BayPinned) are
+          interactive advertising directories and do not host, process, or hold funds for any
+          transactions. Payments are processed directly by Stripe. CityPinned and its sister city
+          networks cannot issue refunds, reverse transactions, or resolve financial disputes
+          between parties. For payment issues, please contact Stripe or your financial
+          institution directly.
+        </p>
       </section>
 
       <section className="border-t border-slate-200 bg-white py-14">
