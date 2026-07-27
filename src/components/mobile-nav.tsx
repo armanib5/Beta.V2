@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useState } from "react";
 import { BASE_PATH } from "@/lib/site";
+import type { Vendor } from "@/lib/types";
 
 export function MobileNav({
   links,
   isSignedIn,
+  profile,
 }: {
   links: { href: string; label: string }[];
   isSignedIn: boolean;
+  profile?: Pick<Vendor, "business_name" | "logo_url"> | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -52,9 +55,23 @@ export function MobileNav({
             <Link
               href={isSignedIn ? "/vendor/dashboard" : "/vendor/login"}
               onClick={() => setOpen(false)}
-              className="mt-1 rounded-md bg-slate-900 px-3 py-3 text-center text-base font-semibold text-white"
+              className="mt-1 flex items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-3 text-center text-base font-semibold text-white"
             >
-              {isSignedIn ? "My Dashboard" : "Vendor Login"}
+              {isSignedIn ? (
+                <>
+                  {profile?.logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- static export, arbitrary vendor-uploaded URLs
+                    <img src={profile.logo_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-700 text-xs">
+                      {(profile?.business_name ?? "?").charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  {profile?.business_name ?? "My Dashboard"}
+                </>
+              ) : (
+                "Vendor Login"
+              )}
             </Link>
           </div>
         </div>

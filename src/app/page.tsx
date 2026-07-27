@@ -57,12 +57,6 @@ export default function HomePage() {
               Browse the Vendor Directory
             </Link>
           </div>
-          <p className="mt-5 text-sm text-slate-400">
-            Already have an account?{" "}
-            <Link href="/vendor/login" className="font-semibold text-amber-400 hover:text-amber-300">
-              Log In
-            </Link>
-          </p>
         </div>
       </section>
 

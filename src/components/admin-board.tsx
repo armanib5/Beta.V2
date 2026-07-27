@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Booth, LovEntry, Vendor } from "@/lib/types";
 
@@ -232,7 +233,12 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-bold text-slate-900">Venue Board (Admin)</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-slate-900">Venue Board (Admin)</h1>
+        <Link href="/admin/vendors" className="text-sm font-semibold text-slate-700 underline">
+          Vendor Approvals →
+        </Link>
+      </div>
       <p className="mt-1 text-sm text-slate-600">
         Tap a booth to cycle Open → Reserved → Occupied. Private — not visible to vendors.
       </p>

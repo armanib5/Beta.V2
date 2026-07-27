@@ -224,5 +224,9 @@ var PLACES = [
       [37.3324186353823, -121.88950861424625],
       [37.332231567565415, -121.88996315002443]
     ]
-  }
+  },
+  { "id": "jt-fm", "cat": "market", "hood": "japantown", "t": "Japantown Farmers Market", "a": "357 E. Taylor St (Gordon Biersch Brewery parking lot), San Jose, CA", "lat": 37.3533052, "lng": -121.8925223, "w": "Sundays, 8:00am - 12:00pm (May - Oct)", "d": "sun", "sh": 8, "eh": 12, "ds": "Organized by the Japantown Farmers Market Committee / Gordon Biersch." },
+  { "id": "sr-fm", "cat": "market", "hood": "santana", "t": "Santana Row Farmers Market", "a": "Santana Row (between Olin Ave & Olsen Dr), San Jose, CA", "lat": 37.3209796, "lng": -121.9486002, "w": "Wednesdays, 4:00pm - 8:00pm (May - Sept)", "d": "wed", "sh": 16, "eh": 20, "ds": "Organized by the California Farmers' Markets Association (CFMA)." },
+  { "id": "vmc-fm", "cat": "market", "hood": "santana", "t": "Santa Clara Valley Medical Center Farmers Market", "a": "751 S. Bascom Ave (hospital parking lot), San Jose, CA", "lat": 37.3151936, "lng": -121.9332862, "w": "Wednesdays, 9:00am - 1:00pm (May - Nov)", "d": "wed", "sh": 9, "eh": 13, "ds": "Organized by West Coast Farmers Markets (WCFMA)." },
+  { "id": "camp-fm", "cat": "market", "hood": "camp-downtown", "t": "Downtown Campbell Farmers Market", "a": "E. Campbell Ave & N. 1st St, Downtown Campbell, CA", "lat": 37.2870626, "lng": -121.944881, "w": "Sundays, 9:00am - 1:00pm (year-round)", "d": "sun", "sh": 9, "eh": 13, "ds": "Organized by the Urban Village Farmers' Market Association (UVFM)." }
 ];

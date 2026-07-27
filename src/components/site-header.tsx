@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { BASE_PATH } from "@/lib/site";
 import { MobileNav } from "@/components/mobile-nav";
+import type { Vendor } from "@/lib/types";
 
 // Next.js routes (client-side navigation via next/link).
 const appLinks = [
@@ -22,16 +23,34 @@ const boardLinks = [
   { href: `${BASE_PATH}/pins/`, label: "Add a Pin" },
 ];
 
+type Profile = Pick<Vendor, "business_name" | "logo_url"> | null;
+
 export function SiteHeader() {
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [profile, setProfile] = useState<Profile>(null);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setIsSignedIn(Boolean(data.user)));
+
+    async function loadProfile(userId: string) {
+      const { data } = await supabase
+        .from("vendors")
+        .select("business_name,logo_url")
+        .eq("id", userId)
+        .maybeSingle<Profile>();
+      setProfile(data ?? null);
+    }
+
+    supabase.auth.getUser().then(({ data }) => {
+      setIsSignedIn(Boolean(data.user));
+      if (data.user) loadProfile(data.user.id);
+    });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSignedIn(Boolean(session?.user));
+      if (session?.user) loadProfile(session.user.id);
+      else setProfile(null);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -61,13 +80,27 @@ export function SiteHeader() {
           ))}
           <Link
             href={isSignedIn ? "/vendor/dashboard" : "/vendor/login"}
-            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+            className="flex items-center gap-2 rounded-full bg-slate-900 py-1.5 pl-1.5 pr-4 text-sm font-semibold text-white hover:bg-slate-700"
           >
-            {isSignedIn ? "My Dashboard" : "Vendor Login"}
+            {isSignedIn ? (
+              <>
+                {profile?.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- static export, arbitrary vendor-uploaded URLs
+                  <img src={profile.logo_url} alt="" className="h-7 w-7 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-xs">
+                    {(profile?.business_name ?? "?").charAt(0).toUpperCase()}
+                  </span>
+                )}
+                {profile?.business_name ?? "My Dashboard"}
+              </>
+            ) : (
+              "Vendor Login"
+            )}
           </Link>
         </nav>
 
-        <MobileNav links={[...boardLinks, ...appLinks]} isSignedIn={isSignedIn} />
+        <MobileNav links={[...boardLinks, ...appLinks]} isSignedIn={isSignedIn} profile={profile} />
       </div>
     </header>
   );
