@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Booth, LovEntry, Vendor } from "@/lib/types";
+import { logActivity } from "@/lib/activity";
 
 const STATUS_STYLES: Record<Booth["status"], string> = {
   open: "bg-green-50 border-green-300 text-green-800",
@@ -127,6 +128,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
       setError(insertError?.message ?? "Could not create event.");
       return;
     }
+    logActivity(supabase, "event", data.id, data.name, "Created", data.location ?? undefined);
     setEvents((prev) => [data, ...prev]);
     setEventId(data.id);
     setNewEventName("");
@@ -154,6 +156,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
       setError(insertError?.message ?? "Could not create vendor flyer.");
       return;
     }
+    logActivity(supabase, "vendor", data.id, data.name, "Created flyer");
     const flyer: Flyer = { key: `lov:${data.id}`, name: data.name, image: data.flyer_image_url };
     setFlyers((prev) => [...prev, flyer]);
     setFlyersByKey((prev) => ({ ...prev, [flyer.key]: flyer }));
@@ -183,6 +186,8 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
       setError(updateError?.message ?? "Could not assign vendor.");
       return;
     }
+    const flyerName = flyersByKey[key]?.name ?? "no vendor";
+    logActivity(supabase, "booth", data.id, `Booth ${data.label}`, "Assigned vendor", flyerName);
     setBooths((prev) => prev.map((b) => (b.id === booth.id ? data : b)));
   }
 
@@ -206,6 +211,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
       setError(updateError?.message ?? "Could not update booth.");
       return;
     }
+    logActivity(supabase, "booth", data.id, `Booth ${data.label}`, `Status → ${nextStatus}`);
     setBooths((prev) => prev.map((b) => (b.id === booth.id ? data : b)));
   }
 
@@ -229,6 +235,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
       setError(insertError?.message ?? "Could not create booth.");
       return;
     }
+    logActivity(supabase, "booth", data.id, `Booth ${data.label}`, "Created", newTier === "top" ? "Top Booth" : undefined);
     setBooths((prev) => [...prev, data].sort((a, b) => a.label.localeCompare(b.label)));
     setNewLabel("");
     setNewBoothFlyer("");

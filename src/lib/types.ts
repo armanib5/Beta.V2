@@ -117,6 +117,18 @@ export interface Registration {
   created_at: string;
 }
 
+export type ActivityEntityType = "vendor" | "event" | "booth";
+
+export interface ActivityLog {
+  id: string;
+  entity_type: ActivityEntityType;
+  entity_id: string;
+  entity_name: string;
+  action: string;
+  detail: string | null;
+  created_at: string;
+}
+
 export function formatPrice(cents: number, currency = "usd") {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

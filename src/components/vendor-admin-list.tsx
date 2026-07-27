@@ -3,6 +3,15 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Vendor, VendorStatus } from "@/lib/types";
+import { logActivity } from "@/lib/activity";
+
+function describePatch(patch: Partial<Vendor>): string {
+  const parts: string[] = [];
+  if (patch.status) parts.push(`status → ${patch.status}`);
+  if ("is_founding_vendor" in patch) parts.push(`Founding Vendor ${patch.is_founding_vendor ? "on" : "off"}`);
+  if ("is_top10" in patch) parts.push(`Top 10 ${patch.is_top10 ? "on" : "off"}`);
+  return parts.join(", ");
+}
 
 const STATUS_STYLES: Record<VendorStatus, string> = {
   pending: "bg-amber-50 border-amber-300 text-amber-800",
@@ -31,6 +40,7 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
       setError(updateError?.message ?? "Could not update vendor.");
       return;
     }
+    logActivity(supabase, "vendor", data.id, data.business_name, "Updated", describePatch(patch));
     setVendors((prev) => prev.map((v) => (v.id === id ? data : v)));
   }
 

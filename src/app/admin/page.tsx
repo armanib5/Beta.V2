@@ -61,6 +61,16 @@ export default function AdminHubPage() {
           <p className="mt-1 text-sm text-slate-600">Create events, booths, and vendor flyers.</p>
         </Link>
         <Link
+          href="/admin/legacy"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">Legacy Dashboard</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Every vendor and event, organized Live / Future / Past by city — tap any card for its full
+            timestamped history.
+          </p>
+        </Link>
+        <Link
           href="/admin/bookkeeping"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >
