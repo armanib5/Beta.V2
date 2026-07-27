@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Category, LovEntry } from "@/lib/types";
 import { FlyerPlaceholder } from "@/components/flyer-placeholder";
+import { BASE_PATH } from "@/lib/site";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -258,6 +259,12 @@ function EventCard({ event, category }: { event: LovEntry; category?: Category }
         {event.booth_tier === "top" && (
           <span className="mt-1 block text-xs font-semibold text-amber-600">🏆 Top Booth event</span>
         )}
+        <a
+          href={`${BASE_PATH}/board/?openFlyer=${encodeURIComponent(event.name)}`}
+          className="mt-2 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
+        >
+          🗒️ View Flyer on the Board
+        </a>
       </div>
     </div>
   );

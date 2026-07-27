@@ -176,6 +176,7 @@ function init(){
   setCityBg(curCity,curHood);
   openFlyerFromQuery();
   loadLovEvents();
+  loadLovVendors();
 }
 
 /* An anchor already set on another page (city/section picked on the Map,
@@ -309,6 +310,52 @@ function loadLovEvents(){
     renderToday();
     renderBoards();
   }).catch(function(){});
+}
+
+/* Same idea as loadLovEvents(), for the farmers-market guest vendors
+   seeded into V2's lov_entries (type='vendor') - merged into the Board's
+   own local `vendors` array (js/vendors.js) in-memory only, so they open
+   through the same Vendor Hub detail view (openVendorDetail) real board
+   vendors use, with the same "menu/hours/contact" layout. Not linked to
+   any specific event (v.events stays empty) since a guest listing isn't
+   tied to one in the LOV schema - it's independently reachable via
+   ?openVendor=<name> from the Vendor Directory instead. */
+function loadLovVendors(){
+  if(typeof V2_SUPABASE_URL==="undefined")return;
+  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*&type=eq.vendor",{
+    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
+  }).then(function(res){return res.json();}).then(function(rows){
+    if(!Array.isArray(rows)||typeof vendors==="undefined")return;
+    var existingIds=vendors.map(function(v){return v.id;});
+    rows.forEach(function(r){
+      var id="lov-"+r.id;
+      if(existingIds.indexOf(id)>=0)return;
+      vendors.push({
+        id:id,name:r.name,cat:"market",
+        desc:r.location||"",menu:"",address:r.location||"",
+        contact:{phone:"",email:""},website:r.website_url||"",
+        social:{instagram:r.instagram_handle||""},
+        hours:{mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""},
+        featured:false,verified:false,
+        boost:{tier:null,active:false,until:"",radius:null},
+        mx:0,my:0,city:"sj",events:[],gallery:[],logo:"",cover:r.flyer_image_url||"",status:"approved"
+      });
+    });
+    if(typeof renderPins==="function")renderPins();
+    openVendorFromQuery();
+  }).catch(function(){});
+}
+
+/* Vendor Directory's "Vendor Hub" button lands here with ?openVendor=<name>
+   instead of jumping straight to the Board's home view - same bridge
+   pattern as openFlyerFromQuery, matched by exact name (case-insensitive)
+   since that's the only thing both sides share. */
+function openVendorFromQuery(){
+  var params=new URLSearchParams(location.search);
+  var name=params.get("openVendor");
+  if(!name||typeof vendors==="undefined")return;
+  var match=vendors.find(function(v){return v.name.toLowerCase()===name.toLowerCase();});
+  if(match&&typeof openVendorDetail==="function")openVendorDetail(match.id);
 }
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify(evts));}

@@ -79,6 +79,13 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
+            href="/admin"
+            title="CityPinned Admin"
+            className="text-lg hover:opacity-70"
+          >
+            🔒
+          </Link>
+          <Link
             href={isSignedIn ? "/vendor/dashboard" : "/vendor/login"}
             className="flex items-center gap-2 rounded-full bg-slate-900 py-1.5 pl-1.5 pr-4 text-sm font-semibold text-white hover:bg-slate-700"
           >

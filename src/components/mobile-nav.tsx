@@ -53,6 +53,13 @@ export function MobileNav({
               ),
             )}
             <Link
+              href="/admin"
+              onClick={() => setOpen(false)}
+              className="rounded-md px-3 py-3 text-base font-medium text-slate-700 hover:bg-slate-50"
+            >
+              🔒 Admin
+            </Link>
+            <Link
               href={isSignedIn ? "/vendor/dashboard" : "/vendor/login"}
               onClick={() => setOpen(false)}
               className="mt-1 flex items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-3 text-center text-base font-semibold text-white"

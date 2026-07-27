@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Category, LovEntry, Vendor } from "@/lib/types";
 import { calculateProximity, formatDistance, getAnchor, setAnchor, type Anchor } from "@/lib/geo";
 import { FlyerPlaceholder } from "@/components/flyer-placeholder";
+import { BASE_PATH } from "@/lib/site";
 
 interface DirectoryItem {
   id: string;
@@ -204,15 +205,24 @@ export function VendorDirectory() {
                 )}
               </>
             );
-            const cardClassName =
-              "flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md";
-            return entry.href ? (
-              <Link key={entry.id} href={entry.href} className={cardClassName}>
-                {cardBody}
-              </Link>
-            ) : (
-              <div key={entry.id} className={cardClassName}>
-                {cardBody}
+            return (
+              <div
+                key={entry.id}
+                className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+              >
+                {entry.href ? (
+                  <Link href={entry.href} className="flex flex-1 flex-col">
+                    {cardBody}
+                  </Link>
+                ) : (
+                  cardBody
+                )}
+                <a
+                  href={`${BASE_PATH}/board/?openVendor=${encodeURIComponent(entry.name)}`}
+                  className="mt-3 inline-block self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
+                >
+                  🛒 Vendor Hub
+                </a>
               </div>
             );
           })}
