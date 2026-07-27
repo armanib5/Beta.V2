@@ -60,6 +60,15 @@ export default function AdminHubPage() {
           <p className="font-bold text-slate-900">Venue Board</p>
           <p className="mt-1 text-sm text-slate-600">Create events, booths, and vendor flyers.</p>
         </Link>
+        <Link
+          href="/admin/bookkeeping"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">Bookkeeping</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Every vendor, tier, and timestamp — by city and month, exportable as CSV or a printable PDF.
+          </p>
+        </Link>
       </div>
     </div>
   );
