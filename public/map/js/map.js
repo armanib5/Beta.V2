@@ -226,6 +226,45 @@ function loadApprovedPins() {
   });
 }
 
+/* Calendar events (V2's lov_entries, a *different* Supabase project from
+   V1's own — see ../shared/v2-supabase-config.js) used to only show up on
+   /calendar. Fetched the same way loadApprovedPins() pulls in V1's own
+   pins, so seeding an event once makes it show up here too instead of two
+   places drifting apart. section_zone picks the hood directly when set;
+   otherwise falls back to the nearest hood by coordinates, and to this
+   city's default center when the event has no lat/lng of its own at all
+   (an event without a location shouldn't just disappear from the map). */
+function loadLovEvents() {
+  if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
+  return fetch(V2_SUPABASE_URL + "/rest/v1/lov_entries?select=*&type=eq.event", {
+    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
+  }).then(function (res) { return res.json(); }).then(function (rows) {
+    if (!Array.isArray(rows)) return;
+    rows.forEach(function (r) {
+      var lat = r.lat, lng = r.lng, hood;
+      if (r.section_zone) {
+        var bySection = CITY_CENTERS.find(function (c) { return c.section === r.section_zone; });
+        hood = bySection ? nearestHood(bySection.lat, bySection.lng).hood : "downtown";
+        if (lat == null || lng == null) { lat = bySection ? bySection.lat : HOODS[0].lat; lng = bySection ? bySection.lng : HOODS[0].lng; }
+      } else if (lat != null && lng != null) {
+        hood = nearestHood(lat, lng).hood;
+      } else {
+        lat = HOODS[0].lat; lng = HOODS[0].lng; hood = HOODS[0].id; // city-center fallback
+      }
+      var place = {
+        id: "lov-" + r.id, cat: r.recurrence ? "market" : "seasonal", hood: hood,
+        t: r.name, a: r.location || "", ds: r.recurrence || "",
+        lat: lat, lng: lng, wb: r.website_url || undefined,
+        flyer: r.flyer_image_url || null
+      };
+      PLACES.push(place);
+      addPlaceMarker(place);
+    });
+    updateLegendCounts();
+    applyFilters();
+  }).catch(function () {});
+}
+
 /* A vendor's "Find on Our Map" button lands here with ?q=<name> instead
    of jumping straight to /pins/ to create a new pin - this runs the same
    search the search box does (now that live-approved pins are loaded)
@@ -348,6 +387,9 @@ function goToHood(h) {
   flyTo(h.lat, h.lng, h.zoom);
   applyFilters();
   hideFlyer();
+  if (typeof setAnchor === "function") {
+    setAnchor({ lat: h.lat, lng: h.lng, label: h.l, source: "section" });
+  }
 }
 
 function renderHoodRow() {
@@ -486,6 +528,9 @@ function locateUser() {
       radius: 8, color: "#fff", weight: 2, fillColor: "#2c5f8a", fillOpacity: 1
     }).addTo(map);
     flyTo(userLoc.lat, userLoc.lng, 16);
+    if (typeof setAnchor === "function") {
+      setAnchor({ lat: userLoc.lat, lng: userLoc.lng, label: "My Location", source: "gps" });
+    }
   }, function () {
     alert("Could not get your location. Check location permissions.");
   }, { enableHighAccuracy: true, timeout: 8000 });
@@ -518,6 +563,9 @@ function promptLocationOnLoad() {
       applyFilters();
     }
     flyTo(userLoc.lat, userLoc.lng, 16);
+    if (typeof setAnchor === "function") {
+      setAnchor({ lat: userLoc.lat, lng: userLoc.lng, label: "My Location", source: "gps" });
+    }
   }, function () {}, { enableHighAccuracy: true, timeout: 8000 });
 }
 
@@ -557,6 +605,7 @@ function initMap() {
   initFilterRow();
   initSearch();
   loadApprovedPins().then(handleSearchQuery);
+  loadLovEvents();
 
   document.getElementById("zIn").onclick = function () { map.stop(); map.zoomIn(); };
   document.getElementById("zOut").onclick = function () { map.stop(); map.zoomOut(); };
@@ -564,7 +613,37 @@ function initMap() {
   document.getElementById("myLoc").onclick = locateUser;
   document.getElementById("flyerClose").onclick = hideFlyer;
   map.on("click", hideFlyer);
-  if (!openPlaceFromQuery()) promptLocationOnLoad();
+  if (openPlaceFromQuery()) return;
+
+  /* An anchor already set on another page (city picked on the Vendor
+     Directory, GPS fix taken on the Board) carries over here via shared
+     storage instead of starting from scratch every time. */
+  var sharedAnchor = (typeof getAnchor === "function") ? getAnchor() : null;
+  if (sharedAnchor && sharedAnchor.source === "gps") {
+    // Set activeCity/activeHood directly (not via goToHood) so this doesn't
+    // immediately overwrite the precise GPS anchor with a coarser hood center.
+    userLoc = { lat: sharedAnchor.lat, lng: sharedAnchor.lng };
+    userMarker = L.circleMarker([userLoc.lat, userLoc.lng], {
+      radius: 8, color: "#fff", weight: 2, fillColor: "#2c5f8a", fillOpacity: 1
+    }).addTo(map);
+    var gpsLoc = nearestHood(userLoc.lat, userLoc.lng);
+    if (gpsLoc.city !== activeCity) { activeCity = gpsLoc.city; renderHoodRow(); }
+    var gpsHood = activeCityObj().hoods.find(function (h) { return h.id === gpsLoc.hood; });
+    if (gpsHood) {
+      activeHood = gpsHood.id;
+      document.querySelectorAll(".hoodbtn").forEach(function (x) { x.classList.toggle("on", x.dataset.hoodId === activeHood); });
+      setAreaLabel(gpsHood.l, hoodHasPlaces(gpsHood.id));
+      applyFilters();
+    }
+    flyTo(userLoc.lat, userLoc.lng, 16);
+  } else if (sharedAnchor) {
+    var loc2 = nearestHood(sharedAnchor.lat, sharedAnchor.lng);
+    if (loc2.city !== activeCity) { activeCity = loc2.city; renderHoodRow(); }
+    var hoodObj2 = activeCityObj().hoods.find(function (h) { return h.id === loc2.hood; });
+    if (hoodObj2) goToHood(hoodObj2);
+  } else {
+    promptLocationOnLoad();
+  }
 }
 
 /* Board's flyer detail links here with ?showPlace=<id> for events that

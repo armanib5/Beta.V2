@@ -162,6 +162,7 @@ document.getElementById("postBtn2").onclick=function(){openForm("");};
 
 function init(){
   load();
+  applySharedAnchorOnLoad();
   setBrand(curCity);
   renderHoodRow();
   renderToday();
@@ -174,6 +175,25 @@ function init(){
   setupBgUpload();
   setCityBg(curCity,curHood);
   openFlyerFromQuery();
+  loadLovEvents();
+}
+
+/* An anchor already set on another page (city/section picked on the Map,
+   GPS fix taken on the Vendor Directory) carries over here the same way -
+   see goToHood/setCity's setAnchor calls and map.js's equivalent. Only
+   applies on first load, before the visitor has touched this page's own
+   city picker, so it never fights a click they just made here. */
+function applySharedAnchorOnLoad(){
+  if(typeof getAnchor!=="function")return;
+  var a=getAnchor();
+  if(!a||!a.label)return;
+  var match=CITY_CENTERS.find(function(c){return c.label===a.label;});
+  if(!match)return;
+  var cityAbbr=match.id.split("-")[0];
+  if(CN[cityAbbr]&&cityAbbr!==curCity){
+    curCity=cityAbbr;
+    curHood=cityAbbr==="sj"?(HOODS_SJ.some(function(h){return match.id==="sj-"+h.id;})?match.id.slice(3):"downtown"):null;
+  }
 }
 
 /* Map pins have no real link back to a Board flyer (separate data -
@@ -244,6 +264,51 @@ function load(){
   try{var r=localStorage.getItem(KEY);evts=r?JSON.parse(r):JSON.parse(JSON.stringify(DEF));}
   catch(e){evts=JSON.parse(JSON.stringify(DEF));}
   expire();
+}
+
+var WEEKDAY_CODES=[["sun","sunday"],["mon","monday"],["tue","tuesday"],["wed","wednesday"],["thu","thursday"],["fri","friday"],["sat","saturday"]];
+function recurrenceToDayCode(recurrence){
+  var lower=(recurrence||"").toLowerCase();
+  for(var i=0;i<WEEKDAY_CODES.length;i++){
+    if(lower.indexOf(WEEKDAY_CODES[i][1])>=0)return WEEKDAY_CODES[i][0];
+  }
+  return "monthly";
+}
+
+/* Calendar events (V2's lov_entries, a *different* Supabase project from
+   V1's own board — see ../shared/v2-supabase-config.js) used to only show
+   up on /calendar. Merged into evts in-memory (never saved to localStorage
+   under KEY) so seeding an event once makes it show up on the Board's
+   Today/This Week strip and category rows too, without a stale copy
+   surviving a future re-fetch or overwriting anything a real flyer poster
+   saved here. Missing flyer image falls back to the category icon
+   (mkTCard/openDetail already do this for any event with no ev.photo) —
+   missing coordinates aren't relevant here, the Board files by hood name
+   not lat/lng. */
+function loadLovEvents(){
+  if(typeof V2_SUPABASE_URL==="undefined")return;
+  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*&type=eq.event",{
+    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
+  }).then(function(res){return res.json();}).then(function(rows){
+    if(!Array.isArray(rows))return;
+    var existingIds=evts.map(function(e){return e.id;});
+    rows.forEach(function(r){
+      var id="lov-"+r.id;
+      if(existingIds.indexOf(id)>=0)return;
+      var hood=r.section_zone?(HOODS_SJ.find(function(h){return h.l===r.section_zone||h.id===r.section_zone;})||{}).id:"downtown";
+      var d=r.event_date?r.event_date.slice(0,10):recurrenceToDayCode(r.recurrence);
+      evts.push({
+        id:id,cat:r.recurrence?"market":"seasonal",lbl:r.recurrence?"Recurring":"Live Festival",
+        exp:false,hood:hood||"downtown",
+        t:r.name,w:r.recurrence||(r.event_date?r.event_date.slice(0,10):""),d:d,
+        a:r.location||"",ph:"",wb:r.website_url||"",ds:r.recurrence||"",
+        photo:r.flyer_image_url||"",ed:r.end_date?r.end_date.slice(0,10):undefined
+      });
+    });
+    expire();
+    renderToday();
+    renderBoards();
+  }).catch(function(){});
 }
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify(evts));}
@@ -376,6 +441,10 @@ function goToHood(hoodId){
   setCityBg(curCity,curHood);
   renderBoards();
   renderToday();
+  if(typeof setAnchor==="function"&&typeof hoodCoords==="function"){
+    var c=hoodCoords(curCity,hoodId);
+    if(c)setAnchor({lat:c.lat,lng:c.lng,label:c.label,source:"section"});
+  }
 }
 
 function setCity(v){
@@ -395,6 +464,10 @@ function setCity(v){
     renderBoards();
   }
   renderToday();
+  if(typeof setAnchor==="function"&&typeof hoodCoords==="function"){
+    var c=hoodCoords(v,curHood);
+    if(c)setAnchor({lat:c.lat,lng:c.lng,label:c.label,source:"city"});
+  }
 }
 
 function renderToday(){

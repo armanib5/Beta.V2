@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { LovEntry, Vendor } from "@/lib/types";
-import { formatDistance, haversineDistanceMiles } from "@/lib/geo";
+import { calculateProximity, formatDistance, getAnchor, setAnchor, type Anchor } from "@/lib/geo";
 
 interface DirectoryItem {
   id: string;
@@ -74,9 +74,16 @@ export function VendorDirectory() {
     [vendors, guestListings],
   );
 
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  // Same shared anchor the Map and Board read/write (localStorage, same
+  // origin) — a city picked on the Map is already the anchor here on load,
+  // and picking "Sort Near Me" here carries over to them too.
+  const [anchor, setAnchorState] = useState<Anchor | null>(null);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAnchorState(getAnchor());
+  }, []);
 
   function findNearMe() {
     if (!navigator.geolocation) {
@@ -87,7 +94,14 @@ export function VendorDirectory() {
     setLocationError(null);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        const next: Anchor = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          label: "My Location",
+          source: "gps",
+        };
+        setAnchor(next);
+        setAnchorState(next);
         setLocating(false);
       },
       () => {
@@ -99,27 +113,13 @@ export function VendorDirectory() {
   }
 
   const sortedItems = useMemo(() => {
-    const withDistance = items.map((item) => ({
-      ...item,
-      distance:
-        userLocation && item.lat !== null && item.lng !== null
-          ? haversineDistanceMiles(userLocation.lat, userLocation.lng, item.lat, item.lng)
-          : null,
-    }));
-
-    if (!userLocation) {
-      return withDistance.sort(
-        (a, b) => Number(b.isTop10) - Number(a.isTop10) || a.name.localeCompare(b.name),
-      );
+    if (!anchor) {
+      return items
+        .map((item) => ({ ...item, distance: null as number | null }))
+        .sort((a, b) => Number(b.isTop10) - Number(a.isTop10) || a.name.localeCompare(b.name));
     }
-
-    return withDistance.sort((a, b) => {
-      if (a.distance === null && b.distance === null) return a.name.localeCompare(b.name);
-      if (a.distance === null) return 1;
-      if (b.distance === null) return -1;
-      return a.distance - b.distance;
-    });
-  }, [items, userLocation]);
+    return calculateProximity(items, anchor);
+  }, [items, anchor]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -136,7 +136,7 @@ export function VendorDirectory() {
           disabled={locating}
           className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
         >
-          {locating ? "Locating…" : userLocation ? "📍 Sorted Near You" : "📍 Sort Near Me"}
+          {locating ? "Locating…" : anchor ? `📍 Sorted Near ${anchor.label}` : "📍 Sort Near Me"}
         </button>
       </div>
       {locationError && <p className="mt-2 text-sm font-medium text-red-600">{locationError}</p>}
