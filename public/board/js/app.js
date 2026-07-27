@@ -344,7 +344,7 @@ function recurrenceToDayCode(recurrence){
    not lat/lng. */
 function loadLovEvents(){
   if(typeof V2_SUPABASE_URL==="undefined")return;
-  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*&type=eq.event",{
+  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*&type=eq.event&or=(publish_at.is.null,publish_at.lte."+encodeURIComponent(new Date().toISOString())+")",{
     headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
   }).then(function(res){return res.json();}).then(function(rows){
     if(!Array.isArray(rows))return;
@@ -386,7 +386,7 @@ function loadLovEvents(){
    ?openVendor=<name> from the Vendor Directory instead. */
 function loadLovVendors(){
   if(typeof V2_SUPABASE_URL==="undefined")return;
-  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*&type=eq.vendor",{
+  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*&type=eq.vendor&or=(publish_at.is.null,publish_at.lte."+encodeURIComponent(new Date().toISOString())+")",{
     headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
   }).then(function(res){return res.json();}).then(function(rows){
     if(!Array.isArray(rows)||typeof vendors==="undefined")return;

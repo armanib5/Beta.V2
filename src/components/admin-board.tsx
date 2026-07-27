@@ -54,10 +54,12 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
   const [newEventName, setNewEventName] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventLocation, setNewEventLocation] = useState("");
+  const [newEventPublishAt, setNewEventPublishAt] = useState("");
   const [showNewEvent, setShowNewEvent] = useState(initialEvents.length === 0);
 
   const [newFlyerName, setNewFlyerName] = useState("");
   const [newFlyerImage, setNewFlyerImage] = useState("");
+  const [newFlyerPublishAt, setNewFlyerPublishAt] = useState("");
   const [showNewFlyer, setShowNewFlyer] = useState(false);
 
   async function loadFlyers() {
@@ -120,6 +122,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
         name: newEventName.trim(),
         event_date: newEventDate || null,
         location: newEventLocation.trim() || null,
+        publish_at: newEventPublishAt ? new Date(newEventPublishAt).toISOString() : null,
       })
       .select("*")
       .single<LovEntry>();
@@ -128,12 +131,20 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
       setError(insertError?.message ?? "Could not create event.");
       return;
     }
-    logActivity(supabase, "event", data.id, data.name, "Created", data.location ?? undefined);
+    logActivity(
+      supabase,
+      "event",
+      data.id,
+      data.name,
+      "Created",
+      data.publish_at ? `Scheduled to publish ${new Date(data.publish_at).toLocaleString("en-US")}` : (data.location ?? undefined),
+    );
     setEvents((prev) => [data, ...prev]);
     setEventId(data.id);
     setNewEventName("");
     setNewEventDate("");
     setNewEventLocation("");
+    setNewEventPublishAt("");
     setShowNewEvent(false);
   }
 
@@ -148,6 +159,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
         type: "vendor",
         name: newFlyerName.trim(),
         flyer_image_url: newFlyerImage.trim() || null,
+        publish_at: newFlyerPublishAt ? new Date(newFlyerPublishAt).toISOString() : null,
       })
       .select("*")
       .single<LovEntry>();
@@ -156,13 +168,21 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
       setError(insertError?.message ?? "Could not create vendor flyer.");
       return;
     }
-    logActivity(supabase, "vendor", data.id, data.name, "Created flyer");
+    logActivity(
+      supabase,
+      "vendor",
+      data.id,
+      data.name,
+      "Created flyer",
+      data.publish_at ? `Scheduled to publish ${new Date(data.publish_at).toLocaleString("en-US")}` : undefined,
+    );
     const flyer: Flyer = { key: `lov:${data.id}`, name: data.name, image: data.flyer_image_url };
     setFlyers((prev) => [...prev, flyer]);
     setFlyersByKey((prev) => ({ ...prev, [flyer.key]: flyer }));
     setNewBoothFlyer(flyer.key);
     setNewFlyerName("");
     setNewFlyerImage("");
+    setNewFlyerPublishAt("");
     setShowNewFlyer(false);
   }
 
@@ -312,6 +332,17 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
                 className="mt-1 w-56 rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Publish date <span className="font-normal text-slate-400">(blank = live now)</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={newEventPublishAt}
+                onChange={(e) => setNewEventPublishAt(e.target.value)}
+                className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
             <button
               type="submit"
               className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
@@ -453,6 +484,17 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
               value={newFlyerImage}
               onChange={(e) => setNewFlyerImage(e.target.value)}
               className="mt-1 w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">
+              Publish date <span className="font-normal text-slate-400">(blank = live now)</span>
+            </label>
+            <input
+              type="datetime-local"
+              value={newFlyerPublishAt}
+              onChange={(e) => setNewFlyerPublishAt(e.target.value)}
+              className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
           <button

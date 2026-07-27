@@ -71,6 +71,7 @@ export function VendorDirectory() {
       .from("lov_entries")
       .select("*")
       .eq("type", "vendor")
+      .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
       .returns<LovEntry[]>()
       .then(({ data }) => setGuestListings(data ?? []));
     supabase

@@ -72,6 +72,7 @@ export interface LovEntry {
   recurrence: string | null;
   website_url: string | null;
   section_zone: string | null;
+  publish_at: string | null;
   created_at: string;
   updated_at: string;
 }

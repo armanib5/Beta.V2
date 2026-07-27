@@ -23,6 +23,8 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
   const [vendors, setVendors] = useState(initialVendors);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
 
   async function updateVendor(id: string, patch: Partial<Vendor>) {
     setError(null);
@@ -44,6 +46,35 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
     setVendors((prev) => prev.map((v) => (v.id === id ? data : v)));
   }
 
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function batchUpdate(patch: Partial<Vendor>) {
+    setError(null);
+    setBatchBusy(true);
+    const supabase = createClient();
+    const ids = [...selected];
+    const results = await Promise.all(
+      ids.map((id) => supabase.from("vendors").update(patch).eq("id", id).select("*").single<Vendor>()),
+    );
+    setBatchBusy(false);
+    const updated = new Map<string, Vendor>();
+    for (const r of results) {
+      if (r.data) {
+        updated.set(r.data.id, r.data);
+        logActivity(supabase, "vendor", r.data.id, r.data.business_name, "Updated (batch)", describePatch(patch));
+      }
+    }
+    setVendors((prev) => prev.map((v) => updated.get(v.id) ?? v));
+    setSelected(new Set());
+  }
+
   if (vendors.length === 0) {
     return <p className="mt-8 text-sm text-slate-500">No vendors yet.</p>;
   }
@@ -51,6 +82,35 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
   return (
     <div className="mt-6 space-y-3">
       {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      {selected.size > 0 && (
+        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-white p-3 shadow-md">
+          <span className="text-sm font-semibold text-slate-700">{selected.size} selected</span>
+          <button
+            type="button"
+            disabled={batchBusy}
+            onClick={() => batchUpdate({ status: "active" })}
+            className="rounded-full bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+          >
+            Approve All
+          </button>
+          <button
+            type="button"
+            disabled={batchBusy}
+            onClick={() => batchUpdate({ status: "suspended" })}
+            className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+          >
+            Reject All
+          </button>
+          <button
+            type="button"
+            disabled={batchBusy}
+            onClick={() => setSelected(new Set())}
+            className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Clear
+          </button>
+        </div>
+      )}
       {vendors.map((vendor) => {
         const busy = busyId === vendor.id;
         return (
@@ -58,6 +118,13 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
             key={vendor.id}
             className={`flex flex-wrap items-center gap-3 rounded-xl border p-4 ${STATUS_STYLES[vendor.status]}`}
           >
+            <input
+              type="checkbox"
+              checked={selected.has(vendor.id)}
+              onChange={() => toggleSelected(vendor.id)}
+              className="h-4 w-4 shrink-0"
+              aria-label={`Select ${vendor.business_name}`}
+            />
             {vendor.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element -- static export, arbitrary vendor-uploaded URLs
               <img src={vendor.logo_url} alt="" className="h-12 w-12 rounded-lg object-cover" />

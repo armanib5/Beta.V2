@@ -236,7 +236,7 @@ function loadApprovedPins() {
    (an event without a location shouldn't just disappear from the map). */
 function loadLovEvents() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
-  return fetch(V2_SUPABASE_URL + "/rest/v1/lov_entries?select=*&type=eq.event", {
+  return fetch(V2_SUPABASE_URL + "/rest/v1/lov_entries?select=*&type=eq.event&or=(publish_at.is.null,publish_at.lte." + encodeURIComponent(new Date().toISOString()) + ")", {
     headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
   }).then(function (res) { return res.json(); }).then(function (rows) {
     if (!Array.isArray(rows)) return;
