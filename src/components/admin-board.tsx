@@ -78,6 +78,9 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
   }
 
   useEffect(() => {
+    // Async fetch-then-setState (not a synchronous browser-API read) —
+    // the standard fetch-on-mount pattern, not what this rule targets.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadFlyers();
   }, []);
 
