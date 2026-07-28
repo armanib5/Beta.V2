@@ -47,6 +47,24 @@ export default function AdminHubPage() {
       <p className="mt-2 text-sm text-slate-600">Private — only visible to signed-in admins.</p>
       <div className="mt-8 space-y-3">
         <Link
+          href="/admin/dashboard"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">Admin Dashboard</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Live summary metrics by city — Events, Vendors, Pins, Bookings, Revenue.
+          </p>
+        </Link>
+        <Link
+          href="/admin/pins"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">Pins Manager</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Manage map pins — category, status, coordinates, and vendor/event links.
+          </p>
+        </Link>
+        <Link
           href="/admin/vendors"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >

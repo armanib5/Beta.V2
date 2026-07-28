@@ -199,23 +199,25 @@ function nearestHood(lat, lng) {
   return best || { city: "sj", hood: "downtown" };
 }
 
-/* Approved pins (added via /admin/'s Pins tab or the public /pins/ page)
-   live in Supabase, but this map only ever read the static PLACES array -
-   approving a pin never made it appear here. Fetched once after the
-   static map is already up and merged in as new markers, so approving in
-   /admin/ actually shows up on the live map instead of only updating a
-   database row nobody sees. */
+/* Approved pins from the Back Office Pins Manager (V2's own `pins` table -
+   NOT the old /admin/'s Pins tab / public /pins/ page, which point at a
+   different, abandoned Supabase project entirely and are left untouched).
+   `event`-category pins are skipped here on purpose: their linked event
+   already renders its own marker via loadLovEvents(), so drawing this pin
+   too would just duplicate it on the map. */
+var PIN_CATEGORY_TO_MAP = { food: "foodhall", business: "shop", parking: "centers", restroom: "centers", safety: "centers" };
 function loadApprovedPins() {
-  if (typeof isSupabaseConfigured !== "function" || !isSupabaseConfigured()) return Promise.resolve();
-  var sb = getSupabase();
-  return sb.from("pins").select("*").eq("status", "approved").then(function (res) {
-    if (res.error || !res.data || !res.data.length) return;
-    res.data.forEach(function (p) {
+  if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
+  return fetch(V2_SUPABASE_URL + "/rest/v1/pins?select=*&status=eq.approved", {
+    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
+  }).then(function (res) { return res.json(); }).then(function (rows) {
+    if (!Array.isArray(rows)) return;
+    rows.forEach(function (p) {
+      if (p.category === "event") return;
       var loc = nearestHood(p.lat, p.lng);
       var place = {
-        id: "sb-" + p.id, cat: p.cat_id || "shop", hood: loc.hood,
-        t: p.title || p.owner_name || "Vendor Pin",
-        a: p.owner_name || "", ds: p.description || "",
+        id: "pin-" + p.id, cat: PIN_CATEGORY_TO_MAP[p.category] || "shop", hood: loc.hood,
+        t: p.title, a: "", ds: p.description || "",
         lat: p.lat, lng: p.lng
       };
       PLACES.push(place);
@@ -223,7 +225,7 @@ function loadApprovedPins() {
     });
     updateLegendCounts();
     applyFilters();
-  });
+  }).catch(function () {});
 }
 
 /* Calendar events (V2's lov_entries, a *different* Supabase project from
@@ -287,7 +289,7 @@ function loadLovEvents() {
 var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars" };
 function loadVendorPins() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
-  return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&lat=not.is.null&lng=not.is.null", {
+  return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&is_internal=eq.false&lat=not.is.null&lng=not.is.null", {
     headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
   }).then(function (res) { return res.json(); }).then(function (rows) {
     if (!Array.isArray(rows)) return;

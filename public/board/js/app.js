@@ -476,7 +476,7 @@ var BOARD_CAT_SLUGS={restaurant:"bars",bar:"bars"};
    anywhere on the board itself. */
 function loadRealVendors(){
   if(typeof V2_SUPABASE_URL==="undefined")return;
-  fetch(V2_SUPABASE_URL+"/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active",{
+  fetch(V2_SUPABASE_URL+"/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&is_internal=eq.false",{
     headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
   }).then(function(res){return res.json();}).then(function(rows){
     if(!Array.isArray(rows)||typeof vendors==="undefined")return;
@@ -590,6 +590,23 @@ function isLiveNow(ev){
     if(h<ev.sh||h>ev.eh)return false;
   }
   return true;
+}
+
+/* Real-time flyer card status badge - reuses isLiveNow()/eventOnDate()
+   rather than re-deriving "is this happening" from scratch, so the badge
+   can never disagree with the live-now pulse/sort logic those already
+   drive elsewhere on the board. */
+function flyerLiveStatus(ev){
+  if(ev.exp)return{emoji:"🔴",label:"Closed",cls:"closed"};
+  var today=new Date();
+  if(isLiveNow(ev)||eventOnDate(ev,today))return{emoji:"🟢",label:"Open Now",cls:"open"};
+  var tomorrow=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1);
+  if(eventOnDate(ev,tomorrow))return{emoji:"🟡",label:"Starting Soon",cls:"soon"};
+  if(ev.d&&ev.d.length===10){
+    var endKey=ev.ed||ev.d;
+    if(endKey<dateKeyOf(today))return{emoji:"🔴",label:"Closed",cls:"closed"};
+  }
+  return{emoji:"📅",label:"Upcoming",cls:"upcoming"};
 }
 
 /* Each city gets its own downtown background photo. Until real photos are
@@ -832,7 +849,10 @@ function mkTCard(ev,featured){
   else{imgDiv.innerHTML=ico;}
   var body=document.createElement("div");
   body.className="tcbody";
-  body.innerHTML=(featured?"<span class='tcpin'>&#9733; Featured</span>":"")+"<h4>"+ev.t+"</h4><div class='tw'>"+ev.w+"</div>";
+  var live=flyerLiveStatus(ev);
+  body.innerHTML=(featured?"<span class='tcpin'>&#9733; Featured</span>":"")+
+    "<span class='livebadge "+live.cls+"'>"+live.emoji+" "+live.label+"</span>"+
+    "<h4>"+ev.t+"</h4><div class='tw'>"+ev.w+"</div>";
   d.appendChild(imgDiv);d.appendChild(body);
   d.addEventListener("click",function(){openDetail(ev.id);});
   return d;
@@ -1011,10 +1031,13 @@ function mkFlyer(ev){
   }
   var fb=document.createElement("div");fb.className="fb";
   var rib=document.createElement("span");rib.className="rib "+ev.cat;rib.textContent=ev.lbl;
+  var liveStat=flyerLiveStatus(ev);
+  var livespan=document.createElement("span");livespan.className="livebadge "+liveStat.cls;
+  livespan.textContent=liveStat.emoji+" "+liveStat.label;
   var h3=document.createElement("h3");h3.textContent=ev.t;
   var fw=document.createElement("div");fw.className="fw";fw.textContent=ev.w;
   var fa=document.createElement("div");fa.className="fa";fa.textContent=ev.a.split(",")[0];
-  fb.appendChild(rib);fb.appendChild(h3);fb.appendChild(fw);fb.appendChild(fa);
+  fb.appendChild(rib);fb.appendChild(livespan);fb.appendChild(h3);fb.appendChild(fw);fb.appendChild(fa);
 
   fc.appendChild(fimg);fc.appendChild(fb);
   fc.addEventListener("click",function(){openDetail(ev.id);});

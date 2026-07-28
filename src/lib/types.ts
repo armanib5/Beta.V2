@@ -47,6 +47,7 @@ export interface Vendor {
   lat: number | null;
   lng: number | null;
   onboarded_at: string | null;
+  is_internal: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -103,6 +104,23 @@ export interface Booth {
   lov_entry_id: string | null;
   x: number | null;
   y: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PinCategory = "food" | "parking" | "restroom" | "safety" | "business" | "event";
+export type PinStatus = "draft" | "pending" | "approved" | "expired";
+
+export interface Pin {
+  id: string;
+  title: string;
+  description: string | null;
+  category: PinCategory;
+  status: PinStatus;
+  lat: number;
+  lng: number;
+  vendor_id: string | null;
+  event_id: string | null;
   created_at: string;
   updated_at: string;
 }

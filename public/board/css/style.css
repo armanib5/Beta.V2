@@ -105,6 +105,11 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 .fb{padding:9px 10px 11px;background:#fff;flex:1;display:flex;flex-direction:column;min-height:0;}
 .rib{font-family:'Special Elite',monospace;font-size:8px;text-transform:uppercase;letter-spacing:1.5px;padding:2px 6px;color:#fff;display:inline-block;margin-bottom:5px;border-radius:1px;}
 .rib.market{background:var(--g);}.rib.foodhall{background:var(--go);}.rib.bars{background:var(--wn);}.rib.artwalk{background:var(--bl);}.rib.cityart{background:var(--pu);}.rib.parks{background:var(--pk);}.rib.venue{background:var(--br);}.rib.seasonal{background:var(--cr8);}.rib.shop{background:var(--re);}
+.livebadge{font-size:9px;font-weight:700;display:inline-block;margin:0 0 5px 5px;padding:1px 6px;border-radius:8px;vertical-align:middle;}
+.livebadge.open{background:rgba(34,197,94,.16);color:#15803d;}
+.livebadge.soon{background:rgba(234,179,8,.18);color:#a16207;}
+.livebadge.closed{background:rgba(239,68,68,.16);color:#b91c1c;}
+.livebadge.upcoming{background:rgba(100,116,139,.16);color:#475569;}
 .fc h3{font-family:'Special Elite',monospace;font-size:12px;line-height:1.25;color:#1a0800;margin-bottom:3px;}
 .fc .fw{font-size:10px;font-weight:700;color:#8B2500;margin-bottom:1px;}
 .fc .fa{font-size:9.5px;color:#5a4030;opacity:.85;}
