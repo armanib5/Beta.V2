@@ -252,6 +252,7 @@ function loadLovEvents() {
   }).then(function (res) { return res.json(); }).then(function (rows) {
     if (!Array.isArray(rows)) return;
     rows.forEach(function (r) {
+      if (r.status && r.status !== "active") return;
       var lat = r.lat, lng = r.lng, hood;
       if (r.section_zone) {
         var bySection = CITY_CENTERS.find(function (c) { return c.section === r.section_zone; });

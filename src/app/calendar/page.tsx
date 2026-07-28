@@ -28,6 +28,7 @@ export default function CalendarPage() {
       .from("lov_entries")
       .select("*")
       .eq("type", "event")
+      .eq("status", "active")
       .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
       .order("event_date")
       .returns<LovEntry[]>()

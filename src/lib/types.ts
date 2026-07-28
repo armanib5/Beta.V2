@@ -1,5 +1,6 @@
 export type VendorStatus = "pending" | "active" | "suspended";
 export type RegistrationStatus = "pending" | "paid" | "failed" | "refunded";
+export type CategoryTier = "top_10" | "featured" | "standard";
 
 export interface Category {
   id: string;
@@ -47,6 +48,8 @@ export interface Vendor {
   lat: number | null;
   lng: number | null;
   onboarded_at: string | null;
+  category_tier: CategoryTier;
+  is_featured: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +76,24 @@ export interface LovEntry {
   website_url: string | null;
   section_zone: string | null;
   publish_at: string | null;
+  details: string | null;
+  status: FlyerStatus;
+  category_tier: CategoryTier;
+  is_featured: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FlyerStatus = "active" | "draft" | "archived";
+export type FlyerBoard = "master" | "weekly" | "today";
+
+export interface FlyerRotation {
+  id: string;
+  flyer_id: string;
+  assigned_board: FlyerBoard;
+  assigned_day: string | null;
+  category: string | null;
+  status: FlyerStatus;
   created_at: string;
   updated_at: string;
 }
