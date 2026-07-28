@@ -60,10 +60,15 @@
   <div class="tag">Farmers Market &nbsp; Food &nbsp; Art &nbsp; World Cup &nbsp; Theaters &nbsp; Events</div>
 </div>
 <div class="tdwrap" id="tdwrap">
-  <div class="sh"><h2>Happening Today</h2><span class="live">LIVE</span></div>
-  <div class="tscr" id="tdCrds"></div>
-  <div class="sh" style="margin-top:20px;margin-bottom:10px;"><h2>This Week</h2></div>
-  <div class="tscr" id="wkCrds"></div>
+  <div class="sh">
+    <h2 id="corkTitle">Featured Spotlight</h2>
+    <div class="corktoggle">
+      <button class="ctb on" id="corkSpotBtn" type="button">🌟 Spotlight</button>
+      <button class="ctb" id="corkTop10Btn" type="button">🏆 Top 10 Today</button>
+    </div>
+  </div>
+  <div id="corkSpotlight"></div>
+  <div class="tscr" id="corkTop10List" hidden></div>
 </div>
 <main class="boards" id="bView"></main>
 <section id="mapSec">

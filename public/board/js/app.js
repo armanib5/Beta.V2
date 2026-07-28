@@ -220,6 +220,7 @@ function init(){
   loadFlyerRotation();
   setupWaffleMenu();
   setupMidnightRotation();
+  setupCorkToggle();
 }
 
 /* Nav buttons (Main/Boards/Map/Today/Dashboard/Admin/Login/Background)
@@ -315,8 +316,7 @@ function setupBgParallax(){
     bgScale=1.06+Math.min(window.scrollY/3000,0.05);
     applyBgTransform();
   },{passive:true});
-  bindStripParallax(document.getElementById("tdCrds"));
-  bindStripParallax(document.getElementById("wkCrds"));
+  bindStripParallax(document.getElementById("corkTop10List"));
 }
 
 function load(){
@@ -391,11 +391,12 @@ function loadLovEvents(){
       var cat=(slug&&LOV_CAT_SLUG_TO_BOARD[slug])||(r.recurrence?"market":"seasonal");
       var d=r.event_date?r.event_date.slice(0,10):recurrenceToDayCode(r.recurrence);
       evts.push({
-        id:id,flyerId:r.id,cat:cat,lbl:r.recurrence?"Recurring":"Live Festival",
+        id:id,flyerId:r.id,cat:cat,lbl:r.booth_tier==="top"?"Top 10":(r.recurrence?"Recurring":"Live Festival"),
         exp:false,city:loc.city,hood:loc.hood,
         t:r.name,w:r.recurrence||(r.event_date?r.event_date.slice(0,10):""),d:d,
         a:r.location||"",ph:"",wb:r.website_url||"",ds:r.details||r.recurrence||"",
-        photo:r.flyer_image_url||"",ed:r.end_date?r.end_date.slice(0,10):undefined
+        photo:r.flyer_image_url||"",ed:r.end_date?r.end_date.slice(0,10):undefined,
+        top:!!(r.booth_tier==="top"||r.category_tier==="top_10"||r.is_featured)
       });
     });
     expire();
@@ -507,7 +508,8 @@ function loadRealVendors(){
           exp:false,city:loc.city,hood:loc.hood,
           t:r.business_name+(r.is_top10?" ⭐":""),w:"",d:"daily",
           a:"",ph:"",wb:r.website_url||"",ds:r.short_description||"",
-          photo:r.logo_url||""
+          photo:r.logo_url||"",
+          top:!!(r.is_top10||r.category_tier==="top_10"||r.is_featured)
         });
       }
     });
@@ -755,71 +757,110 @@ function eventOnDate(ev,d){
 
 var DOW_CODES=["sun","mon","tue","wed","thu","fri","sat"];
 
+/* Featured Cork Board: one spotlight flyer at a time instead of the old
+   sprawling Today/This Week strips, with a toggle to a citywide Top 10
+   list. Picking priority for the spotlight: an explicit Board 3 date
+   override > today's Board 2 weekly pick > the best live-now/Top10 match
+   for today > the nearest upcoming flyer, so there's always something to
+   show instead of a blank board. */
+var corkMode="spotlight";
 function renderToday(){
-  var tc=document.getElementById("tdCrds"),wc=document.getElementById("wkCrds");
-  if(!tc||!wc)return;
+  var spotEl=document.getElementById("corkSpotlight"),listEl=document.getElementById("corkTop10List");
+  if(!spotEl||!listEl)return;
   var hood=curHood;
   var cityEvts=evts.filter(function(e){return eventInCity(e,curCity);});
-  var pool=hood?cityEvts.filter(function(e){return(e.hood||"downtown")===hood;}):cityEvts;
+  var pool=hood?cityEvts.filter(function(e){return e.top||(e.hood||"downtown")===hood;}):cityEvts;
 
   var today=new Date();
   var todayKey=dateKeyOf(today);
   var todayDow=DOW_CODES[today.getDay()];
-
-  /* Board 2's pick for today's weekday - Board 3 deliberately excludes it
-     from its own automatic pool below, so the two boards don't just show
-     the same flyer twice, unless an admin explicitly overrides Board 3
-     for this exact date. */
-  var todaysWeeklyPickIds=flyerRotation.weeklyByDay[todayDow]||[];
   var todayOverrideIds=flyerRotation.todayByDate[todayKey]||[];
+  var todaysWeeklyPickIds=flyerRotation.weeklyByDay[todayDow]||[];
 
-  var td,tdFeaturedIds;
+  var spotlight=null;
   if(todayOverrideIds.length){
-    /* Respects the current city (an override for a San Jose event
-       shouldn't bleed into Santa Clara's or Gilroy's Today board), but
-       bypasses the neighborhood filter - a citywide spotlight pick. */
-    td=cityEvts.filter(function(e){return todayOverrideIds.indexOf(e.flyerId)>=0;});
-    tdFeaturedIds=todayOverrideIds;
-  }else{
-    td=pool.filter(function(e){return eventOnDate(e,today)&&todaysWeeklyPickIds.indexOf(e.flyerId)<0;});
-    tdFeaturedIds=[];
+    spotlight=cityEvts.filter(function(e){return todayOverrideIds.indexOf(e.flyerId)>=0;})[0]||null;
   }
-  td.sort(function(a,b){return (isLiveNow(b)?1:0)-(isLiveNow(a)?1:0);});
-  tc.innerHTML="";
-  if(td.length){
-    td.forEach(function(ev){tc.appendChild(mkTCard(ev,tdFeaturedIds.indexOf(ev.flyerId)>=0));});
-  }else{
-    tc.appendChild(mkNothingCard("Nothing happening today — check back soon!"));
+  if(!spotlight&&todaysWeeklyPickIds.length){
+    spotlight=cityEvts.filter(function(e){return todaysWeeklyPickIds.indexOf(e.flyerId)>=0;})[0]||null;
+  }
+  if(!spotlight){
+    var todayCandidates=pool.filter(function(e){return eventOnDate(e,today);})
+      .sort(function(a,b){
+        return (b.top?1:0)-(a.top?1:0)||(isLiveNow(b)?1:0)-(isLiveNow(a)?1:0)||eventSortKey(a)-eventSortKey(b);
+      });
+    spotlight=todayCandidates[0]||null;
+  }
+  if(!spotlight){
+    var upcoming=pool.slice().sort(function(a,b){return eventSortKey(a)-eventSortKey(b);});
+    spotlight=upcoming[0]||null;
   }
 
-  wc.className="weekdays";
-  wc.innerHTML="";
-  for(var i=0;i<7;i++){
-    var d=new Date(today.getFullYear(),today.getMonth(),today.getDate()+i);
-    var dow=DOW_CODES[d.getDay()];
-    var pickIds=flyerRotation.weeklyByDay[dow]||[];
-    var featured=pool.filter(function(e){return pickIds.indexOf(e.flyerId)>=0;});
-    var auto=pool.filter(function(e){return eventOnDate(e,d)&&pickIds.indexOf(e.flyerId)<0;});
-    var dayEvts=featured.concat(auto);
-    var block=document.createElement("div");
-    block.className="wkday";
-    var label=(i===0?"Today, ":i===1?"Tomorrow, ":WEEKDAY_NAMES[d.getDay()]+", ")+
-      (d.getMonth()+1)+"/"+d.getDate();
-    var hd=document.createElement("div");
-    hd.className="wkday-hd";
-    hd.textContent=label;
-    var strip=document.createElement("div");
-    strip.className="tscr";
-    if(dayEvts.length){
-      featured.forEach(function(ev){strip.appendChild(mkTCard(ev,true));});
-      auto.forEach(function(ev){strip.appendChild(mkTCard(ev,false));});
-    }else{
-      strip.appendChild(mkNothingCard("Nothing happening " + (i===0?"today":i===1?"tomorrow":"this day") + " yet."));
-    }
-    block.appendChild(hd);block.appendChild(strip);
-    wc.appendChild(block);
+  spotEl.innerHTML="";
+  spotEl.appendChild(spotlight?mkSpotlightCard(spotlight):mkNothingCard("Nothing featured yet — check back soon!"));
+
+  var top10=cityEvts.filter(function(e){return e.top;})
+    .sort(function(a,b){return (isLiveNow(b)?1:0)-(isLiveNow(a)?1:0)||eventSortKey(a)-eventSortKey(b);});
+  listEl.innerHTML="";
+  if(top10.length){
+    top10.forEach(function(ev){listEl.appendChild(mkTCard(ev,true));});
+  }else{
+    listEl.appendChild(mkNothingCard("No Top 10 flyers yet."));
   }
+
   lastRenderedDateKey=todayKey;
+}
+
+function mkSpotlightCard(ev){
+  var ico=C[ev.cat]?C[ev.cat].i:"&#128204;";
+  var card=document.createElement("div");
+  card.className="spot-card"+(isLiveNow(ev)?" live-now":"");
+  var img=document.createElement("div");
+  img.className="spot-img";
+  if(ev.photo){img.style.backgroundImage="url("+ev.photo+")";img.style.backgroundSize="cover";img.style.backgroundPosition="center";}
+  else{img.innerHTML=ico;}
+  var body=document.createElement("div");
+  body.className="spot-body";
+  var live=flyerLiveStatus(ev);
+  body.innerHTML=
+    "<span class='rib "+ev.cat+"'>"+ev.lbl+"</span> "+
+    "<span class='livebadge "+live.cls+"'>"+live.emoji+" "+live.label+"</span><br>"+
+    "<span class='moneybadge'>💰 Featured / Boosted Spot ($50–$100 Boost Tier)</span>"+
+    "<h2>"+ev.t+"</h2>"+
+    (ev.ds?"<p class='spot-desc'>"+ev.ds+"</p>":"")+
+    (ev.a?"<div class='fa'>"+ev.a.split(",")[0]+"</div>":"");
+  card.appendChild(img);card.appendChild(body);
+  card.addEventListener("click",function(){openDetail(ev.id);});
+  return card;
+}
+
+function setupCorkToggle(){
+  var spotBtn=document.getElementById("corkSpotBtn"),top10Btn=document.getElementById("corkTop10Btn");
+  var spotEl=document.getElementById("corkSpotlight"),listEl=document.getElementById("corkTop10List");
+  var title=document.getElementById("corkTitle");
+  if(!spotBtn||!top10Btn)return;
+  function setMode(mode){
+    corkMode=mode;
+    spotBtn.classList.toggle("on",mode==="spotlight");
+    top10Btn.classList.toggle("on",mode==="top10");
+    spotEl.hidden=mode!=="spotlight";
+    listEl.hidden=mode!=="top10";
+    if(title)title.textContent=mode==="spotlight"?"Featured Spotlight":"Top 10 Events Today";
+  }
+  spotBtn.addEventListener("click",function(){setMode("spotlight");});
+  top10Btn.addEventListener("click",function(){setMode("top10");});
+  var wrap=document.getElementById("tdwrap");
+  if(wrap){
+    var touchX=null;
+    wrap.addEventListener("touchstart",function(e){touchX=e.touches[0].clientX;},{passive:true});
+    wrap.addEventListener("touchend",function(e){
+      if(touchX==null)return;
+      var dx=e.changedTouches[0].clientX-touchX;
+      if(Math.abs(dx)<40)return;
+      setMode(dx<0?"top10":"spotlight");
+      touchX=null;
+    },{passive:true});
+  }
 }
 
 function mkTCard(ev,featured){
@@ -886,7 +927,11 @@ function renderBoards(){
      what looks like a dead end. */
   var alwaysShow=hood&&hood!=="downtown";
   ORD.forEach(function(cat){
-    var items=cityEvts.filter(function(e){return e.cat===cat&&(!hood||(e.hood||"downtown")===hood);});
+    /* Top 10 / Featured flyers bypass the neighborhood filter (still
+       scoped to the current city) - a paid premium placement is meant to
+       be seen citywide, not hidden just because a visitor has a specific
+       neighborhood picked. */
+    var items=cityEvts.filter(function(e){return e.cat===cat&&(e.top||!hood||(e.hood||"downtown")===hood);});
     if(!items.length&&!alwaysShow&&cat!=="venue"&&cat!=="shop"&&cat!=="bars"&&cat!=="parks")return;
     bv.appendChild(mkBoard(cat,items));
   });
