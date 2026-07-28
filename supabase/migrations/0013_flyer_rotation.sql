@@ -46,19 +46,26 @@ create trigger set_updated_at before update on public.flyer_rotation
 
 alter table public.flyer_rotation enable row level security;
 
+-- Postgres has no "create policy if not exists", so each policy is
+-- dropped first — makes this migration safe to paste and run more than
+-- once instead of erroring on a second run.
+drop policy if exists "flyer rotation is publicly readable" on public.flyer_rotation;
 create policy "flyer rotation is publicly readable"
   on public.flyer_rotation for select
   using (true);
 
+drop policy if exists "admin can insert flyer rotation" on public.flyer_rotation;
 create policy "admin can insert flyer rotation"
   on public.flyer_rotation for insert
   with check (exists (select 1 from public.admins where id = auth.uid()));
 
+drop policy if exists "admin can update flyer rotation" on public.flyer_rotation;
 create policy "admin can update flyer rotation"
   on public.flyer_rotation for update
   using (exists (select 1 from public.admins where id = auth.uid()))
   with check (exists (select 1 from public.admins where id = auth.uid()));
 
+drop policy if exists "admin can delete flyer rotation" on public.flyer_rotation;
 create policy "admin can delete flyer rotation"
   on public.flyer_rotation for delete
   using (exists (select 1 from public.admins where id = auth.uid()));
