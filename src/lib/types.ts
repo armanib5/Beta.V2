@@ -54,6 +54,7 @@ export interface Vendor {
   operating_hours: Record<string, string> | null;
   happy_hour_specials: string | null;
   menu_url: string | null;
+  is_featured: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +62,8 @@ export interface Vendor {
 export type LovEntryType = "event" | "vendor";
 export type BoothTier = "top" | "regular";
 export type BoothStatus = "open" | "reserved" | "claimed";
+export type FlyerStatus = "active" | "draft" | "archived";
+export type FlyerBoard = "master" | "weekly" | "today";
 
 export interface LovEntry {
   id: string;
@@ -80,7 +83,21 @@ export interface LovEntry {
   website_url: string | null;
   section_zone: string | null;
   publish_at: string | null;
+  details: string | null;
+  status: FlyerStatus;
   category_tier: CategoryTier;
+  is_featured: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FlyerRotation {
+  id: string;
+  flyer_id: string;
+  assigned_board: FlyerBoard;
+  assigned_day: string | null;
+  category: string | null;
+  status: FlyerStatus;
   created_at: string;
   updated_at: string;
 }
