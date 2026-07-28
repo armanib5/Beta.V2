@@ -218,6 +218,7 @@ function init(){
   loadLovVendors();
   loadRealVendors();
   loadFlyerRotation();
+  loadRealCategories();
   setupWaffleMenu();
   setupMidnightRotation();
   setupCorkToggle();
@@ -1359,51 +1360,123 @@ function subSug(lid){
   save();cls();openDetail(lid);
 }
 
+/* Real categories (not just the board's 9 coarse groupings) so a public
+   submission lands with an actual category_id an admin can trust, not a
+   lossy guess. Fetched once at init() and cached - see loadRealCategories(). */
+var realCategories=[];
+function loadRealCategories(){
+  if(typeof V2_SUPABASE_URL==="undefined")return;
+  fetch(V2_SUPABASE_URL+"/rest/v1/categories?select=*&order=sort_order",{
+    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
+  }).then(function(res){return res.json();}).then(function(rows){
+    if(Array.isArray(rows))realCategories=rows;
+  }).catch(function(){});
+}
+
 function openForm(defCat){
   var fp=document.getElementById("frmPanel");
-  var opts=Object.entries(C).map(function(e){return "<option value='"+e[0]+"'>"+e[1].l+"</option>";}).join("");
+  var catOpts=realCategories.length
+    ? realCategories.map(function(c){return "<option value='"+c.id+"'>"+c.name+"</option>";}).join("")
+    : Object.entries(C).map(function(e){return "<option value='"+e[0]+"'>"+e[1].l+"</option>";}).join("");
   var hoodField="";
   if(curCity==="sj"){
     var hoodOpts=HOODS_SJ.map(function(h){return "<option value='"+h.id+"'"+(h.id===curHood?" selected":"")+">"+h.l+"</option>";}).join("");
     hoodField="<label>Neighborhood</label><select id='fhood'>"+hoodOpts+"</select>";
   }
-  fp.innerHTML="<div class='fi'><h2>Post a Flyer</h2><label>Title *</label><input id='ft' type='text' placeholder='e.g. Japantown Night Market'><label>Category</label><select id='fcat'>"+opts+"</select>"+hoodField+"<label>Short label shown on flyer</label><input id='fl' type='text' placeholder='e.g. Weekly Market'><label>When</label><input id='fw' type='text' placeholder='e.g. Saturdays 10am-2pm'><label>Date or recurrence</label><select id='fdate'><option value=''>None</option><option value='today'>Today</option><option value='daily'>Every Day</option><option value='mon'>Mondays</option><option value='tue'>Tuesdays</option><option value='wed'>Wednesdays</option><option value='thu'>Thursdays</option><option value='fri'>Fridays</option><option value='sat'>Saturdays</option><option value='sun'>Sundays</option><option value='monthly'>First Friday Monthly</option></select><label>Address *</label><input id='fa' type='text' placeholder='e.g. 87 N San Pedro St San Jose CA'><label>Phone</label><input id='fph' type='text' placeholder='(408) 555-0100'><label>Website</label><input id='fws' type='text' placeholder='https://'><label>Description</label><textarea id='fd' placeholder='Tell people what this is...'></textarea><label>Tags (comma separated)</label><input id='ft2' type='text' placeholder='Free Family Outdoor'><label>End date (auto-expires)</label><input id='fen' type='date'><label>Parking</label><input id='fpk' type='text' placeholder='e.g. ParkSJ garage 90 min free'><label>Transit</label><input id='ftr' type='text' placeholder='e.g. VTA Route 68, 5 min walk'><label>Accessibility</label><input id='fac' type='text' placeholder='e.g. Fully accessible, wide pathways'><label>Family</label><input id='ffam' type='text' placeholder='e.g. Family friendly, stroller-friendly'><label>Photo (optional)</label><input id='fp2' type='file' accept='image/*'><div class='facts'><button class='bcan' id='frmCan'>Cancel</button><button class='bsub' id='frmSub'>Pin It Up</button></div></div>";
-  if(defCat)document.getElementById("fcat").value=defCat;
+  fp.innerHTML="<div class='fi'><h2>Post a Flyer</h2><p class='fnote'>Submitted flyers are reviewed by an admin before they go live on the board.</p><label>Title *</label><input id='ft' type='text' placeholder='e.g. Japantown Night Market'><label>Category</label><select id='fcat'>"+catOpts+"</select>"+hoodField+"<label>When</label><input id='fw' type='text' placeholder='e.g. Saturdays 10am-2pm'><label>Date or recurrence</label><select id='fdate'><option value=''>None</option><option value='today'>Today</option><option value='daily'>Every Day</option><option value='mon'>Mondays</option><option value='tue'>Tuesdays</option><option value='wed'>Wednesdays</option><option value='thu'>Thursdays</option><option value='fri'>Fridays</option><option value='sat'>Saturdays</option><option value='sun'>Sundays</option><option value='monthly'>First Friday Monthly</option></select><label>Address *</label><input id='fa' type='text' placeholder='e.g. 87 N San Pedro St San Jose CA'><label>Phone</label><input id='fph' type='text' placeholder='(408) 555-0100'><label>Website</label><input id='fws' type='text' placeholder='https://'><label>Description</label><textarea id='fd' placeholder='Tell people what this is...'></textarea><label>Parking</label><input id='fpk' type='text' placeholder='e.g. ParkSJ garage 90 min free'><label>Transit</label><input id='ftr' type='text' placeholder='e.g. VTA Route 68, 5 min walk'><div class='facts'><button class='bcan' id='frmCan'>Cancel</button><button class='bsub' id='frmSub'>Submit for Review</button></div></div>";
+  if(defCat){
+    var fcatEl=document.getElementById("fcat");
+    if(realCategories.length){
+      var match=realCategories.find(function(c){return LOV_CAT_SLUG_TO_BOARD[c.slug]===defCat;});
+      if(match)fcatEl.value=match.id;
+    }else{
+      fcatEl.value=defCat;
+    }
+  }
   document.getElementById("frmCan").onclick=cls;
   document.getElementById("frmSub").onclick=subForm;
   document.getElementById("frmOv").classList.add("on");
 }
 
+/* Submits a brand-new flyer to the real database (lov_entries), landing
+   as status='pending' via the force_pending_lov_submission trigger no
+   matter who submits it - it only ever appears on the public board after
+   an admin approves it in /admin/flyers. Editing an existing evts item
+   (frmPanel.dataset.eid set, from editEv()) still only updates the local
+   in-memory copy - that's a separate, admin-only affordance already
+   covered by the real Supabase-backed editors in /admin/board and
+   /admin/flyers, not the public submission path this fixes. */
 function subForm(){
   var t=document.getElementById("ft").value.trim();
   var a=document.getElementById("fa").value.trim();
   if(!t||!a){alert("Please add a title and address.");return;}
-  var cat=document.getElementById("fcat").value;
   var eid=document.getElementById("frmPanel").dataset.eid;
+  if(!eid){submitFlyerToSupabase(t,a);return;}
+
+  var cat=document.getElementById("fcat").value;
   var hoodEl=document.getElementById("fhood");
-  var ev={id:eid||"u"+Date.now(),cat:cat,hood:hoodEl?hoodEl.value:"",
-    lbl:document.getElementById("fl").value.trim()||(C[cat]?C[cat].l:cat),
+  var ev={id:eid,cat:cat,hood:hoodEl?hoodEl.value:"",
+    lbl:C[cat]?C[cat].l:cat,
     t:t,w:document.getElementById("fw").value.trim()||"See details",
     d:document.getElementById("fdate").value||"",a:a,
     ph:document.getElementById("fph").value.trim(),
     wb:normalizeUrl(document.getElementById("fws").value),
     ds:document.getElementById("fd").value.trim(),
-    tags:document.getElementById("ft2").value.split(",").map(function(s){return s.trim();}).filter(Boolean),
-    ed:document.getElementById("fen").value||"",photo:"",g:[],exp:false,ms:"",
+    ed:"",photo:"",g:[],exp:false,ms:"",
     mx:390+(Math.random()-.5)*100,my:420+(Math.random()-.5)*80,
     pk:document.getElementById("fpk").value.trim()||"Contact organizer.",
     tr:document.getElementById("ftr").value.trim()||"Check VTA.org.",
-    ac:document.getElementById("fac").value.trim()||"Contact organizer.",
-    fam:document.getElementById("ffam").value.trim()||"Contact organizer.",
     fp:"See Google Maps",fd:"See Google Maps",vg:[]};
-  function done(){
-    if(eid){var i=evts.findIndex(function(e){return e.id===eid;});if(i>=0){ev.g=evts[i].g||[];evts[i]=ev;}}
-    else evts.push(ev);
-    expire();save();cls();renderBoards();renderToday();renderPins();
-  }
-  var pf=document.getElementById("fp2").files[0];
-  if(pf){resizeImageFile(pf,1100,0.82,function(dataUrl){ev.photo=dataUrl;done();});}
-  else done();
+  var i=evts.findIndex(function(e){return e.id===eid;});
+  if(i>=0){ev.g=evts[i].g||[];evts[i]=ev;}
+  expire();save();cls();renderBoards();renderToday();renderPins();
+}
+
+function submitFlyerToSupabase(t,a){
+  if(typeof V2_SUPABASE_URL==="undefined"){alert("Can't submit right now - please try again later.");return;}
+  var hoodEl=document.getElementById("fhood");
+  var hood=hoodEl?hoodEl.value:curHood;
+  var loc=(typeof hoodCoords==="function")?hoodCoords(curCity,hood):null;
+  var dateVal=document.getElementById("fdate").value||"";
+  var isSpecificDate=dateVal.length===10;
+  var categoryId=document.getElementById("fcat").value;
+  var phone=document.getElementById("fph").value.trim();
+  var website=document.getElementById("fws").value.trim();
+  var when=document.getElementById("fw").value.trim();
+  var desc=document.getElementById("fd").value.trim();
+  var parking=document.getElementById("fpk").value.trim();
+  var transit=document.getElementById("ftr").value.trim();
+  var detailsParts=[];
+  if(when)detailsParts.push(when);
+  if(desc)detailsParts.push(desc);
+  if(phone)detailsParts.push("Phone: "+phone);
+  if(parking)detailsParts.push("Parking: "+parking);
+  if(transit)detailsParts.push("Transit: "+transit);
+
+  var payload={
+    type:"event",name:t,location:a,
+    category_id:realCategories.length?(categoryId||null):null,
+    recurrence:isSpecificDate?null:(dateVal||null),
+    event_date:isSpecificDate?dateVal:null,
+    website_url:normalizeUrl(website)||null,
+    details:detailsParts.join(" · ")||null,
+    lat:loc?loc.lat:null,lng:loc?loc.lng:null
+  };
+
+  var submitBtn=document.getElementById("frmSub");
+  if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="Submitting…";}
+  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries",{
+    method:"POST",
+    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY,"Content-Type":"application/json",Prefer:"return=minimal"},
+    body:JSON.stringify(payload)
+  }).then(function(res){
+    if(!res.ok)throw new Error("submit failed");
+    cls();
+    alert("Thanks! Your flyer was submitted and will appear here once an admin approves it.");
+  }).catch(function(){
+    if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="Submit for Review";}
+    alert("Sorry, something went wrong submitting your flyer. Please try again.");
+  });
 }
 
 function renderPins(){

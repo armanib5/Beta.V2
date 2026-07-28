@@ -4,19 +4,89 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, Vendor, VendorPhoto } from "@/lib/types";
+import { formatPrice, type Category, type PricingTier, type Vendor, type VendorPhoto } from "@/lib/types";
 import { VendorPhotoManager } from "@/components/vendor-photo-manager";
+
+function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] }) {
+  const [requestedAt, setRequestedAt] = useState(vendor.boost_requested_at);
+  const [requesting, setRequesting] = useState(false);
+
+  if (vendor.is_top10) {
+    return (
+      <div className="mt-8 rounded-2xl border border-amber-300 bg-amber-50 p-6">
+        <h2 className="text-lg font-bold text-slate-900">🏆 You&apos;re Top 10 / Featured</h2>
+        <p className="mt-1 text-sm text-slate-700">All premium badges are already active on your listing.</p>
+      </div>
+    );
+  }
+
+  async function requestBoost() {
+    setRequesting(true);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("vendors")
+      .update({ boost_requested_at: new Date().toISOString() })
+      .eq("id", vendor.id);
+    setRequesting(false);
+    if (!error) setRequestedAt(new Date().toISOString());
+  }
+
+  return (
+    <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
+      <h2 className="text-lg font-bold text-slate-900">Boost / Feature Your Listing</h2>
+      <p className="mt-1 text-sm text-slate-600">
+        Get a gold Top 10 badge and priority placement across the Board, Map, and Directory.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {tiers.map((tier) => (
+          <div key={tier.id} className="rounded-xl border border-slate-200 p-4">
+            <p className="font-bold text-slate-900">{tier.name}</p>
+            <p className="text-sm text-slate-600">{formatPrice(tier.price_cents)}</p>
+            {tier.stripe_payment_link ? (
+              <a
+                href={tier.stripe_payment_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+              >
+                Pay & Upgrade
+              </a>
+            ) : (
+              <p className="mt-2 text-xs text-slate-400">Contact us to pay for this tier.</p>
+            )}
+          </div>
+        ))}
+      </div>
+      {requestedAt ? (
+        <p className="mt-4 text-sm font-medium text-amber-700">
+          ⏳ Requested {new Date(requestedAt).toLocaleDateString("en-US")} — an admin will review and activate it.
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={requestBoost}
+          disabled={requesting}
+          className="mt-4 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+        >
+          {requesting ? "Requesting…" : "I've paid — request activation"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function VendorDashboard({
   vendor,
   categories,
   selectedCategoryIds,
   photos,
+  tiers,
 }: {
   vendor: Vendor;
   categories: Category[];
   selectedCategoryIds: string[];
   photos: VendorPhoto[];
+  tiers: PricingTier[];
 }) {
   const router = useRouter();
 
@@ -177,6 +247,8 @@ export function VendorDashboard({
           <VendorPhotoManager vendorId={vendor.id} logoUrl={vendor.logo_url} initialPhotos={photos} />
         </div>
       </div>
+
+      <BoostRequest vendor={vendor} tiers={tiers} />
 
       <form onSubmit={handleSave} className="mt-8 space-y-6 rounded-2xl border border-slate-200 bg-white p-6">
         <h2 className="text-lg font-bold text-slate-900">Profile Details</h2>

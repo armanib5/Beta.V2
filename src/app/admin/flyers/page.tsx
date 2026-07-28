@@ -64,6 +64,7 @@ export default function AdminFlyersPage() {
   }, []);
 
   const flyerById = useMemo(() => new Map(flyers.map((f) => [f.id, f])), [flyers]);
+  const pendingFlyers = useMemo(() => flyers.filter((f) => f.status === "pending"), [flyers]);
 
   async function setFlyerStatus(id: string, next: FlyerStatus) {
     setError(null);
@@ -162,6 +163,41 @@ export default function AdminFlyersPage() {
       </p>
 
       {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+
+      {pendingFlyers.length > 0 && (
+        <div className="mt-6 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+          <h2 className="font-bold text-amber-900">⏳ Pending Review ({pendingFlyers.length})</h2>
+          <p className="mt-1 text-xs text-amber-800">
+            Submitted by a vendor or a public visitor via the Board&apos;s &quot;Post a Flyer&quot; — not
+            visible anywhere on the public site until approved.
+          </p>
+          <div className="mt-3 space-y-2">
+            {pendingFlyers.map((f) => (
+              <div key={f.id} className="rounded-lg border border-amber-200 bg-white p-3">
+                <p className="text-sm font-bold text-slate-900">{f.name}</p>
+                <p className="mt-0.5 text-xs text-slate-600">{f.location || "No address given"}</p>
+                {f.details && <p className="mt-1 text-xs text-slate-500">{f.details}</p>}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFlyerStatus(f.id, "active")}
+                    className="rounded-full bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700"
+                  >
+                    ✓ Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFlyerStatus(f.id, "archived")}
+                    className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-200"
+                  >
+                    ✕ Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={addAssignment} className="mt-6 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4">
         <div>
@@ -300,6 +336,7 @@ export default function AdminFlyersPage() {
                 className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
               >
                 <option value="active">Active</option>
+                <option value="pending">Pending</option>
                 <option value="draft">Draft</option>
                 <option value="archived">Archived</option>
               </select>

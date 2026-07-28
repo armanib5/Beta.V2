@@ -50,6 +50,7 @@ export interface Vendor {
   onboarded_at: string | null;
   category_tier: CategoryTier;
   is_featured: boolean;
+  boost_requested_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -84,7 +85,7 @@ export interface LovEntry {
   updated_at: string;
 }
 
-export type FlyerStatus = "active" | "draft" | "archived";
+export type FlyerStatus = "active" | "draft" | "pending" | "archived";
 export type FlyerBoard = "master" | "weekly" | "today";
 
 export interface FlyerRotation {

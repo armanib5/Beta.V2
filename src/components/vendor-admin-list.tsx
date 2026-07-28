@@ -75,6 +75,17 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
     setSelected(new Set());
   }
 
+  const boostRequests = vendors.filter((v) => v.boost_requested_at && !v.is_top10);
+
+  async function approveBoost(vendor: Vendor) {
+    await updateVendor(vendor.id, {
+      is_top10: true,
+      category_tier: "top_10",
+      is_featured: true,
+      boost_requested_at: null,
+    });
+  }
+
   if (vendors.length === 0) {
     return <p className="mt-8 text-sm text-slate-500">No vendors yet.</p>;
   }
@@ -82,6 +93,40 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
   return (
     <div className="mt-6 space-y-3">
       {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      {boostRequests.length > 0 && (
+        <div className="rounded-xl border-2 border-indigo-300 bg-indigo-50 p-4">
+          <h2 className="font-bold text-indigo-900">💰 Boost Requests ({boostRequests.length})</h2>
+          <p className="mt-1 text-xs text-indigo-800">Vendors who self-reported paying for a Boost/Featured upgrade.</p>
+          <div className="mt-3 space-y-2">
+            {boostRequests.map((v) => (
+              <div key={v.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-white p-3">
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{v.business_name}</p>
+                  <p className="text-xs text-slate-500">
+                    Requested {new Date(v.boost_requested_at!).toLocaleDateString("en-US")}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => approveBoost(v)}
+                    className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                  >
+                    ✓ Approve Boost
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateVendor(v.id, { boost_requested_at: null })}
+                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {selected.size > 0 && (
         <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-white p-3 shadow-md">
           <span className="text-sm font-semibold text-slate-700">{selected.size} selected</span>

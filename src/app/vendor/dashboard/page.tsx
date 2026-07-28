@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
-import type { Category, Vendor, VendorPhoto } from "@/lib/types";
+import type { Category, PricingTier, Vendor, VendorPhoto } from "@/lib/types";
 import { VendorDashboard } from "@/components/vendor-dashboard";
 
 const SLUG_RETRY_ATTEMPTS = 5;
@@ -16,6 +16,7 @@ export default function VendorDashboardPage() {
     categories: Category[];
     selectedCategoryIds: string[];
     photos: VendorPhoto[];
+    tiers: PricingTier[];
   } | null>(null);
   // A signed-up-but-no-vendor-row account (email-confirmation delayed the
   // signup form's insert, so it never ran) has no profile to redirect to
@@ -38,7 +39,7 @@ export default function VendorDashboardPage() {
         return;
       }
 
-      const [{ data: vendor }, { data: categories }, { data: vendorCategories }, { data: photos }] =
+      const [{ data: vendor }, { data: categories }, { data: vendorCategories }, { data: photos }, { data: tiers }] =
         await Promise.all([
           supabase.from("vendors").select("*").eq("id", user.id).maybeSingle<Vendor>(),
           supabase.from("categories").select("*").order("sort_order").returns<Category[]>(),
@@ -49,6 +50,7 @@ export default function VendorDashboardPage() {
             .eq("vendor_id", user.id)
             .order("sort_order")
             .returns<VendorPhoto[]>(),
+          supabase.from("pricing_tiers").select("*").eq("is_active", true).order("sort_order").returns<PricingTier[]>(),
         ]);
 
       if (cancelled) return;
@@ -63,6 +65,7 @@ export default function VendorDashboardPage() {
         categories: categories ?? [],
         selectedCategoryIds: (vendorCategories ?? []).map((row) => row.category_id),
         photos: photos ?? [],
+        tiers: tiers ?? [],
       });
     });
 
@@ -148,6 +151,7 @@ export default function VendorDashboardPage() {
       categories={state.categories}
       selectedCategoryIds={state.selectedCategoryIds}
       photos={state.photos}
+      tiers={state.tiers}
     />
   );
 }
