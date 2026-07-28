@@ -217,7 +217,9 @@ function init(){
   loadLovEvents();
   loadLovVendors();
   loadRealVendors();
+  loadFlyerRotation();
   setupWaffleMenu();
+  setupMidnightRotation();
 }
 
 /* Nav buttons (Main/Boards/Map/Today/Dashboard/Admin/Login/Background)
@@ -381,6 +383,7 @@ function loadLovEvents(){
     if(!Array.isArray(rows))return;
     var existingIds=evts.map(function(e){return e.id;});
     rows.forEach(function(r){
+      if(r.status&&r.status!=="active")return;
       var id="lov-"+r.id;
       if(existingIds.indexOf(id)>=0)return;
       var loc=cityHoodFromRow(r);
@@ -388,16 +391,41 @@ function loadLovEvents(){
       var cat=(slug&&LOV_CAT_SLUG_TO_BOARD[slug])||(r.recurrence?"market":"seasonal");
       var d=r.event_date?r.event_date.slice(0,10):recurrenceToDayCode(r.recurrence);
       evts.push({
-        id:id,cat:cat,lbl:r.recurrence?"Recurring":"Live Festival",
+        id:id,flyerId:r.id,cat:cat,lbl:r.recurrence?"Recurring":"Live Festival",
         exp:false,city:loc.city,hood:loc.hood,
         t:r.name,w:r.recurrence||(r.event_date?r.event_date.slice(0,10):""),d:d,
-        a:r.location||"",ph:"",wb:r.website_url||"",ds:r.recurrence||"",
+        a:r.location||"",ph:"",wb:r.website_url||"",ds:r.details||r.recurrence||"",
         photo:r.flyer_image_url||"",ed:r.end_date?r.end_date.slice(0,10):undefined
       });
     });
     expire();
     renderToday();
     renderBoards();
+  }).catch(function(){});
+}
+
+/* FLYER_ROTATION — admin-curated board placements layered on top of the
+   automatic event listings above. Board 2 gets one pinned flyer per
+   weekday code ('mon'..'sun'); Board 3 gets an explicit override for one
+   specific ISO date. Both are opt-in - an lov_entries row not in this
+   table just renders through the normal automatic logic, unaffected. */
+var flyerRotation={weeklyByDay:{},todayByDate:{}};
+function loadFlyerRotation(){
+  if(typeof V2_SUPABASE_URL==="undefined")return;
+  fetch(V2_SUPABASE_URL+"/rest/v1/flyer_rotation?select=*&status=eq.active",{
+    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
+  }).then(function(res){return res.json();}).then(function(rows){
+    if(!Array.isArray(rows))return;
+    var weeklyByDay={},todayByDate={};
+    rows.forEach(function(r){
+      if(r.assigned_board==="weekly"&&r.assigned_day){
+        (weeklyByDay[r.assigned_day]=weeklyByDay[r.assigned_day]||[]).push(r.flyer_id);
+      }else if(r.assigned_board==="today"&&r.assigned_day){
+        (todayByDate[r.assigned_day]=todayByDate[r.assigned_day]||[]).push(r.flyer_id);
+      }
+    });
+    flyerRotation={weeklyByDay:weeklyByDay,todayByDate:todayByDate};
+    renderToday();
   }).catch(function(){});
 }
 
@@ -417,6 +445,7 @@ function loadLovVendors(){
     if(!Array.isArray(rows)||typeof vendors==="undefined")return;
     var existingIds=vendors.map(function(v){return v.id;});
     rows.forEach(function(r){
+      if(r.status&&r.status!=="active")return;
       var id="lov-"+r.id;
       if(existingIds.indexOf(id)>=0)return;
       var loc=cityHoodFromRow(r);
@@ -724,6 +753,8 @@ function eventOnDate(ev,d){
   return ev.d===["sun","mon","tue","wed","thu","fri","sat"][d.getDay()];
 }
 
+var DOW_CODES=["sun","mon","tue","wed","thu","fri","sat"];
+
 function renderToday(){
   var tc=document.getElementById("tdCrds"),wc=document.getElementById("wkCrds");
   if(!tc||!wc)return;
@@ -732,11 +763,28 @@ function renderToday(){
   var pool=hood?cityEvts.filter(function(e){return(e.hood||"downtown")===hood;}):cityEvts;
 
   var today=new Date();
-  var td=pool.filter(function(e){return eventOnDate(e,today);});
+  var todayKey=dateKeyOf(today);
+  var todayDow=DOW_CODES[today.getDay()];
+
+  /* Board 2's pick for today's weekday - Board 3 deliberately excludes it
+     from its own automatic pool below, so the two boards don't just show
+     the same flyer twice, unless an admin explicitly overrides Board 3
+     for this exact date. */
+  var todaysWeeklyPickIds=flyerRotation.weeklyByDay[todayDow]||[];
+  var todayOverrideIds=flyerRotation.todayByDate[todayKey]||[];
+
+  var td,tdFeaturedIds;
+  if(todayOverrideIds.length){
+    td=evts.filter(function(e){return todayOverrideIds.indexOf(e.flyerId)>=0;});
+    tdFeaturedIds=todayOverrideIds;
+  }else{
+    td=pool.filter(function(e){return eventOnDate(e,today)&&todaysWeeklyPickIds.indexOf(e.flyerId)<0;});
+    tdFeaturedIds=[];
+  }
   td.sort(function(a,b){return (isLiveNow(b)?1:0)-(isLiveNow(a)?1:0);});
   tc.innerHTML="";
   if(td.length){
-    td.forEach(function(ev){tc.appendChild(mkTCard(ev));});
+    td.forEach(function(ev){tc.appendChild(mkTCard(ev,tdFeaturedIds.indexOf(ev.flyerId)>=0));});
   }else{
     tc.appendChild(mkNothingCard("Nothing happening today — check back soon!"));
   }
@@ -745,7 +793,11 @@ function renderToday(){
   wc.innerHTML="";
   for(var i=0;i<7;i++){
     var d=new Date(today.getFullYear(),today.getMonth(),today.getDate()+i);
-    var dayEvts=pool.filter(function(e){return eventOnDate(e,d);});
+    var dow=DOW_CODES[d.getDay()];
+    var pickIds=flyerRotation.weeklyByDay[dow]||[];
+    var featured=pool.filter(function(e){return pickIds.indexOf(e.flyerId)>=0;});
+    var auto=pool.filter(function(e){return eventOnDate(e,d)&&pickIds.indexOf(e.flyerId)<0;});
+    var dayEvts=featured.concat(auto);
     var block=document.createElement("div");
     block.className="wkday";
     var label=(i===0?"Today, ":i===1?"Tomorrow, ":WEEKDAY_NAMES[d.getDay()]+", ")+
@@ -756,29 +808,47 @@ function renderToday(){
     var strip=document.createElement("div");
     strip.className="tscr";
     if(dayEvts.length){
-      dayEvts.forEach(function(ev){strip.appendChild(mkTCard(ev));});
+      featured.forEach(function(ev){strip.appendChild(mkTCard(ev,true));});
+      auto.forEach(function(ev){strip.appendChild(mkTCard(ev,false));});
     }else{
       strip.appendChild(mkNothingCard("Nothing happening " + (i===0?"today":i===1?"tomorrow":"this day") + " yet."));
     }
     block.appendChild(hd);block.appendChild(strip);
     wc.appendChild(block);
   }
+  lastRenderedDateKey=todayKey;
 }
 
-function mkTCard(ev){
+function mkTCard(ev,featured){
   var ico=C[ev.cat]?C[ev.cat].i:"&#128204;";
   var d=document.createElement("div");
-  d.className="tc"+(isLiveNow(ev)?" live-now":"");
+  d.className="tc"+(isLiveNow(ev)?" live-now":"")+(featured?" featured":"");
   var imgDiv=document.createElement("div");
   imgDiv.className="tcimg";
   if(ev.photo){imgDiv.style.backgroundImage="url("+ev.photo+")";imgDiv.style.backgroundSize="cover";imgDiv.style.backgroundPosition="center";}
   else{imgDiv.innerHTML=ico;}
   var body=document.createElement("div");
   body.className="tcbody";
-  body.innerHTML="<h4>"+ev.t+"</h4><div class='tw'>"+ev.w+"</div>";
+  body.innerHTML=(featured?"<span class='tcpin'>&#9733; Featured</span>":"")+"<h4>"+ev.t+"</h4><div class='tw'>"+ev.w+"</div>";
   d.appendChild(imgDiv);d.appendChild(body);
   d.addEventListener("click",function(){openDetail(ev.id);});
   return d;
+}
+
+/* Client-only "midnight rotation handler": no server/cron exists on a
+   static export, so a tab left open across midnight would keep showing
+   yesterday's Today/This Week picks until manually reloaded. Checking the
+   calendar day every minute and re-rendering on change gets the same
+   effect without needing a real scheduled job. */
+var lastRenderedDateKey=null;
+function setupMidnightRotation(){
+  setInterval(function(){
+    var key=dateKeyOf(new Date());
+    if(lastRenderedDateKey&&key!==lastRenderedDateKey){
+      renderToday();
+      renderBoards();
+    }
+  },60000);
 }
 
 /* Polite empty-state card, styled like a real flyer instead of plain

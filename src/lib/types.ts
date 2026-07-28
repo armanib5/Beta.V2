@@ -73,6 +73,22 @@ export interface LovEntry {
   website_url: string | null;
   section_zone: string | null;
   publish_at: string | null;
+  details: string | null;
+  status: FlyerStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FlyerStatus = "active" | "draft" | "archived";
+export type FlyerBoard = "master" | "weekly" | "today";
+
+export interface FlyerRotation {
+  id: string;
+  flyer_id: string;
+  assigned_board: FlyerBoard;
+  assigned_day: string | null;
+  category: string | null;
+  status: FlyerStatus;
   created_at: string;
   updated_at: string;
 }
