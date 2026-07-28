@@ -56,8 +56,8 @@ export interface Vendor {
 }
 
 export type LovEntryType = "event" | "vendor";
-export type BoothTier = "top" | "regular";
-export type BoothStatus = "open" | "reserved" | "claimed";
+export type BoothTier = "top" | "standard";
+export type BoothStatus = "open" | "reserved" | "occupied";
 
 export interface LovEntry {
   id: string;
@@ -103,12 +103,31 @@ export interface Booth {
   id: string;
   event_id: string;
   label: string;
+  booth_number: number | null;
   tier: BoothTier;
   status: BoothStatus;
   vendor_id: string | null;
   lov_entry_id: string | null;
   x: number | null;
   y: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type BoundaryType = "fence" | "gate" | "exit" | "vendor_area";
+
+export interface ZoneBoundaryPoint {
+  x: number;
+  y: number;
+}
+
+export interface ZoneBoundary {
+  id: string;
+  event_id: string;
+  boundary_type: BoundaryType;
+  label: string | null;
+  points: ZoneBoundaryPoint[];
+  vendor_id: string | null;
   created_at: string;
   updated_at: string;
 }
