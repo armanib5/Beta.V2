@@ -27,6 +27,7 @@ create index if not exists booths_number_idx on public.booths (event_id, booth_n
 -- A vendor can claim any open booth for themselves, or release one they
 -- already hold back to open — but never touch a booth someone else holds,
 -- and never assign a booth to anyone but themselves.
+drop policy if exists "vendor can claim or release an available booth" on public.booths;
 create policy "vendor can claim or release an available booth"
   on public.booths for update
   using (status = 'open' or vendor_id = auth.uid())
@@ -57,19 +58,23 @@ create trigger set_updated_at before update on public.zone_boundaries
 
 alter table public.zone_boundaries enable row level security;
 
+drop policy if exists "zone boundaries are publicly readable" on public.zone_boundaries;
 create policy "zone boundaries are publicly readable"
   on public.zone_boundaries for select
   using (true);
 
+drop policy if exists "admin can insert zone boundaries" on public.zone_boundaries;
 create policy "admin can insert zone boundaries"
   on public.zone_boundaries for insert
   with check (exists (select 1 from public.admins where id = auth.uid()));
 
+drop policy if exists "admin can update zone boundaries" on public.zone_boundaries;
 create policy "admin can update zone boundaries"
   on public.zone_boundaries for update
   using (exists (select 1 from public.admins where id = auth.uid()))
   with check (exists (select 1 from public.admins where id = auth.uid()));
 
+drop policy if exists "admin can delete zone boundaries" on public.zone_boundaries;
 create policy "admin can delete zone boundaries"
   on public.zone_boundaries for delete
   using (exists (select 1 from public.admins where id = auth.uid()));
