@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { logActivity } from "@/lib/activity";
-import type { Booth, BoundaryType, LovEntry, ZoneBoundary, ZoneBoundaryPoint } from "@/lib/types";
+import type { Booth, BoundaryType, LovEntry, Vendor, ZoneBoundary, ZoneBoundaryPoint } from "@/lib/types";
 import { ZoneMap } from "@/components/zone-map";
 
 const STATUS_CYCLE: Record<Booth["status"], Booth["status"]> = {
@@ -36,10 +36,15 @@ export default function AdminZonesPage() {
   const [loadingZone, setLoadingZone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+
   const [newNumber, setNewNumber] = useState("");
   const [newTier, setNewTier] = useState<Booth["tier"]>("standard");
   const [newX, setNewX] = useState("");
   const [newY, setNewY] = useState("");
+  const [newWidth, setNewWidth] = useState("8");
+  const [newHeight, setNewHeight] = useState("8");
+  const [newVendorId, setNewVendorId] = useState("");
 
   const [newBoundaryType, setNewBoundaryType] = useState<BoundaryType>("fence");
   const [newBoundaryLabel, setNewBoundaryLabel] = useState("");
@@ -54,15 +59,19 @@ export default function AdminZonesPage() {
         setStatus("denied");
         return;
       }
-      const { data } = await supabase
-        .from("lov_entries")
-        .select("*")
-        .eq("type", "event")
-        .order("event_date", { ascending: false })
-        .returns<LovEntry[]>();
+      const [{ data }, { data: vendorRows }] = await Promise.all([
+        supabase
+          .from("lov_entries")
+          .select("*")
+          .eq("type", "event")
+          .order("event_date", { ascending: false })
+          .returns<LovEntry[]>(),
+        supabase.from("vendors").select("*").eq("status", "active").eq("is_internal", false).returns<Vendor[]>(),
+      ]);
       if (cancelled) return;
       setEvents(data ?? []);
       setEventId(data?.[0]?.id ?? "");
+      setVendors(vendorRows ?? []);
       setStatus("ready");
     });
     return () => {
@@ -128,6 +137,10 @@ export default function AdminZonesPage() {
         tier: newTier,
         x: newX.trim() ? Number(newX.trim()) : null,
         y: newY.trim() ? Number(newY.trim()) : null,
+        width: newWidth.trim() ? Number(newWidth.trim()) : null,
+        height: newHeight.trim() ? Number(newHeight.trim()) : null,
+        vendor_id: newVendorId || null,
+        status: newVendorId ? "occupied" : "open",
       })
       .select("*")
       .single<Booth>();
@@ -135,11 +148,40 @@ export default function AdminZonesPage() {
       setError(insertError?.message ?? "Could not create booth.");
       return;
     }
-    logActivity(supabase, "booth", data.id, `Booth ${data.booth_number ?? data.label}`, "Created", newTier === "top" ? "Top Booth" : undefined);
+    const vendorName = vendors.find((v) => v.id === newVendorId)?.business_name;
+    logActivity(
+      supabase,
+      "booth",
+      data.id,
+      `Booth ${data.booth_number ?? data.label}`,
+      "Created",
+      [newTier === "top" ? "Top Booth" : undefined, vendorName ? `Assigned to ${vendorName}` : undefined]
+        .filter(Boolean)
+        .join(", "),
+    );
     setBooths((prev) => [...prev, data]);
     setNewNumber("");
     setNewX("");
     setNewY("");
+    setNewVendorId("");
+  }
+
+  async function assignBoothVendor(booth: Booth, vendorId: string) {
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("booths")
+      .update({ vendor_id: vendorId || null, status: vendorId ? "occupied" : "open" })
+      .eq("id", booth.id)
+      .select("*")
+      .single<Booth>();
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not assign vendor.");
+      return;
+    }
+    const vendorName = vendors.find((v) => v.id === vendorId)?.business_name ?? "no vendor";
+    logActivity(supabase, "booth", data.id, `Booth ${data.booth_number ?? data.label}`, "Assigned vendor", vendorName);
+    setBooths((prev) => prev.map((b) => (b.id === booth.id ? data : b)));
   }
 
   async function addBoundary(e: React.FormEvent) {
@@ -230,12 +272,42 @@ export default function AdminZonesPage() {
       <div className="mt-6">
         {loadingZone && <p className="text-sm text-slate-500">Loading zone map…</p>}
         {!loadingZone && eventId && (
-          <ZoneMap booths={booths} boundaries={boundaries} mode="admin" onBoothClick={handleBoothClick} />
+          <ZoneMap
+            booths={booths}
+            boundaries={boundaries}
+            mode="admin"
+            onBoothClick={handleBoothClick}
+            vendorNameById={Object.fromEntries(vendors.map((v) => [v.id, v.business_name]))}
+          />
         )}
         {!loadingZone && eventId && booths.length === 0 && (
           <p className="mt-3 text-sm text-slate-500">No booths yet for this event — add one below.</p>
         )}
       </div>
+
+      {booths.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {booths.map((b) => (
+            <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+              <span className="font-semibold text-slate-800">
+                Booth {b.booth_number ?? b.label} <span className="text-xs font-normal text-slate-400">({b.status})</span>
+              </span>
+              <select
+                value={b.vendor_id ?? ""}
+                onChange={(e) => assignBoothVendor(b, e.target.value)}
+                className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+              >
+                <option value="">Unassigned</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.business_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
 
       {eventId && (
         <form onSubmit={addBooth} className="mt-6 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4">
@@ -281,6 +353,43 @@ export default function AdminZonesPage() {
               onChange={(e) => setNewY(e.target.value)}
               className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Width %</label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={newWidth}
+              onChange={(e) => setNewWidth(e.target.value)}
+              className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Height %</label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={newHeight}
+              onChange={(e) => setNewHeight(e.target.value)}
+              className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Vendor (optional)</label>
+            <select
+              value={newVendorId}
+              onChange={(e) => setNewVendorId(e.target.value)}
+              className="mt-1 w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Unassigned</option>
+              {vendors.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.business_name}
+                </option>
+              ))}
+            </select>
           </div>
           <button type="submit" className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
             Add Booth

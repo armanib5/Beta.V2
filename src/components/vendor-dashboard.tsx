@@ -10,6 +10,9 @@ import { VendorPhotoManager } from "@/components/vendor-photo-manager";
 function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] }) {
   const [requestedAt, setRequestedAt] = useState(vendor.boost_requested_at);
   const [requesting, setRequesting] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemError, setRedeemError] = useState<string | null>(null);
 
   if (vendor.is_top10) {
     return (
@@ -29,6 +32,21 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
       .eq("id", vendor.id);
     setRequesting(false);
     if (!error) setRequestedAt(new Date().toISOString());
+  }
+
+  async function redeemCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!promoCode.trim()) return;
+    setRedeeming(true);
+    setRedeemError(null);
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("redeem_promo_code", { p_code: promoCode.trim().toUpperCase() });
+    setRedeeming(false);
+    if (error || !data?.ok) {
+      setRedeemError(error?.message ?? data?.error ?? "Could not redeem that code.");
+      return;
+    }
+    window.location.reload();
   }
 
   return (
@@ -71,6 +89,27 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
           {requesting ? "Requesting…" : "I've paid — request activation"}
         </button>
       )}
+
+      <form onSubmit={redeemCode} className="mt-6 flex flex-wrap items-end gap-2 border-t border-slate-200 pt-4">
+        <div>
+          <label className="block text-xs font-medium text-slate-700">Have a promo code?</label>
+          <input
+            type="text"
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+            placeholder="CODE"
+            className="mt-1 w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={redeeming}
+          className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-60"
+        >
+          {redeeming ? "Redeeming…" : "Redeem"}
+        </button>
+        {redeemError && <p className="w-full text-xs font-medium text-red-600">{redeemError}</p>}
+      </form>
     </div>
   );
 }

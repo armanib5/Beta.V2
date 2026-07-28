@@ -10,7 +10,6 @@ import type { Vendor } from "@/lib/types";
 // Next.js routes (client-side navigation via next/link).
 const appLinks = [
   { href: "/directory", label: "Directory" },
-  { href: "/vendors", label: "Vendor Directory" },
   { href: "/calendar", label: "Calendar" },
   { href: "/#pricing", label: "Become a Vendor" },
 ];

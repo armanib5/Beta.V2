@@ -115,6 +115,8 @@ export interface Booth {
   lov_entry_id: string | null;
   x: number | null;
   y: number | null;
+  width: number | null;
+  height: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -144,6 +146,17 @@ export interface VendorPhoto {
   url: string;
   caption: string | null;
   sort_order: number;
+  created_at: string;
+}
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  tier_id: string;
+  max_uses: number | null;
+  uses_count: number;
+  expires_at: string | null;
+  is_active: boolean;
   created_at: string;
 }
 

@@ -80,6 +80,15 @@ export default function AdminHubPage() {
           </p>
         </Link>
         <Link
+          href="/admin/promo-codes"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">Promo Codes</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Issue codes vendors can redeem for an instant free Top 10/Featured upgrade.
+          </p>
+        </Link>
+        <Link
           href="/admin/legacy"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >

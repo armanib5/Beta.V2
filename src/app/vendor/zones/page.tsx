@@ -17,6 +17,7 @@ export default function VendorZonesPage() {
   const [loading, setLoading] = useState(true);
   const [loadingZone, setLoadingZone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vendorNameById, setVendorNameById] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -27,7 +28,7 @@ export default function VendorZonesPage() {
         router.replace("/vendor/login");
         return;
       }
-      const [{ data: vendorRow }, { data: eventRows }] = await Promise.all([
+      const [{ data: vendorRow }, { data: eventRows }, { data: allVendors }] = await Promise.all([
         supabase.from("vendors").select("*").eq("id", user.id).maybeSingle<Vendor>(),
         supabase
           .from("lov_entries")
@@ -35,11 +36,15 @@ export default function VendorZonesPage() {
           .eq("type", "event")
           .order("event_date", { ascending: false })
           .returns<LovEntry[]>(),
+        supabase.from("vendors").select("id,business_name").eq("status", "active").returns<
+          Pick<Vendor, "id" | "business_name">[]
+        >(),
       ]);
       if (cancelled) return;
       setVendor(vendorRow ?? null);
       setEvents(eventRows ?? []);
       setEventId(eventRows?.[0]?.id ?? "");
+      setVendorNameById(Object.fromEntries((allVendors ?? []).map((v) => [v.id, v.business_name])));
       setLoading(false);
     });
     return () => {
@@ -140,7 +145,14 @@ export default function VendorZonesPage() {
       <div className="mt-6">
         {loadingZone && <p className="text-sm text-slate-500">Loading zone map…</p>}
         {!loadingZone && eventId && (
-          <ZoneMap booths={booths} boundaries={boundaries} mode="vendor" currentVendorId={vendor.id} onBoothClick={claim} />
+          <ZoneMap
+            booths={booths}
+            boundaries={boundaries}
+            mode="vendor"
+            currentVendorId={vendor.id}
+            onBoothClick={claim}
+            vendorNameById={vendorNameById}
+          />
         )}
         {!loadingZone && eventId && booths.length === 0 && (
           <p className="mt-3 text-sm text-slate-500">No booths have been set up for this event yet.</p>

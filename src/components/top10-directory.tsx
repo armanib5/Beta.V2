@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, LovEntry, Vendor } from "@/lib/types";
-import { calculateProximity, formatDistance, getAnchor, setAnchor, type Anchor } from "@/lib/geo";
+import { CITIES, CITY_CENTERS, calculateProximity, formatDistance, getAnchor, nearestCityCenter, setAnchor, type Anchor } from "@/lib/geo";
 import { FlyerPlaceholder } from "@/components/flyer-placeholder";
 import { BASE_PATH } from "@/lib/site";
 
@@ -39,6 +39,14 @@ interface DirectoryItem {
   lng: number | null;
   eventDate: string | null;
   href: string | null;
+  city: string;
+  section: string | null;
+}
+
+function cityInfo(lat: number | null, lng: number | null): { city: string; section: string | null } {
+  if (lat == null || lng == null) return { city: "Unknown", section: null };
+  const nearest = nearestCityCenter(lat, lng);
+  return { city: nearest.city, section: nearest.section };
 }
 
 function classifyGuestPill(entry: LovEntry, categorySlugById: Map<string, string>): Exclude<Pill, "all" | "events"> {
@@ -63,6 +71,7 @@ function fromVendor(vendor: Vendor): DirectoryItem {
     lng: vendor.lng,
     eventDate: null,
     href: `/vendor?slug=${encodeURIComponent(vendor.slug)}`,
+    ...cityInfo(vendor.lat, vendor.lng),
   };
 }
 
@@ -80,6 +89,7 @@ function fromGuestListing(entry: LovEntry, categorySlugById: Map<string, string>
     lng: entry.lng,
     eventDate: null,
     href: null,
+    ...cityInfo(entry.lat, entry.lng),
   };
 }
 
@@ -97,6 +107,7 @@ function fromEvent(entry: LovEntry, categoryById: Map<string, Category>): Direct
     lng: entry.lng,
     eventDate: entry.event_date,
     href: null,
+    ...cityInfo(entry.lat, entry.lng),
   };
 }
 
@@ -106,6 +117,9 @@ export function Top10Directory() {
   const [events, setEvents] = useState<LovEntry[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pill, setPill] = useState<Pill>("all");
+  const [cityFilter, setCityFilter] = useState("All");
+  const [sectionFilter, setSectionFilter] = useState("All");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const supabase = createClient();
@@ -186,10 +200,22 @@ export function Top10Directory() {
     );
   }
 
-  const filtered = useMemo(
-    () => (pill === "all" ? allItems : allItems.filter((item) => item.pill === pill)),
-    [allItems, pill],
-  );
+  const cities = useMemo(() => ["All", ...CITIES], []);
+  const sections = useMemo(() => {
+    if (cityFilter === "All") return ["All"];
+    return ["All", ...CITY_CENTERS.filter((c) => c.city === cityFilter).map((c) => c.section ?? c.label)];
+  }, [cityFilter]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allItems.filter((item) => {
+      if (pill !== "all" && item.pill !== pill) return false;
+      if (cityFilter !== "All" && item.city !== cityFilter) return false;
+      if (sectionFilter !== "All" && item.section !== sectionFilter) return false;
+      if (q && !item.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [allItems, pill, cityFilter, sectionFilter, search]);
 
   const top10 = useMemo(() => filtered.filter((item) => item.isTop10), [filtered]);
 
@@ -234,6 +260,43 @@ export function Top10Directory() {
             {p.label}
           </button>
         ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <select
+          value={cityFilter}
+          onChange={(e) => {
+            setCityFilter(e.target.value);
+            setSectionFilter("All");
+          }}
+          className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700"
+        >
+          {cities.map((c) => (
+            <option key={c} value={c}>
+              {c === "All" ? "All Cities" : c}
+            </option>
+          ))}
+        </select>
+        {sections.length > 1 && (
+          <select
+            value={sectionFilter}
+            onChange={(e) => setSectionFilter(e.target.value)}
+            className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700"
+          >
+            {sections.map((s) => (
+              <option key={s} value={s}>
+                {s === "All" ? "All Neighborhoods" : s}
+              </option>
+            ))}
+          </select>
+        )}
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name…"
+          className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700"
+        />
       </div>
 
       {top10.length > 0 && (

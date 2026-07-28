@@ -42,13 +42,23 @@ interface ZoneMapProps {
   currentVendorId?: string;
   onBoothClick?: (booth: Booth) => void;
   boothLabel?: (booth: Booth) => string;
+  /** vendor_id -> display name, so a claimed booth can show a special pin
+   * with that vendor's initial instead of just a generic status color. */
+  vendorNameById?: Record<string, string>;
+}
+
+const VENDOR_PIN_COLORS = ["#7c3aed", "#0891b2", "#c2410c", "#15803d", "#be185d", "#4f46e5"];
+function vendorPinColor(vendorId: string): string {
+  let hash = 0;
+  for (let i = 0; i < vendorId.length; i++) hash = (hash * 31 + vendorId.charCodeAt(i)) >>> 0;
+  return VENDOR_PIN_COLORS[hash % VENDOR_PIN_COLORS.length];
 }
 
 /** Interactive SVG venue map: a percentage-coordinate (0-100) grid of
  * booths with zone boundary overlays (fences/gates/exits/vendor areas).
  * Admins tap any booth to cycle its status; vendors tap an open booth to
  * claim it, or their own booth to release it. */
-export function ZoneMap({ booths, boundaries, mode, currentVendorId, onBoothClick, boothLabel }: ZoneMapProps) {
+export function ZoneMap({ booths, boundaries, mode, currentVendorId, onBoothClick, boothLabel, vendorNameById }: ZoneMapProps) {
   const laidOut = layoutBooths(booths);
 
   return (
@@ -94,6 +104,9 @@ export function ZoneMap({ booths, boundaries, mode, currentVendorId, onBoothClic
           const mine = mode === "vendor" && currentVendorId && booth.vendor_id === currentVendorId;
           const clickable =
             mode === "admin" || (mode === "vendor" && (booth.status === "open" || mine));
+          const w = booth.width ?? 8;
+          const h = booth.height ?? 8;
+          const vendorName = booth.vendor_id ? vendorNameById?.[booth.vendor_id] : undefined;
           return (
             <g
               key={booth.id}
@@ -102,21 +115,38 @@ export function ZoneMap({ booths, boundaries, mode, currentVendorId, onBoothClic
               onClick={clickable ? () => onBoothClick?.(booth) : undefined}
             >
               <rect
-                x={-4}
-                y={-4}
-                width={8}
-                height={8}
+                x={-w / 2}
+                y={-h / 2}
+                width={w}
+                height={h}
                 rx={1.4}
                 fill={STATUS_FILL[booth.status]}
                 stroke={mine ? "#0ea5e9" : STATUS_STROKE[booth.status]}
                 strokeWidth={booth.tier === "top" || mine ? 1 : 0.5}
               />
               {booth.tier === "top" && (
-                <circle cx={-3.2} cy={-3.2} r={0.9} fill="#f59e0b" />
+                <circle cx={-w / 2 + 0.8} cy={-h / 2 + 0.8} r={0.9} fill="#f59e0b" />
+              )}
+              {/* Special vendor pin: a claimed booth shows the vendor's own
+                  colored badge/initial instead of just a status color, so
+                  it's identifiable as "this specific vendor's spot" at a
+                  glance. */}
+              {vendorName && (
+                <circle cx={w / 2 - 0.8} cy={-h / 2 + 0.8} r={1.1} fill={vendorPinColor(booth.vendor_id!)} stroke="#fff" strokeWidth={0.3} />
+              )}
+              {vendorName && (
+                <text x={w / 2 - 0.8} y={-h / 2 + 1.1} fontSize="1.4" textAnchor="middle" fontWeight={700} fill="#fff">
+                  {vendorName.charAt(0).toUpperCase()}
+                </text>
               )}
               <text x={0} y={0.8} fontSize="2.6" textAnchor="middle" fontWeight={700} fill="#1e293b">
                 {boothLabel ? boothLabel(booth) : (booth.booth_number ?? booth.label)}
               </text>
+              {vendorName && (
+                <text x={0} y={h / 2 + 2.6} fontSize="2.1" textAnchor="middle" fill="#334155">
+                  {vendorName}
+                </text>
+              )}
             </g>
           );
         })}
