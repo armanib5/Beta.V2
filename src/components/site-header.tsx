@@ -3,9 +3,35 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { checkIsAdmin } from "@/lib/admin";
 import { BASE_PATH } from "@/lib/site";
 import { MobileNav } from "@/components/mobile-nav";
 import type { Vendor } from "@/lib/types";
+
+const SESSION_HINT_KEY = "citypinned_session_hint";
+
+/** The V1 static Board/Map pages use a completely different Supabase
+ * client (plain supabase-js via CDN, localStorage-based sessions) than
+ * this app (@supabase/ssr, cookie-based sessions) — the two can't read
+ * each other's session directly. This writes a small, non-authoritative
+ * "hint" to localStorage (shared across same-origin pages) so the Board's
+ * nav can show "My Dashboard"/"Admin" instead of always showing "Vendor
+ * Login" even when already signed in. Real authorization still happens
+ * independently wherever it matters (RLS, checkIsAdmin on /admin/*). */
+function writeSessionHint(signedIn: boolean, businessName?: string | null, isAdmin?: boolean) {
+  try {
+    if (!signedIn) {
+      window.localStorage.removeItem(SESSION_HINT_KEY);
+      return;
+    }
+    window.localStorage.setItem(
+      SESSION_HINT_KEY,
+      JSON.stringify({ signedIn: true, businessName: businessName ?? null, isAdmin: Boolean(isAdmin) }),
+    );
+  } catch {
+    // localStorage unavailable (private mode edge cases) — nav just falls back to "Vendor Login"
+  }
+}
 
 // Next.js routes (client-side navigation via next/link).
 const appLinks = [
@@ -39,18 +65,24 @@ export function SiteHeader() {
         .eq("id", userId)
         .maybeSingle<Profile>();
       setProfile(data ?? null);
+      const isAdmin = await checkIsAdmin(supabase);
+      writeSessionHint(true, data?.business_name, isAdmin);
     }
 
     supabase.auth.getUser().then(({ data }) => {
       setIsSignedIn(Boolean(data.user));
       if (data.user) loadProfile(data.user.id);
+      else writeSessionHint(false);
     });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSignedIn(Boolean(session?.user));
       if (session?.user) loadProfile(session.user.id);
-      else setProfile(null);
+      else {
+        setProfile(null);
+        writeSessionHint(false);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);

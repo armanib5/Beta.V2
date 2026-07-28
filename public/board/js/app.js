@@ -222,6 +222,30 @@ function init(){
   setupWaffleMenu();
   setupMidnightRotation();
   setupCorkToggle();
+  setupAuthNav();
+}
+
+/* The Board uses a completely different Supabase client (plain
+   supabase-js via CDN, localStorage sessions) than the main app
+   (@supabase/ssr, cookie sessions) - they can't read each other's real
+   session. site-header.tsx writes a small non-authoritative "hint" to
+   localStorage (same origin, so visible here too) whenever sign-in state
+   changes; this just toggles the nav to match it so "Vendor Login" stops
+   showing once already signed in. Real gating still happens independently
+   on /vendor/dashboard and /admin/* regardless of what this shows. */
+function setupAuthNav(){
+  var dash=document.getElementById("nDash"),admin=document.getElementById("nAdmin"),login=document.getElementById("nVendorLogin");
+  if(!dash||!admin||!login)return;
+  var hint=null;
+  try{
+    var raw=window.localStorage.getItem("citypinned_session_hint");
+    if(raw)hint=JSON.parse(raw);
+  }catch(e){}
+  var signedIn=hint&&hint.signedIn;
+  dash.style.display=signedIn?"inline-block":"none";
+  admin.style.display=(signedIn&&hint.isAdmin)?"inline-block":"none";
+  login.style.display=signedIn?"none":"inline-block";
+  if(signedIn&&hint.businessName)dash.textContent=hint.businessName;
 }
 
 /* Nav buttons (Main/Boards/Map/Today/Dashboard/Admin/Login/Background)

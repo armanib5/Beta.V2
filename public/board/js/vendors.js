@@ -252,14 +252,12 @@ function hVendorPin(id) {
   var p = document.getElementById("vpin-" + id); if (p) p.classList.add("pulse");
 }
 
-/* ── ADMIN MODERATION PLACEHOLDER ──
-   Hidden behind ?admin=1 until real accounts/roles exist. Lets a site
-   operator approve pending vendor listings and flip boost tiers on/off. */
-function maybeShowAdminNav() {
-  if (location.search.indexOf("admin=1") >= 0) {
-    document.getElementById("nAdmin").style.display = "inline-block";
-  }
-}
+/* ── ADMIN MODERATION PLACEHOLDER (retired) ──
+   Real accounts/roles now exist (Supabase Auth + the `admins` table, see
+   /admin/*) - the nav's #nAdmin link now goes there instead, its
+   visibility driven by setupAuthNav() in app.js. This local-only ?admin=1
+   placeholder is left in place but no longer wired into the nav. */
+function maybeShowAdminNav() {}
 function showAdmin() {
   document.getElementById("bView").style.display = "none";
   document.getElementById("tdwrap").style.display = "none";

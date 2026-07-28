@@ -220,6 +220,45 @@ export default function AdminZonesPage() {
     setBoundaries((prev) => prev.filter((b) => b.id !== id));
   }
 
+  function exportZoneWord() {
+    const vendorNameById = Object.fromEntries(vendors.map((v) => [v.id, v.business_name]));
+    const eventName = events.find((e) => e.id === eventId)?.name ?? "Event";
+    const boothRows = booths
+      .map(
+        (b) =>
+          `<tr><td>${b.booth_number ?? b.label}</td><td>${b.tier}</td><td>${b.status}</td><td>${
+            b.vendor_id ? (vendorNameById[b.vendor_id] ?? "Unknown vendor") : "—"
+          }</td><td>${b.width ?? 8}% × ${b.height ?? 8}%</td></tr>`,
+      )
+      .join("");
+    const boundaryRows = boundaries
+      .map((bd) => `<tr><td>${bd.boundary_type.replace("_", " ")}</td><td>${bd.label ?? "—"}</td><td>${bd.points.length} points</td></tr>`)
+      .join("");
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>${eventName} — Zone Inventory</title></head>
+<body>
+<h1>${eventName} — Event Zone Inventory</h1>
+<p>Generated ${new Date().toLocaleString("en-US")}</p>
+<h2>Booths (${booths.length})</h2>
+<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-family:Calibri,Arial,sans-serif;font-size:11pt;">
+<thead><tr><th>Booth #</th><th>Tier</th><th>Status</th><th>Vendor</th><th>Size</th></tr></thead>
+<tbody>${boothRows}</tbody>
+</table>
+<h2>Boundaries (${boundaries.length})</h2>
+<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-family:Calibri,Arial,sans-serif;font-size:11pt;">
+<thead><tr><th>Type</th><th>Label</th><th>Points</th></tr></thead>
+<tbody>${boundaryRows}</tbody>
+</table>
+</body></html>`;
+    const blob = new Blob([html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${eventName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-zone-inventory.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (status === "loading") {
     return <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
   }
@@ -240,31 +279,51 @@ export default function AdminZonesPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between print:hidden">
         <h1 className="text-2xl font-bold text-slate-900">Event Zone Map (Admin)</h1>
         <Link href="/admin/board" className="text-sm font-semibold text-slate-700 underline">
           Venue Board →
         </Link>
       </div>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-1 text-sm text-slate-600 print:hidden">
         Tap a booth to cycle Open → Reserved → Occupied. Add fences, gates, exits, and vendor areas below.
       </p>
 
-      <div className="mt-6">
+      <div className="mt-6 print:hidden">
         <label className="block text-sm font-medium text-slate-700">Event</label>
-        <select
-          value={eventId}
-          onChange={(e) => setEventId(e.target.value)}
-          className="mt-1 w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-        >
-          {events.length === 0 && <option value="">No events yet — create one in Venue Board</option>}
-          {events.map((event) => (
-            <option key={event.id} value={event.id}>
-              {event.name}
-              {event.event_date ? ` — ${event.event_date}` : ""}
-            </option>
-          ))}
-        </select>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <select
+            value={eventId}
+            onChange={(e) => setEventId(e.target.value)}
+            className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+          >
+            {events.length === 0 && <option value="">No events yet — create one in Venue Board</option>}
+            {events.map((event) => (
+              <option key={event.id} value={event.id}>
+                {event.name}
+                {event.event_date ? ` — ${event.event_date}` : ""}
+              </option>
+            ))}
+          </select>
+          {eventId && (
+            <>
+              <button
+                type="button"
+                onClick={exportZoneWord}
+                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                📄 Export Word
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                🖨️ Print
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}

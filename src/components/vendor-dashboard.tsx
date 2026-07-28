@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice, type Category, type PricingTier, type Vendor, type VendorPhoto } from "@/lib/types";
@@ -409,7 +409,7 @@ export function VendorDashboard({
         </button>
       </form>
 
-      <AccountLoginSettings currentEmail={vendor.contact_email} />
+      <AccountLoginSettings vendor={vendor} />
     </div>
   );
 }
@@ -417,12 +417,20 @@ export function VendorDashboard({
 /** Lets a vendor set up their own real email/password — for accounts the
  * admin comped with a PIN and a placeholder @vendor.citypinned.app
  * address, this is how they take over their own login going forward. */
-function AccountLoginSettings({ currentEmail }: { currentEmail: string }) {
+function AccountLoginSettings({ vendor }: { vendor: Vendor }) {
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setSessionEmail(data.user?.email ?? null));
+  }, []);
+
+  const isPinLogin = (sessionEmail ?? vendor.contact_email).endsWith("@vendor.citypinned.app");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -455,9 +463,37 @@ function AccountLoginSettings({ currentEmail }: { currentEmail: string }) {
   return (
     <div className="mt-10 border-t border-slate-200 pt-6">
       <h2 className="text-lg font-bold text-slate-900">Account Login</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Currently signed in as <span className="font-medium">{currentEmail}</span>. Set your own
-        email and password here whenever you&rsquo;re ready — you don&rsquo;t have to keep using a PIN.
+
+      <div className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Signed in as</p>
+          <p className="font-medium text-slate-900">{sessionEmail ?? vendor.contact_email}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Login method</p>
+          <p className="font-medium text-slate-900">{isPinLogin ? "Business ID + PIN" : "Email + password"}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Business ID (PIN login)</p>
+          <p className="font-mono font-medium text-slate-900">{vendor.slug}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Account ID</p>
+          <p className="truncate font-mono text-xs font-medium text-slate-900" title={vendor.id}>
+            {vendor.id}
+          </p>
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">
+        A password can&apos;t be shown once set (nobody — including us — can read it back), only replaced.
+        Your Account ID never changes no matter how you log in, so it stays the same if this account is ever
+        moved to a future version of CityPinned.
+      </p>
+
+      <p className="mt-4 text-sm text-slate-600">
+        Set your own email and/or password below whenever you&rsquo;re ready — you don&rsquo;t have to keep
+        using a PIN. This updates your login on our server, so it takes effect immediately on every device,
+        not just this one.
       </p>
       <form onSubmit={handleSubmit} className="mt-4 max-w-sm space-y-3">
         <input

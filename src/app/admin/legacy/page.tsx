@@ -9,6 +9,7 @@ import { formatPrice, type ActivityLog, type LovEntry, type PricingTier, type Ve
 
 type TimeBucket = "live" | "future" | "past";
 type Kind = "vendor" | "event";
+type ApprovalStatus = "approved" | "pending" | "rejected" | "draft";
 
 interface Item {
   id: string;
@@ -16,10 +17,24 @@ interface Item {
   name: string;
   city: string;
   bucket: TimeBucket;
+  approval: ApprovalStatus;
   badge: string | null;
   subtitle: string;
   dateLabel: string;
   sortDate: string;
+}
+
+function vendorApproval(status: Vendor["status"]): ApprovalStatus {
+  if (status === "active") return "approved";
+  if (status === "pending") return "pending";
+  return "rejected";
+}
+
+function eventApproval(status: LovEntry["status"]): ApprovalStatus {
+  if (status === "active") return "approved";
+  if (status === "pending") return "pending";
+  if (status === "draft") return "draft";
+  return "rejected";
 }
 
 function todayKey(): string {
@@ -45,6 +60,7 @@ function vendorToItem(v: Vendor, tierName: string | null): Item {
     name: v.business_name,
     city: cityForCoords(v.lat, v.lng),
     bucket,
+    approval: vendorApproval(v.status),
     badge,
     subtitle: `${v.status}${tierName ? ` · ${tierName}` : ""}`,
     dateLabel: new Date(v.onboarded_at ?? v.created_at).toLocaleDateString("en-US"),
@@ -68,6 +84,7 @@ function eventToItem(e: LovEntry): Item {
     name: e.name,
     city: cityForCoords(e.lat, e.lng, e.section_zone),
     bucket,
+    approval: eventApproval(e.status),
     badge: e.booth_tier === "top" ? "🏆 Top Booth" : null,
     subtitle: e.recurrence ?? e.location ?? "Event",
     dateLabel: start ? new Date(start).toLocaleDateString("en-US") : "Recurring",
@@ -81,6 +98,18 @@ const BUCKET_STYLE: Record<TimeBucket, string> = {
   future: "border-blue-300 bg-blue-50",
   past: "border-slate-300 bg-slate-50",
 };
+const APPROVAL_LABEL: Record<ApprovalStatus, string> = {
+  approved: "Approved",
+  pending: "Pending",
+  rejected: "Rejected",
+  draft: "Draft",
+};
+const APPROVAL_STYLE: Record<ApprovalStatus, string> = {
+  approved: "bg-green-600 text-white",
+  pending: "bg-amber-500 text-white",
+  rejected: "bg-red-600 text-white",
+  draft: "bg-slate-400 text-white",
+};
 
 export default function LegacyDashboardPage() {
   const [status, setStatus] = useState<"loading" | "denied" | "ready">("loading");
@@ -89,6 +118,7 @@ export default function LegacyDashboardPage() {
   const [tiers, setTiers] = useState<PricingTier[]>([]);
   const [cityFilter, setCityFilter] = useState("All");
   const [kindFilter, setKindFilter] = useState<"all" | Kind>("all");
+  const [approvalFilter, setApprovalFilter] = useState<"all" | ApprovalStatus>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [history, setHistory] = useState<ActivityLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -132,7 +162,10 @@ export default function LegacyDashboardPage() {
   );
 
   const filtered = items.filter(
-    (i) => (cityFilter === "All" || i.city === cityFilter) && (kindFilter === "all" || i.kind === kindFilter),
+    (i) =>
+      (cityFilter === "All" || i.city === cityFilter) &&
+      (kindFilter === "all" || i.kind === kindFilter) &&
+      (approvalFilter === "all" || i.approval === approvalFilter),
   );
 
   const buckets: TimeBucket[] = ["live", "future", "past"];
@@ -157,9 +190,9 @@ export default function LegacyDashboardPage() {
   }
 
   function downloadCsv() {
-    const header = ["Name", "Type", "City", "Status", "Badge", "Date"];
+    const header = ["Name", "Type", "City", "Status", "Approval", "Badge", "Date"];
     const lines = filtered.map((i) =>
-      [i.name, i.kind, i.city, BUCKET_LABEL[i.bucket], i.badge ?? "", i.dateLabel]
+      [i.name, i.kind, i.city, BUCKET_LABEL[i.bucket], APPROVAL_LABEL[i.approval], i.badge ?? "", i.dateLabel]
         .map((c) => `"${String(c).replace(/"/g, '""')}"`)
         .join(","),
     );
@@ -169,6 +202,35 @@ export default function LegacyDashboardPage() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `citypinned-legacy-dashboard-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /** A .doc file is just HTML with a Word-compatible MIME type and
+   * extension - Word (desktop and mobile) opens it directly as a real
+   * document, no docx-generation library needed for a static export. */
+  function downloadWord() {
+    const rows = filtered
+      .map(
+        (i) =>
+          `<tr><td>${i.name}</td><td>${i.kind}</td><td>${i.city}</td><td>${BUCKET_LABEL[i.bucket]}</td><td>${APPROVAL_LABEL[i.approval]}</td><td>${i.badge ?? ""}</td><td>${i.dateLabel}</td></tr>`,
+      )
+      .join("");
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>CityPinned Inventory</title></head>
+<body>
+<h1>CityPinned — Full Inventory</h1>
+<p>Generated ${new Date().toLocaleString("en-US")} — ${filtered.length} of ${items.length} total.</p>
+<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-family:Calibri,Arial,sans-serif;font-size:11pt;">
+<thead><tr><th>Name</th><th>Type</th><th>City</th><th>Live Status</th><th>Approval</th><th>Badge</th><th>Date</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</body></html>`;
+    const blob = new Blob([html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `citypinned-inventory-${new Date().toISOString().slice(0, 10)}.doc`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -234,12 +296,36 @@ export default function LegacyDashboardPage() {
         </button>
         <button
           type="button"
+          onClick={downloadWord}
+          className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          📄 Export Word
+        </button>
+        <button
+          type="button"
           onClick={() => window.print()}
           className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           🖨️ Print / Save as PDF
         </button>
         <span className="text-sm font-medium text-slate-500">{filtered.length} shown</span>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-2 print:hidden">
+        {(["all", "approved", "pending", "rejected", "draft"] as const).map((a) => (
+          <button
+            key={a}
+            type="button"
+            onClick={() => setApprovalFilter(a)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+              approvalFilter === a
+                ? "bg-slate-900 text-white"
+                : "border border-slate-300 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {a === "all" ? "All Approval States" : APPROVAL_LABEL[a]}
+          </button>
+        ))}
       </div>
 
       {buckets.map((bucket) => {
@@ -262,9 +348,14 @@ export default function LegacyDashboardPage() {
                         expanded ? "ring-2 ring-slate-900" : ""
                       }`}
                     >
-                      <p className="truncate font-bold text-slate-900">
-                        {item.kind === "vendor" ? "🏪" : "📅"} {item.name}
-                      </p>
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="truncate font-bold text-slate-900">
+                          {item.kind === "vendor" ? "🏪" : "📅"} {item.name}
+                        </p>
+                        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${APPROVAL_STYLE[item.approval]}`}>
+                          {APPROVAL_LABEL[item.approval]}
+                        </span>
+                      </div>
                       <p className="mt-0.5 truncate text-xs text-slate-600">{item.city}</p>
                       <p className="mt-0.5 truncate text-xs text-slate-500">{item.subtitle}</p>
                       {item.badge && <p className="mt-1 text-xs font-semibold text-amber-700">{item.badge}</p>}
