@@ -15,7 +15,7 @@ const PILLS: { key: Pill; label: string }[] = [
   { key: "events", label: "Events" },
   { key: "bars", label: "Bars & Drinks" },
   { key: "food", label: "Food / Bites" },
-  { key: "vendors", label: "Vendors" },
+  { key: "vendors", label: "Pop-Up Vendors" },
 ];
 
 const TOP10_TITLE: Record<Pill, string> = {
