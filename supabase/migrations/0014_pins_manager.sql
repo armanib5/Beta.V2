@@ -28,26 +28,34 @@ create trigger set_updated_at before update on public.pins
 
 alter table public.pins enable row level security;
 
+-- Postgres has no "create policy if not exists", so each policy is
+-- dropped first — makes this migration safe to paste and run more than
+-- once instead of erroring on a second run.
 -- Public map/board only ever needs approved pins; everything else
 -- (draft/pending/expired) is admin-only, same visibility model as
 -- lov_entries.status.
+drop policy if exists "approved pins are publicly readable" on public.pins;
 create policy "approved pins are publicly readable"
   on public.pins for select
   using (status = 'approved');
 
+drop policy if exists "admin can select any pin" on public.pins;
 create policy "admin can select any pin"
   on public.pins for select
   using (exists (select 1 from public.admins where id = auth.uid()));
 
+drop policy if exists "admin can insert pins" on public.pins;
 create policy "admin can insert pins"
   on public.pins for insert
   with check (exists (select 1 from public.admins where id = auth.uid()));
 
+drop policy if exists "admin can update pins" on public.pins;
 create policy "admin can update pins"
   on public.pins for update
   using (exists (select 1 from public.admins where id = auth.uid()))
   with check (exists (select 1 from public.admins where id = auth.uid()));
 
+drop policy if exists "admin can delete pins" on public.pins;
 create policy "admin can delete pins"
   on public.pins for delete
   using (exists (select 1 from public.admins where id = auth.uid()));
