@@ -775,7 +775,10 @@ function renderToday(){
 
   var td,tdFeaturedIds;
   if(todayOverrideIds.length){
-    td=evts.filter(function(e){return todayOverrideIds.indexOf(e.flyerId)>=0;});
+    /* Respects the current city (an override for a San Jose event
+       shouldn't bleed into Santa Clara's or Gilroy's Today board), but
+       bypasses the neighborhood filter - a citywide spotlight pick. */
+    td=cityEvts.filter(function(e){return todayOverrideIds.indexOf(e.flyerId)>=0;});
     tdFeaturedIds=todayOverrideIds;
   }else{
     td=pool.filter(function(e){return eventOnDate(e,today)&&todaysWeeklyPickIds.indexOf(e.flyerId)<0;});
