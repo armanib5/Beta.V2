@@ -20,6 +20,12 @@ function VendorSignupContent() {
       <h1 className="text-center text-2xl font-bold text-slate-900">
         {isVenue ? "Create your Venue Hub login" : "Create your vendor login"}
       </h1>
+      {!isVenue && (
+        <p className="mt-2 text-center text-sm text-slate-600">
+          Create your free vendor profile, upload your flyer, showcase your business, join local
+          events, and get discovered by customers searching the city.
+        </p>
+      )}
       <p className="mt-2 text-center text-sm text-slate-600">
         {isVenue
           ? "Your venue gets its own flyer/hub — every show or event you host links straight back to it. Set up your account now; you can switch between Hosting Hub and Show Hub any time from your dashboard."
