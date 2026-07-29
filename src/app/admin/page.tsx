@@ -89,6 +89,15 @@ export default function AdminHubPage() {
           </p>
         </Link>
         <Link
+          href="/admin/photos"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">🖼️ Photo Admin</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Every vendor logo, gallery photo, and flyer photo in one place — add, crop, or take one down.
+          </p>
+        </Link>
+        <Link
           href="/admin/reports"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >
