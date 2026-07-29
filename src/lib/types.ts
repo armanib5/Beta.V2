@@ -171,6 +171,16 @@ export interface ZoneBoundary {
   updated_at: string;
 }
 
+export interface VendorBoostBooking {
+  id: string;
+  vendor_id: string;
+  tier_id: string | null;
+  registration_id: string | null;
+  slot_start: string;
+  slot_end: string;
+  created_at: string;
+}
+
 export interface VendorPhoto {
   id: string;
   vendor_id: string;

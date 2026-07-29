@@ -97,8 +97,41 @@ async function stripeRequest(env: Env, path: string, body: Record<string, unknow
   return data;
 }
 
+const SLOT_MS = 10 * 60 * 1000;
+const MAX_PER_SLOT = 5;
+
+// Rounds a timestamp down to the 10-minute rotation boundary it falls in -
+// applied to every slot regardless of source (client-picked or
+// server-computed) so a slightly-off client timestamp can never land
+// between buckets or dodge the capacity count for its real bucket.
+function bucketStart(iso: string | number): number {
+  const t = typeof iso === "number" ? iso : new Date(iso).getTime();
+  return Math.floor(t / SLOT_MS) * SLOT_MS;
+}
+
+function nextBucketStart(fromMs: number): number {
+  return Math.ceil(fromMs / SLOT_MS) * SLOT_MS;
+}
+
+// One REST round-trip for however many buckets are being checked/booked -
+// counts existing rows per bucket so a slot already at MAX_PER_SLOT can be
+// rejected before Stripe is ever involved.
+async function bookedCounts(env: Env, bucketStartsMs: number[]): Promise<Map<number, number>> {
+  if (bucketStartsMs.length === 0) return new Map();
+  const isoList = bucketStartsMs.map((ms) => new Date(ms).toISOString());
+  const res = await sb(env, `/vendor_boost_bookings?slot_start=in.(${isoList.join(",")})&select=slot_start`);
+  const rows = (await res.json()) as Array<{ slot_start: string }>;
+  const counts = new Map<number, number>();
+  for (const ms of bucketStartsMs) counts.set(ms, 0);
+  for (const row of rows) {
+    const ms = bucketStart(row.slot_start);
+    counts.set(ms, (counts.get(ms) ?? 0) + 1);
+  }
+  return counts;
+}
+
 async function handleCreateCheckoutSession(request: Request, env: Env): Promise<Response> {
-  let body: { vendor_id?: string; tier_id?: string };
+  let body: { vendor_id?: string; tier_id?: string; slots?: string[] };
   try {
     body = await request.json();
   } catch {
@@ -131,10 +164,36 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
   if (!vendor) return json({ error: "Vendor not found." }, 404);
   if (!tier) return json({ error: "Pricing tier not found or inactive." }, 404);
 
-  // Quick Vendor Boost ($15/20-min) shows CityPinned's cut as its own
-  // itemized line at checkout rather than folding it into the price.
+  // Quick Vendor Boost ($15/20-min) and Top 10 Placement ($30/30-min) both
+  // show CityPinned's cut as its own itemized line at checkout rather than
+  // folding it into the price.
   const isBoost = tier.slug === "vendor-boost";
-  const platformFeeCents = isBoost ? 100 : 0;
+  const isPlacement = tier.slug === "top10-30min";
+  const platformFeeCents = isBoost || isPlacement ? 100 : 0;
+
+  // Quick Boost: the vendor picks exactly 2 of the 10-minute slots shown
+  // available in the dashboard. Top 10 Placement: always 3 consecutive
+  // slots starting right now - never client-supplied, so there's no path
+  // for a request to claim a slot other than "starting immediately".
+  let slotStartsMs: number[] = [];
+  if (isBoost) {
+    const requested = Array.isArray(body.slots) ? body.slots : [];
+    if (requested.length !== 2) return json({ error: "Pick exactly 2 boost slots." }, 400);
+    slotStartsMs = [...new Set(requested.map((s) => bucketStart(s)))];
+    if (slotStartsMs.length !== 2) return json({ error: "Boost slots must be 2 different 10-minute windows." }, 400);
+    if (slotStartsMs.some((ms) => ms <= Date.now())) return json({ error: "Boost slots must be in the future." }, 400);
+  } else if (isPlacement) {
+    const start = nextBucketStart(Date.now());
+    slotStartsMs = [start, start + SLOT_MS, start + 2 * SLOT_MS];
+  }
+
+  if (slotStartsMs.length > 0) {
+    const counts = await bookedCounts(env, slotStartsMs);
+    const full = slotStartsMs.filter((ms) => (counts.get(ms) ?? 0) >= MAX_PER_SLOT);
+    if (full.length > 0) {
+      return json({ error: `Slot(s) starting ${full.map((ms) => new Date(ms).toISOString()).join(", ")} just filled up - pick another.` }, 409);
+    }
+  }
 
   const regRes = await sb(env, "/registrations", {
     method: "POST",
@@ -182,7 +241,12 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
       customer_email: vendor.contact_email,
       client_reference_id: vendorId,
       line_items: lineItems,
-      metadata: { vendor_id: vendorId, tier_id: tierId, registration_id: registration.id },
+      metadata: {
+        vendor_id: vendorId,
+        tier_id: tierId,
+        registration_id: registration.id,
+        slots: slotStartsMs.length > 0 ? JSON.stringify(slotStartsMs.map((ms) => new Date(ms).toISOString())) : undefined,
+      },
       success_url: `${origin}/register/confirmation?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/vendor/dashboard`,
     })) as { id: string; url: string };
@@ -241,7 +305,7 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
     id: string;
     payment_intent: string | { id: string } | null;
     client_reference_id: string | null;
-    metadata: { vendor_id?: string; tier_id?: string } | null;
+    metadata: { vendor_id?: string; tier_id?: string; slots?: string } | null;
   };
   let event: { type: string; data: { object: CheckoutSession } };
   try {
@@ -287,42 +351,62 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
     }>;
     if (!tier || !vendor) throw new Error(`Tier or vendor not found (tier=${tierId}, vendor=${vendorId})`);
 
-    const isBoost = tier.slug === "vendor-boost";
+    const usesSlots = tier.slug === "vendor-boost" || tier.slug === "top10-30min";
 
-    // Quick Vendor Boost is a 20-minute, parallel-friendly visibility bump
-    // on top of whatever the vendor's account already is - it must NOT
-    // touch approval status, tier_id, or the permanent Top 10/Founding
-    // flags, unlike the $50/$100 tiers below which do exactly that.
-    const vendorPatchBody = isBoost
-      ? { boost_active_until: new Date(Date.now() + 20 * 60 * 1000).toISOString() }
-      : {
-          status: "active",
-          approved_at: new Date().toISOString(),
-          tier_id: tierId,
-          is_founding_vendor: vendor.is_founding_vendor || tier.is_founding,
-          is_top10: vendor.is_top10 || tier.is_top10,
-          is_featured: vendor.is_featured || tier.is_top10,
-          category_tier: tier.is_top10 ? "top_10" : vendor.category_tier,
-        };
-    const vendorPatchRes = await sb(env, `/vendors?id=eq.${vendorId}`, {
-      method: "PATCH",
-      body: JSON.stringify(vendorPatchBody),
-    });
-    if (!vendorPatchRes.ok) throw new Error(`Vendor update failed: ${await vendorPatchRes.text()}`);
+    // Quick Vendor Boost and Top 10 Placement are slot-scheduled, parallel-
+    // friendly visibility bumps on top of whatever the vendor's account
+    // already is - they must NOT touch approval status, tier_id, or the
+    // permanent Top 10/Founding flags, unlike the $50/$100 tiers below
+    // which do exactly that. Their booking rows (not a vendor column) are
+    // the source of truth for "boosted right now", since a slot can be
+    // scheduled for later rather than starting immediately.
+    if (usesSlots) {
+      let slots: string[] = [];
+      try {
+        slots = session.metadata?.slots ? JSON.parse(session.metadata.slots) : [];
+      } catch {
+        slots = [];
+      }
+      if (slots.length === 0) throw new Error(`Paid ${tier.slug} checkout with no slots in metadata (session=${session.id})`);
+      const bookingRows = slots.map((slotStart) => ({
+        vendor_id: vendorId,
+        tier_id: tierId,
+        registration_id: existing?.id ?? null,
+        slot_start: slotStart,
+        slot_end: new Date(new Date(slotStart).getTime() + SLOT_MS).toISOString(),
+      }));
+      const bookingRes = await sb(env, "/vendor_boost_bookings", { method: "POST", body: JSON.stringify(bookingRows) });
+      if (!bookingRes.ok) throw new Error(`Booking insert failed: ${await bookingRes.text()}`);
+    } else {
+      const vendorPatchBody = {
+        status: "active",
+        approved_at: new Date().toISOString(),
+        tier_id: tierId,
+        is_founding_vendor: vendor.is_founding_vendor || tier.is_founding,
+        is_top10: vendor.is_top10 || tier.is_top10,
+        is_featured: vendor.is_featured || tier.is_top10,
+        category_tier: tier.is_top10 ? "top_10" : vendor.category_tier,
+      };
+      const vendorPatchRes = await sb(env, `/vendors?id=eq.${vendorId}`, {
+        method: "PATCH",
+        body: JSON.stringify(vendorPatchBody),
+      });
+      if (!vendorPatchRes.ok) throw new Error(`Vendor update failed: ${await vendorPatchRes.text()}`);
+    }
 
     const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null);
     const regPatchBody = {
       status: "paid",
       paid_at: new Date().toISOString(),
       stripe_payment_intent_id: paymentIntentId,
-      awarded_top10: !isBoost && tier.is_top10,
+      awarded_top10: !usesSlots && tier.is_top10,
     };
     const regPatchRes = existing
       ? await sb(env, `/registrations?id=eq.${existing.id}`, { method: "PATCH", body: JSON.stringify(regPatchBody) })
       : await sb(env, `/registrations?stripe_checkout_session_id=eq.${session.id}`, { method: "PATCH", body: JSON.stringify(regPatchBody) });
     if (!regPatchRes.ok) throw new Error(`Registration update failed: ${await regPatchRes.text()}`);
 
-    if (!isBoost && tier.is_top10 && tier.max_slots !== null) {
+    if (!usesSlots && tier.is_top10 && tier.max_slots !== null) {
       await sb(env, "/rpc/claim_top10_slot", { method: "POST", body: JSON.stringify({ p_tier_id: tierId }) }).catch(() => {});
     }
 

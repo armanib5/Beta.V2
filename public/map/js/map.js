@@ -319,41 +319,52 @@ function checkAdminPendingBadge() {
     }
   }).catch(function () {});
 }
-/* Quick Vendor Boost ($15/20-min, independent of the permanent Top 10
-   badge) - just an extra marker-title indicator like is_top10's 🏆
-   already is, evaluated once at load time same as everything else here
-   (this map doesn't poll for live vendor changes, so a boost that
-   expires mid-visit won't un-mark itself until the page reloads -
-   consistent with how a Top 10 upgrade/downgrade already behaves here). */
-function isBoostedNow(boostActiveUntil) {
-  return !!boostActiveUntil && new Date(boostActiveUntil).getTime() > Date.now();
+/* Quick Boost / Top 10 Placement (independent of the permanent Top 10
+   badge) reserve specific 10-minute slots ahead of time now, so "boosted
+   right now" can't be read off the vendor row anymore - it means "has a
+   vendor_boost_bookings row covering this exact moment", fetched
+   separately and applied as an extra marker-title indicator like
+   is_top10's 🏆 already is. Both are evaluated once at load time (this
+   map doesn't poll for live vendor changes, so a boost that starts or
+   expires mid-visit won't mark/un-mark itself until the page reloads -
+   same limitation that already existed for is_top10 here). */
+function loadBoostedVendorIds() {
+  if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve(new Set());
+  var nowIso = new Date().toISOString();
+  return fetch(V2_SUPABASE_URL + "/rest/v1/vendor_boost_bookings?select=vendor_id&slot_start=lte." + nowIso + "&slot_end=gt." + nowIso, {
+    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
+  }).then(function (res) { return res.json(); }).then(function (rows) {
+    return new Set(Array.isArray(rows) ? rows.map(function (r) { return r.vendor_id; }) : []);
+  }).catch(function () { return new Set(); });
 }
 
 function loadVendorPins() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
-  return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&is_internal=eq.false&lat=not.is.null&lng=not.is.null", {
-    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
-  }).then(function (res) { return res.json(); }).then(function (rows) {
-    if (!Array.isArray(rows)) return;
-    rows.forEach(function (r) {
-      var id = "vendor-" + r.id;
-      if (PLACES.some(function (p) { return p.id === id; })) return;
-      var slug = (r.vendor_categories && r.vendor_categories[0] && r.vendor_categories[0].categories)
-        ? r.vendor_categories[0].categories.slug : null;
-      var cat = (slug && MAP_CAT_SLUGS[slug]) || "shop";
-      var loc = nearestHood(r.lat, r.lng);
-      var place = {
-        id: id, cat: cat, hood: loc.hood,
-        t: r.business_name + (r.is_top10 ? " 🏆" : "") + (isBoostedNow(r.boost_active_until) ? " 🔥" : ""),
-        a: "", ds: r.short_description || "",
-        lat: r.lat, lng: r.lng, wb: r.website_url || undefined,
-        flyer: r.logo_url || null
-      };
-      PLACES.push(place);
-      addPlaceMarker(place);
+  return loadBoostedVendorIds().then(function (boostedIds) {
+    return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&is_internal=eq.false&lat=not.is.null&lng=not.is.null", {
+      headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
+    }).then(function (res) { return res.json(); }).then(function (rows) {
+      if (!Array.isArray(rows)) return;
+      rows.forEach(function (r) {
+        var id = "vendor-" + r.id;
+        if (PLACES.some(function (p) { return p.id === id; })) return;
+        var slug = (r.vendor_categories && r.vendor_categories[0] && r.vendor_categories[0].categories)
+          ? r.vendor_categories[0].categories.slug : null;
+        var cat = (slug && MAP_CAT_SLUGS[slug]) || "shop";
+        var loc = nearestHood(r.lat, r.lng);
+        var place = {
+          id: id, cat: cat, hood: loc.hood,
+          t: r.business_name + (r.is_top10 ? " 🏆" : "") + (boostedIds.has(r.id) ? " 🔥" : ""),
+          a: "", ds: r.short_description || "",
+          lat: r.lat, lng: r.lng, wb: r.website_url || undefined,
+          flyer: r.logo_url || null
+        };
+        PLACES.push(place);
+        addPlaceMarker(place);
+      });
+      updateLegendCounts();
+      applyFilters();
     });
-    updateLegendCounts();
-    applyFilters();
   }).catch(function () {});
 }
 

@@ -4,7 +4,16 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice, type Category, type LovEntry, type MenuItem, type PricingTier, type Vendor, type VendorPhoto } from "@/lib/types";
+import {
+  formatPrice,
+  type Category,
+  type LovEntry,
+  type MenuItem,
+  type PricingTier,
+  type Vendor,
+  type VendorBoostBooking,
+  type VendorPhoto,
+} from "@/lib/types";
 import { VendorPhotoManager } from "@/components/vendor-photo-manager";
 import { MenuHubManager } from "@/components/menu-hub-manager";
 import { MyListingManager } from "@/components/my-listing-manager";
@@ -24,13 +33,43 @@ function formatCountdown(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-/** $15 + $1 platform fee, 20-minute gold badge on the Map/Directory,
- * independent of and parallel-friendly with the permanent Top 10/Founding
- * tiers below — buying one never touches approval status or the other
- * badges, and any number of vendors can be boosted at the same time. */
+const SLOT_MS = 10 * 60 * 1000;
+const MAX_PER_SLOT = 5;
+const AVAILABILITY_WINDOW_HOURS = 4;
+const PLATFORM_FEE_CENTS = 100;
+
+function nextBucketStart(fromMs: number): number {
+  return Math.ceil(fromMs / SLOT_MS) * SLOT_MS;
+}
+
+function formatHourLabel(ms: number): string {
+  return new Date(ms).toLocaleTimeString("en-US", { hour: "numeric" });
+}
+
+function formatSlotLabel(ms: number): string {
+  return new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+type BoostStep = "pick" | "slots" | "summary";
+
+/** Quick Boost ($15, pick 2 of the available 10-minute slots - up to 5
+ * vendors can share any one slot) and Top 10 Placement ($30, 30 straight
+ * minutes starting now) - both independent of and parallel-friendly with
+ * the permanent Top 10/Founding tiers below, and both add a $1 CityPinned
+ * service fee shown as its own line before payment. Neither ever touches
+ * approval status or the permanent badges; "currently boosted" is read
+ * from vendor_boost_bookings (a slot can be scheduled for later), not a
+ * single vendor column. */
 function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] }) {
   const boostTier = tiers.find((t) => t.slug === "vendor-boost");
+  const placementTier = tiers.find((t) => t.slug === "top10-30min");
   const [now, setNow] = useState(() => Date.now());
+  const [step, setStep] = useState<BoostStep>("pick");
+  const [selectedTier, setSelectedTier] = useState<PricingTier | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<number[]>([]);
+  const [availability, setAvailability] = useState<Map<number, number> | null>(null);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [myBookings, setMyBookings] = useState<VendorBoostBooking[]>([]);
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,22 +78,82 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
     return () => clearInterval(interval);
   }, []);
 
-  const remainingMs = vendor.boost_active_until ? new Date(vendor.boost_active_until).getTime() - now : 0;
-  const isBoosted = remainingMs > 0;
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("vendor_boost_bookings")
+      .select("*")
+      .eq("vendor_id", vendor.id)
+      .gte("slot_end", new Date().toISOString())
+      .order("slot_start")
+      .returns<VendorBoostBooking[]>()
+      .then(({ data }) => setMyBookings(data ?? []));
+  }, [vendor.id]);
 
-  async function buyBoost() {
-    if (!boostTier) return;
+  const activeBooking = myBookings.find(
+    (b) => new Date(b.slot_start).getTime() <= now && now < new Date(b.slot_end).getTime(),
+  );
+  const nextBooking = !activeBooking ? myBookings.find((b) => new Date(b.slot_start).getTime() > now) : undefined;
+
+  async function loadAvailability() {
+    setLoadingAvailability(true);
+    const supabase = createClient();
+    // eslint-disable-next-line react-hooks/purity -- runs only inside this async click handler, never during render
+    const windowStart = nextBucketStart(Date.now());
+    const windowEnd = windowStart + AVAILABILITY_WINDOW_HOURS * 60 * 60 * 1000;
+    const { data } = await supabase
+      .from("vendor_boost_bookings")
+      .select("slot_start")
+      .gte("slot_start", new Date(windowStart).toISOString())
+      .lt("slot_start", new Date(windowEnd).toISOString())
+      .returns<{ slot_start: string }[]>();
+    const counts = new Map<number, number>();
+    for (let t = windowStart; t < windowEnd; t += SLOT_MS) counts.set(t, 0);
+    (data ?? []).forEach((row) => {
+      const bucket = Math.floor(new Date(row.slot_start).getTime() / SLOT_MS) * SLOT_MS;
+      counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+    });
+    setAvailability(counts);
+    setLoadingAvailability(false);
+  }
+
+  function chooseTier(tier: PricingTier) {
+    setSelectedTier(tier);
+    setSelectedSlots([]);
+    setError(null);
+    if (tier.slug === "vendor-boost") {
+      setStep("slots");
+      loadAvailability();
+    } else {
+      setStep("summary");
+    }
+  }
+
+  function toggleSlot(bucketMs: number, full: boolean) {
+    if (full) return;
+    setSelectedSlots((prev) => {
+      if (prev.includes(bucketMs)) return prev.filter((s) => s !== bucketMs);
+      if (prev.length >= 2) return [prev[1], bucketMs];
+      return [...prev, bucketMs];
+    });
+  }
+
+  async function confirmAndPay() {
+    if (!selectedTier) return;
     setError(null);
     setCheckingOut(true);
     try {
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ vendor_id: vendor.id, tier_id: boostTier.id }),
+        body: JSON.stringify({
+          vendor_id: vendor.id,
+          tier_id: selectedTier.id,
+          slots: selectedTier.slug === "vendor-boost" ? selectedSlots.map((ms) => new Date(ms).toISOString()) : undefined,
+        }),
       });
       const data: { url?: string; error?: string } = await res.json();
       if (res.ok && data.url) {
-        // eslint-disable-next-line react-hooks/immutability -- navigation runs only inside this async click handler, never during render
         window.location.href = data.url;
         return;
       }
@@ -66,29 +165,168 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
     }
   }
 
-  if (!boostTier) return null;
+  if (!boostTier && !placementTier) return null;
+
+  const hourGroups: number[][] = [];
+  if (availability) {
+    let currentHour = -1;
+    for (const bucketMs of availability.keys()) {
+      const hour = new Date(bucketMs).getHours();
+      if (hour !== currentHour) {
+        hourGroups.push([]);
+        currentHour = hour;
+      }
+      hourGroups[hourGroups.length - 1].push(bucketMs);
+    }
+  }
 
   return (
     <div className="mt-8 rounded-2xl border border-amber-300 bg-amber-50 p-6">
-      <h2 className="text-lg font-bold text-slate-900">⚡ Quick Boost</h2>
-      <p className="mt-1 text-sm text-slate-700">
-        {formatPrice(boostTier.price_cents)} + $1 platform fee — 20 minutes of gold badge + sorted-to-top
-        placement on the Map and Directory, starting the moment you pay.
-      </p>
-      {isBoosted ? (
-        <p className="mt-4 inline-block rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-slate-900">
-          🔥 BOOSTED — {formatCountdown(remainingMs)} left
+      <h2 className="text-lg font-bold text-slate-900">⚡ Boost Your Listing</h2>
+
+      {activeBooking && (
+        <p className="mt-2 inline-block rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-slate-900">
+          🔥 BOOSTED — {formatCountdown(new Date(activeBooking.slot_end).getTime() - now)} left
         </p>
-      ) : (
-        <button
-          type="button"
-          onClick={buyBoost}
-          disabled={checkingOut}
-          className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
-        >
-          {checkingOut ? "Starting checkout…" : `Boost Me Now — ${formatPrice(boostTier.price_cents + 100)}`}
-        </button>
       )}
+      {!activeBooking && nextBooking && (
+        <p className="mt-2 text-sm font-semibold text-amber-800">
+          ⏰ Next boost scheduled for {formatSlotLabel(new Date(nextBooking.slot_start).getTime())}
+        </p>
+      )}
+
+      {step === "pick" && (
+        <>
+          <p className="mt-1 text-sm text-slate-700">Choose how you want to boost your listing.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {boostTier && (
+              <button
+                type="button"
+                onClick={() => chooseTier(boostTier)}
+                className="rounded-xl border-2 border-slate-300 bg-white p-4 text-left hover:border-amber-400"
+              >
+                <p className="font-bold text-slate-900">⚡ Quick Boost — {formatPrice(boostTier.price_cents)}</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  Pick 2 of the available 10-minute slots (same hour or spread across the day). Gold badge +
+                  sorted-to-top on the Map and Directory during each slot.
+                </p>
+              </button>
+            )}
+            {placementTier && (
+              <button
+                type="button"
+                onClick={() => chooseTier(placementTier)}
+                className="rounded-xl border-2 border-slate-300 bg-white p-4 text-left hover:border-amber-400"
+              >
+                <p className="font-bold text-slate-900">🏆 Top 10 Placement — {formatPrice(placementTier.price_cents)}</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  30 straight minutes of gold badge + sorted-to-top placement, starting the moment you pay.
+                </p>
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {step === "slots" && selectedTier && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-800">
+              Pick 2 slots ({selectedSlots.length}/2 selected) — max {MAX_PER_SLOT} vendors per slot
+            </p>
+            <button type="button" onClick={() => setStep("pick")} className="text-xs font-semibold text-slate-500 underline">
+              ← Back
+            </button>
+          </div>
+          {loadingAvailability && <p className="mt-2 text-sm text-slate-500">Loading available times…</p>}
+          {availability && (
+            <div className="mt-3 space-y-3">
+              {hourGroups.map((bucketMsList) => (
+                <div key={bucketMsList[0]}>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{formatHourLabel(bucketMsList[0])}</p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {bucketMsList.map((bucketMs) => {
+                      const count = availability.get(bucketMs) ?? 0;
+                      const full = count >= MAX_PER_SLOT;
+                      const selected = selectedSlots.includes(bucketMs);
+                      return (
+                        <button
+                          key={bucketMs}
+                          type="button"
+                          disabled={full}
+                          onClick={() => toggleSlot(bucketMs, full)}
+                          title={full ? "Full" : `${MAX_PER_SLOT - count} of ${MAX_PER_SLOT} left`}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                            full
+                              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 line-through"
+                              : selected
+                                ? "border-amber-500 bg-amber-500 text-white"
+                                : "border-slate-300 bg-white text-slate-700 hover:border-amber-400"
+                          }`}
+                        >
+                          :{String(new Date(bucketMs).getMinutes()).padStart(2, "0")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={selectedSlots.length !== 2}
+            onClick={() => setStep("summary")}
+            className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
+          >
+            Continue
+          </button>
+        </div>
+      )}
+
+      {step === "summary" && selectedTier && (
+        <div className="mt-4 max-w-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-800">Checkout Summary</p>
+            <button
+              type="button"
+              onClick={() => setStep(selectedTier.slug === "vendor-boost" ? "slots" : "pick")}
+              className="text-xs font-semibold text-slate-500 underline"
+            >
+              ← Back
+            </button>
+          </div>
+          <div className="mt-2 rounded-xl border border-slate-200 bg-white p-4 text-sm">
+            <div className="flex justify-between">
+              <span>{selectedTier.name}</span>
+              <span>{formatPrice(selectedTier.price_cents)}</span>
+            </div>
+            {selectedTier.slug === "vendor-boost" && selectedSlots.length === 2 && (
+              <p className="mt-1 text-xs text-slate-500">
+                Slots: {formatSlotLabel(selectedSlots[0])} and {formatSlotLabel(selectedSlots[1])}
+              </p>
+            )}
+            {selectedTier.slug === "top10-30min" && <p className="mt-1 text-xs text-slate-500">Starts immediately on payment.</p>}
+            <div className="mt-2 flex justify-between border-t border-slate-100 pt-2">
+              <span>CityPinned service fee</span>
+              <span>{formatPrice(PLATFORM_FEE_CENTS)}</span>
+            </div>
+            <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 font-bold">
+              <span>Total</span>
+              <span>{formatPrice(selectedTier.price_cents + PLATFORM_FEE_CENTS)}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={confirmAndPay}
+            disabled={checkingOut}
+            className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+          >
+            {checkingOut ? "Starting checkout…" : `Confirm & Pay ${formatPrice(selectedTier.price_cents + PLATFORM_FEE_CENTS)}`}
+          </button>
+        </div>
+      )}
+
       {error && <p className="mt-2 text-sm font-medium text-red-600">{error}</p>}
     </div>
   );

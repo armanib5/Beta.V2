@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, LovEntry, Vendor } from "@/lib/types";
+import type { Category, LovEntry, Vendor, VendorBoostBooking } from "@/lib/types";
 import { CITIES, CITY_CENTERS, calculateProximity, formatDistance, getAnchor, nearestCityCenter, setAnchor, type Anchor } from "@/lib/geo";
 import { FlyerPlaceholder } from "@/components/flyer-placeholder";
 import { BASE_PATH } from "@/lib/site";
@@ -75,7 +75,9 @@ function fromVendor(vendor: Vendor): DirectoryItem {
     description: vendor.short_description,
     isTop10: vendor.is_top10 || vendor.category_tier === "top_10",
     isFeatured: vendor.category_tier === "featured",
-    boostActiveUntil: vendor.boost_active_until,
+    // Overlaid from vendor_boost_bookings in the allItems memo below - a
+    // slot-scheduled boost isn't known at the vendor row level anymore.
+    boostActiveUntil: null,
     lat: vendor.lat,
     lng: vendor.lng,
     eventDate: null,
@@ -132,6 +134,7 @@ export function Top10Directory() {
   const [sectionFilter, setSectionFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [boostBookings, setBoostBookings] = useState<VendorBoostBooking[]>([]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -167,19 +170,45 @@ export function Top10Directory() {
       .select("*")
       .returns<Category[]>()
       .then(({ data }) => setCategories(data ?? []));
+    // Covers both a booking active right now and one scheduled for later
+    // today - only "currently active" ones (slot_start <= now < slot_end)
+    // actually render as boosted, computed below with the live `now` tick.
+    supabase
+      .from("vendor_boost_bookings")
+      .select("*")
+      .gte("slot_end", nowIso)
+      .returns<VendorBoostBooking[]>()
+      .then(({ data }) => setBoostBookings(data ?? []));
   }, []);
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const categorySlugById = useMemo(() => new Map(categories.map((c) => [c.id, c.slug])), [categories]);
 
-  const allItems = useMemo(
-    () => [
+  const activeBoostEndByVendor = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of boostBookings) {
+      const start = new Date(b.slot_start).getTime();
+      const end = new Date(b.slot_end).getTime();
+      if (start <= now && now < end) {
+        const existing = map.get(b.vendor_id);
+        if (!existing || new Date(existing).getTime() < end) map.set(b.vendor_id, b.slot_end);
+      }
+    }
+    return map;
+  }, [boostBookings, now]);
+
+  const allItems = useMemo(() => {
+    const items = [
       ...vendors.map(fromVendor),
       ...guestListings.map((e) => fromGuestListing(e, categorySlugById)),
       ...events.map((e) => fromEvent(e, categoryById)),
-    ],
-    [vendors, guestListings, events, categorySlugById, categoryById],
-  );
+    ];
+    return items.map((item) => {
+      if (!item.id.startsWith("vendor:")) return item;
+      const activeEnd = activeBoostEndByVendor.get(item.id.slice("vendor:".length));
+      return activeEnd ? { ...item, boostActiveUntil: activeEnd } : item;
+    });
+  }, [vendors, guestListings, events, categorySlugById, categoryById, activeBoostEndByVendor]);
 
   const [anchor, setAnchorState] = useState<Anchor | null>(null);
   const [locating, setLocating] = useState(false);
