@@ -319,6 +319,16 @@ function checkAdminPendingBadge() {
     }
   }).catch(function () {});
 }
+/* Quick Vendor Boost ($15/20-min, independent of the permanent Top 10
+   badge) - just an extra marker-title indicator like is_top10's 🏆
+   already is, evaluated once at load time same as everything else here
+   (this map doesn't poll for live vendor changes, so a boost that
+   expires mid-visit won't un-mark itself until the page reloads -
+   consistent with how a Top 10 upgrade/downgrade already behaves here). */
+function isBoostedNow(boostActiveUntil) {
+  return !!boostActiveUntil && new Date(boostActiveUntil).getTime() > Date.now();
+}
+
 function loadVendorPins() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
   return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&is_internal=eq.false&lat=not.is.null&lng=not.is.null", {
@@ -334,7 +344,8 @@ function loadVendorPins() {
       var loc = nearestHood(r.lat, r.lng);
       var place = {
         id: id, cat: cat, hood: loc.hood,
-        t: r.business_name + (r.is_top10 ? " 🏆" : ""), a: "", ds: r.short_description || "",
+        t: r.business_name + (r.is_top10 ? " 🏆" : "") + (isBoostedNow(r.boost_active_until) ? " 🔥" : ""),
+        a: "", ds: r.short_description || "",
         lat: r.lat, lng: r.lng, wb: r.website_url || undefined,
         flyer: r.logo_url || null
       };

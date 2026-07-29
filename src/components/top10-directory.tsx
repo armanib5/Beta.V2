@@ -35,12 +35,20 @@ interface DirectoryItem {
   description: string | null;
   isTop10: boolean;
   isFeatured: boolean;
+  boostActiveUntil: string | null;
   lat: number | null;
   lng: number | null;
   eventDate: string | null;
   href: string | null;
   city: string;
   section: string | null;
+}
+
+function formatCountdown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function cityInfo(lat: number | null, lng: number | null): { city: string; section: string | null } {
@@ -67,6 +75,7 @@ function fromVendor(vendor: Vendor): DirectoryItem {
     description: vendor.short_description,
     isTop10: vendor.is_top10 || vendor.category_tier === "top_10",
     isFeatured: vendor.category_tier === "featured",
+    boostActiveUntil: vendor.boost_active_until,
     lat: vendor.lat,
     lng: vendor.lng,
     eventDate: null,
@@ -85,6 +94,7 @@ function fromGuestListing(entry: LovEntry, categorySlugById: Map<string, string>
     description: entry.location,
     isTop10: entry.booth_tier === "top" || entry.category_tier === "top_10",
     isFeatured: entry.category_tier === "featured",
+    boostActiveUntil: null,
     lat: entry.lat,
     lng: entry.lng,
     eventDate: null,
@@ -103,6 +113,7 @@ function fromEvent(entry: LovEntry, categoryById: Map<string, Category>): Direct
     description: entry.location,
     isTop10: entry.category_tier === "top_10",
     isFeatured: entry.category_tier === "featured",
+    boostActiveUntil: null,
     lat: entry.lat,
     lng: entry.lng,
     eventDate: entry.event_date,
@@ -120,6 +131,12 @@ export function Top10Directory() {
   const [cityFilter, setCityFilter] = useState("All");
   const [sectionFilter, setSectionFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -220,15 +237,23 @@ export function Top10Directory() {
 
   const top10 = useMemo(() => filtered.filter((item) => item.isTop10), [filtered]);
 
+  const boostedNow = useMemo(
+    () =>
+      filtered
+        .filter((item) => item.boostActiveUntil && new Date(item.boostActiveUntil).getTime() > now)
+        .sort((a, b) => new Date(a.boostActiveUntil!).getTime() - new Date(b.boostActiveUntil!).getTime()),
+    [filtered, now],
+  );
+
   const nearMe = useMemo(() => {
-    const rest = filtered.filter((item) => !item.isTop10);
+    const rest = filtered.filter((item) => !item.isTop10 && !boostedNow.includes(item));
     if (!anchor) {
       return rest
         .map((item) => ({ ...item, distance: null as number | null }))
         .sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured) || a.name.localeCompare(b.name));
     }
     return calculateProximity(rest, anchor);
-  }, [filtered, anchor]);
+  }, [filtered, anchor, boostedNow]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -300,6 +325,17 @@ export function Top10Directory() {
         />
       </div>
 
+      {boostedNow.length > 0 && (
+        <section className="mt-8">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">⭐ Boosted Now</h2>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {boostedNow.map((item) => (
+              <DirectoryCard key={item.id} item={item} gold now={now} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {top10.length > 0 && (
         <section className="mt-8">
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
@@ -332,10 +368,13 @@ export function Top10Directory() {
 function DirectoryCard({
   item,
   gold,
+  now,
 }: {
   item: DirectoryItem & { distance?: number | null };
   gold?: boolean;
+  now?: number;
 }) {
+  const boostRemainingMs = item.boostActiveUntil && now ? new Date(item.boostActiveUntil).getTime() - now : 0;
   const cardBody = (
     <>
       <div className="flex items-center gap-3">
@@ -350,6 +389,11 @@ function DirectoryCard({
         <div>
           <p className="font-bold text-slate-900">{item.name}</p>
           <div className="flex flex-wrap items-center gap-2">
+            {boostRemainingMs > 0 && (
+              <span className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-slate-900">
+                🔥 BOOSTED ({formatCountdown(boostRemainingMs)} left)
+              </span>
+            )}
             {item.isTop10 && <span className="text-xs font-semibold text-amber-600">🏆 Top 10</span>}
             {!item.isTop10 && item.isFeatured && (
               <span className="text-xs font-semibold text-sky-600">⭐ Featured</span>

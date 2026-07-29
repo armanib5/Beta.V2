@@ -61,6 +61,7 @@ export interface Vendor {
   is_featured: boolean;
   boost_requested_at: string | null;
   boost_expires_at: string | null;
+  boost_active_until: string | null;
   menu_hub_enabled: boolean;
   opens_at: string | null;
   hub_type: VendorHubType;

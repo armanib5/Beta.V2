@@ -17,6 +17,83 @@ const STATUS_DISPLAY: Record<VendorStatus, { label: string; style: string }> = {
   rejected: { label: "✕ Not Approved", style: "border-red-300 bg-red-50 text-red-800" },
 };
 
+function formatCountdown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+/** $15 + $1 platform fee, 20-minute gold badge on the Map/Directory,
+ * independent of and parallel-friendly with the permanent Top 10/Founding
+ * tiers below — buying one never touches approval status or the other
+ * badges, and any number of vendors can be boosted at the same time. */
+function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] }) {
+  const boostTier = tiers.find((t) => t.slug === "vendor-boost");
+  const [now, setNow] = useState(() => Date.now());
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const remainingMs = vendor.boost_active_until ? new Date(vendor.boost_active_until).getTime() - now : 0;
+  const isBoosted = remainingMs > 0;
+
+  async function buyBoost() {
+    if (!boostTier) return;
+    setError(null);
+    setCheckingOut(true);
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ vendor_id: vendor.id, tier_id: boostTier.id }),
+      });
+      const data: { url?: string; error?: string } = await res.json();
+      if (res.ok && data.url) {
+        // eslint-disable-next-line react-hooks/immutability -- navigation runs only inside this async click handler, never during render
+        window.location.href = data.url;
+        return;
+      }
+      setError(data.error ?? "Could not start checkout. Please try again.");
+    } catch {
+      setError("Could not reach payment. Please try again.");
+    } finally {
+      setCheckingOut(false);
+    }
+  }
+
+  if (!boostTier) return null;
+
+  return (
+    <div className="mt-8 rounded-2xl border border-amber-300 bg-amber-50 p-6">
+      <h2 className="text-lg font-bold text-slate-900">⚡ Quick Boost</h2>
+      <p className="mt-1 text-sm text-slate-700">
+        {formatPrice(boostTier.price_cents)} + $1 platform fee — 20 minutes of gold badge + sorted-to-top
+        placement on the Map and Directory, starting the moment you pay.
+      </p>
+      {isBoosted ? (
+        <p className="mt-4 inline-block rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-slate-900">
+          🔥 BOOSTED — {formatCountdown(remainingMs)} left
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={buyBoost}
+          disabled={checkingOut}
+          className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+        >
+          {checkingOut ? "Starting checkout…" : `Boost Me Now — ${formatPrice(boostTier.price_cents + 100)}`}
+        </button>
+      )}
+      {error && <p className="mt-2 text-sm font-medium text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] }) {
   const [requestedAt, setRequestedAt] = useState(vendor.boost_requested_at);
   const [requesting, setRequesting] = useState(false);
@@ -406,6 +483,8 @@ export function VendorDashboard({
       {isMenuHubEntity && (
         <MenuHubManager vendorId={vendor.id} menuHubEnabled={vendor.menu_hub_enabled} initialItems={menuItems} />
       )}
+
+      <QuickBoost vendor={vendor} tiers={tiers} />
 
       <BoostRequest vendor={vendor} tiers={tiers} />
 

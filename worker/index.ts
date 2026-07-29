@@ -114,12 +114,27 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
   ]);
   const [vendors, tiers] = (await Promise.all([vendorRes.json(), tierRes.json()])) as [
     Array<{ id: string; business_name: string; contact_email: string }>,
-    Array<{ id: string; name: string; description: string | null; price_cents: number; currency: string; is_top10: boolean; is_founding: boolean; max_slots: number | null }>,
+    Array<{
+      id: string;
+      slug: string;
+      name: string;
+      description: string | null;
+      price_cents: number;
+      currency: string;
+      is_top10: boolean;
+      is_founding: boolean;
+      max_slots: number | null;
+    }>,
   ];
   const vendor = vendors[0];
   const tier = tiers[0];
   if (!vendor) return json({ error: "Vendor not found." }, 404);
   if (!tier) return json({ error: "Pricing tier not found or inactive." }, 404);
+
+  // Quick Vendor Boost ($15/20-min) shows CityPinned's cut as its own
+  // itemized line at checkout rather than folding it into the price.
+  const isBoost = tier.slug === "vendor-boost";
+  const platformFeeCents = isBoost ? 100 : 0;
 
   const regRes = await sb(env, "/registrations", {
     method: "POST",
@@ -129,7 +144,7 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
       claimed_by_vendor_id: vendorId,
       business_name: vendor.business_name,
       contact_email: vendor.contact_email,
-      amount_cents: tier.price_cents,
+      amount_cents: tier.price_cents + platformFeeCents,
       currency: tier.currency ?? "usd",
       status: "pending",
     }),
@@ -139,22 +154,34 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
   if (!registration) return json({ error: "Could not start registration." }, 500);
 
   const origin = new URL(request.url).origin;
+  const lineItems: Record<string, unknown>[] = [
+    {
+      quantity: 1,
+      price_data: {
+        currency: tier.currency ?? "usd",
+        unit_amount: tier.price_cents,
+        product_data: { name: tier.name, description: tier.description ?? undefined },
+      },
+    },
+  ];
+  if (platformFeeCents > 0) {
+    lineItems.push({
+      quantity: 1,
+      price_data: {
+        currency: tier.currency ?? "usd",
+        unit_amount: platformFeeCents,
+        product_data: { name: "CityPinned Platform Fee" },
+      },
+    });
+  }
+
   let session: { id: string; url: string };
   try {
     session = (await stripeRequest(env, "checkout/sessions", {
       mode: "payment",
       customer_email: vendor.contact_email,
       client_reference_id: vendorId,
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: tier.currency ?? "usd",
-            unit_amount: tier.price_cents,
-            product_data: { name: tier.name, description: tier.description ?? undefined },
-          },
-        },
-      ],
+      line_items: lineItems,
       metadata: { vendor_id: vendorId, tier_id: tierId, registration_id: registration.id },
       success_url: `${origin}/register/confirmation?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/vendor/dashboard`,
@@ -245,6 +272,7 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
       sb(env, `/vendors?id=eq.${vendorId}&select=*`),
     ]);
     const [tier] = (await tierRes.json()) as Array<{
+      slug: string;
       name: string;
       is_top10: boolean;
       is_founding: boolean;
@@ -259,17 +287,26 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
     }>;
     if (!tier || !vendor) throw new Error(`Tier or vendor not found (tier=${tierId}, vendor=${vendorId})`);
 
+    const isBoost = tier.slug === "vendor-boost";
+
+    // Quick Vendor Boost is a 20-minute, parallel-friendly visibility bump
+    // on top of whatever the vendor's account already is - it must NOT
+    // touch approval status, tier_id, or the permanent Top 10/Founding
+    // flags, unlike the $50/$100 tiers below which do exactly that.
+    const vendorPatchBody = isBoost
+      ? { boost_active_until: new Date(Date.now() + 20 * 60 * 1000).toISOString() }
+      : {
+          status: "active",
+          approved_at: new Date().toISOString(),
+          tier_id: tierId,
+          is_founding_vendor: vendor.is_founding_vendor || tier.is_founding,
+          is_top10: vendor.is_top10 || tier.is_top10,
+          is_featured: vendor.is_featured || tier.is_top10,
+          category_tier: tier.is_top10 ? "top_10" : vendor.category_tier,
+        };
     const vendorPatchRes = await sb(env, `/vendors?id=eq.${vendorId}`, {
       method: "PATCH",
-      body: JSON.stringify({
-        status: "active",
-        approved_at: new Date().toISOString(),
-        tier_id: tierId,
-        is_founding_vendor: vendor.is_founding_vendor || tier.is_founding,
-        is_top10: vendor.is_top10 || tier.is_top10,
-        is_featured: vendor.is_featured || tier.is_top10,
-        category_tier: tier.is_top10 ? "top_10" : vendor.category_tier,
-      }),
+      body: JSON.stringify(vendorPatchBody),
     });
     if (!vendorPatchRes.ok) throw new Error(`Vendor update failed: ${await vendorPatchRes.text()}`);
 
@@ -278,14 +315,14 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
       status: "paid",
       paid_at: new Date().toISOString(),
       stripe_payment_intent_id: paymentIntentId,
-      awarded_top10: tier.is_top10,
+      awarded_top10: !isBoost && tier.is_top10,
     };
     const regPatchRes = existing
       ? await sb(env, `/registrations?id=eq.${existing.id}`, { method: "PATCH", body: JSON.stringify(regPatchBody) })
       : await sb(env, `/registrations?stripe_checkout_session_id=eq.${session.id}`, { method: "PATCH", body: JSON.stringify(regPatchBody) });
     if (!regPatchRes.ok) throw new Error(`Registration update failed: ${await regPatchRes.text()}`);
 
-    if (tier.is_top10 && tier.max_slots !== null) {
+    if (!isBoost && tier.is_top10 && tier.max_slots !== null) {
       await sb(env, "/rpc/claim_top10_slot", { method: "POST", body: JSON.stringify({ p_tier_id: tierId }) }).catch(() => {});
     }
 
