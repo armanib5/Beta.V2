@@ -54,6 +54,7 @@ export default function BookkeepingPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [tiers, setTiers] = useState<PricingTier[]>([]);
   const [cityFilter, setCityFilter] = useState<string>("All");
+  const [payingOnly, setPayingOnly] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,7 +103,9 @@ export default function BookkeepingPage() {
   );
 
   const cities = useMemo(() => ["All", "Unknown", ...CITY_CENTERS.map((c) => c.city).filter((v, i, a) => a.indexOf(v) === i)], []);
-  const filteredRows = cityFilter === "All" ? rows : rows.filter((r) => r.city === cityFilter);
+  const filteredRows = rows
+    .filter((r) => cityFilter === "All" || r.city === cityFilter)
+    .filter((r) => !payingOnly || r.priceCents > 0);
 
   const groupedByMonth = useMemo(() => {
     const map = new Map<string, Row[]>();
@@ -170,6 +173,15 @@ export default function BookkeepingPage() {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={() => setPayingOnly((v) => !v)}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${
+            payingOnly ? "bg-green-600 text-white" : "border border-green-400 text-green-700 hover:bg-green-50"
+          }`}
+        >
+          💰 Paying Accounts Only ($50/$100)
+        </button>
         <button
           type="button"
           onClick={downloadCsv}
