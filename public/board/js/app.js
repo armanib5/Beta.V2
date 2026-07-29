@@ -6,10 +6,13 @@ var C={
   parks:{l:"Parks",i:"&#127795;",c:"#5a8c3a"},
   venue:{l:"Theaters",i:"&#127963;",c:"#7a5230"},
   seasonal:{l:"Seasonal",i:"&#9917;",c:"#8B0000"},
+  workshop:{l:"Workshops & Classes",i:"&#127891;",c:"#2c5f8a"},
   centers:{l:"Centers",i:"&#127970;",c:"#0d6b4f"},
-  shop:{l:"Shops",i:"&#128717;",c:"#c0392b"}
+  shop:{l:"Shops",i:"&#128717;",c:"#c0392b"},
+  homecook:{l:"Home Cook",i:"&#127858;",c:"#c26a1d"},
+  other:{l:"&#10024; Other",i:"&#10024;",c:"#6b7280"}
 };
-var ORD=["seasonal","market","foodhall","bars","cityart","parks","venue","centers","shop"];
+var ORD=["seasonal","workshop","market","foodhall","bars","cityart","parks","venue","centers","shop","homecook","other"];
 var CN={sj:"San Jose, CA",sc:"Santa Clara, CA",sv:"Sunnyvale, CA",mv:"Mountain View, CA",camp:"Campbell, CA",gil:"Gilroy, CA"};
 var CITY_ABBR={sj:"SJ",sc:"SC",sv:"SV",mv:"MV",camp:"Camp",gil:"Gil"};
 function setBrand(v){
@@ -378,7 +381,8 @@ var LOV_CAT_SLUG_TO_BOARD={
   "maker-market":"market","night-market":"market","art-walk":"seasonal",
   "music-festival":"venue","comedy-show":"venue","live-show":"venue",
   "cultural-festival":"venue","gaming-festival":"venue","outdoor-movie":"venue",
-  "community-event":"seasonal","restaurant":"bars","bar":"bars"
+  "community-event":"seasonal","restaurant":"bars","bar":"bars",
+  "workshop-class":"workshop"
 };
 /* Resolves a real city+hood from the row's own lat/lng (every seeded row
    has one) instead of only trusting section_zone, which is null on every
@@ -491,7 +495,7 @@ function loadLovVendors(){
   }).catch(function(){});
 }
 
-var BOARD_CAT_SLUGS={restaurant:"bars",bar:"bars"};
+var BOARD_CAT_SLUGS={restaurant:"bars",bar:"bars","home-cook":"homecook",other:"other"};
 /* Real paid/comped vendor accounts (V2's `vendors` table) - same merge as
    loadLovVendors, sourced from the actual vendor accounts instead of the
    LOV guest listings, so a vendor who's actually signed up (or been

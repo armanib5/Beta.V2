@@ -16,7 +16,10 @@ var CATS = {
   "cityart": { "l": "Community Art", "c": "#6a4e7a", "icon": "art" },
   "venue": { "l": "Theaters", "c": "#7a5230", "icon": "mask" },
   "seasonal": { "l": "Seasonal", "c": "#8B0000", "icon": "star" },
+  "workshop": { "l": "Workshops & Classes", "c": "#2c5f8a", "icon": "grad" },
   "shop": { "l": "Shops", "c": "#c0392b", "icon": "bag" },
+  "homecook": { "l": "Home Cook", "c": "#c26a1d", "icon": "pot" },
+  "other": { "l": "✨ Other", "c": "#6b7280", "icon": "sparkle" },
   "parking": { "l": "Parking", "c": "#2c5f8a", "icon": "P" },
   "restrooms": { "l": "Restrooms", "c": "#64748b", "icon": "restroom" },
   "transit": { "l": "Transit", "c": "#1f8a4c", "icon": "train" },
@@ -28,7 +31,7 @@ var CATS = {
 };
 
 /* Order controls the category filter row. */
-var CAT_ORDER = ["market","foodhall","restaurants","bars","cityart","venue","seasonal","centers","shop","parking","restrooms","transit","schools","hospitals","churches","hotels"];
+var CAT_ORDER = ["market","foodhall","restaurants","bars","cityart","venue","seasonal","workshop","centers","shop","homecook","other","parking","restrooms","transit","schools","hospitals","churches","hotels"];
 
 var HOODS = [
   { "id": "downtown", "l": "Downtown San Jose", "lat": 37.3382, "lng": -121.8863, "zoom": 15 },

@@ -5,7 +5,8 @@ var ICONS = {
   leaf: "\u{1F343}", fork: "\u{1F374}", cup: "\u{1F378}", palette: "\u{1F3A8}",
   art: "\u{1F5BC}", mask: "\u{1F3AD}", star: "⭐", bag: "\u{1F6CD}",
   P: "P", restroom: "\u{1F6BB}", train: "\u{1F686}",
-  school: "\u{1F3EB}", hospital: "\u{1F3E5}", church: "⛪", plate: "\u{1F37D}\u{FE0F}", hotel: "\u{1F3E8}"
+  school: "\u{1F3EB}", hospital: "\u{1F3E5}", church: "⛪", plate: "\u{1F37D}\u{FE0F}", hotel: "\u{1F3E8}",
+  grad: "\u{1F393}", pot: "\u{1F372}", sparkle: "\u{2728}"
 };
 
 var map, clusterGroup, userMarker, activeCity = "sj", activeHood = "downtown", activeCat = "all";
@@ -242,7 +243,8 @@ var LOV_CAT_SLUG_TO_MAP = {
   "maker-market": "market", "night-market": "market", "art-walk": "seasonal",
   "music-festival": "venue", "comedy-show": "venue", "live-show": "venue",
   "cultural-festival": "venue", "gaming-festival": "venue", "outdoor-movie": "venue",
-  "community-event": "seasonal", "restaurant": "restaurants", "bar": "bars"
+  "community-event": "seasonal", "restaurant": "restaurants", "bar": "bars",
+  "workshop-class": "workshop"
 };
 
 function loadLovEvents() {
@@ -284,7 +286,7 @@ function loadLovEvents() {
    merge pattern, live from the same project. Category comes from the
    vendor's first tagged category (vendor_categories join); anything not
    already a Map category key falls back to "shop" rather than vanishing. */
-var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars" };
+var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars", "home-cook": "homecook", other: "other" };
 function loadVendorPins() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
   return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&is_internal=eq.false&lat=not.is.null&lng=not.is.null", {
