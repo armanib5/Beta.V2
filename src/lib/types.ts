@@ -57,6 +57,25 @@ export interface Vendor {
   menu_url: string | null;
   is_featured: boolean;
   boost_requested_at: string | null;
+  menu_hub_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MenuItemKind = "bite" | "sip";
+export type MenuItemStatus = "active" | "hidden";
+
+export interface MenuItem {
+  id: string;
+  vendor_id: string;
+  kind: MenuItemKind;
+  name: string;
+  description: string | null;
+  price_cents: number | null;
+  photo_url: string | null;
+  is_top_pick: boolean;
+  sort_order: number;
+  status: MenuItemStatus;
   created_at: string;
   updated_at: string;
 }

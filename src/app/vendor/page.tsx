@@ -4,7 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, Vendor, VendorPhoto } from "@/lib/types";
+import type { Category, MenuItem, Vendor, VendorPhoto } from "@/lib/types";
+import { MenuHub } from "@/components/menu-hub";
 
 export default function VendorProfilePage() {
   return (
@@ -20,6 +21,7 @@ function VendorProfile() {
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [photos, setPhotos] = useState<VendorPhoto[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   useEffect(() => {
     if (!slug) return;
@@ -40,7 +42,7 @@ function VendorProfile() {
         }
         setVendor(vendorRow);
 
-        const [{ data: categoryLinks }, { data: photoRows }] = await Promise.all([
+        const [{ data: categoryLinks }, { data: photoRows }, { data: menuRows }] = await Promise.all([
           supabase.from("vendor_categories").select("categories(*)").eq("vendor_id", vendorRow.id),
           supabase
             .from("vendor_photos")
@@ -48,12 +50,20 @@ function VendorProfile() {
             .eq("vendor_id", vendorRow.id)
             .order("sort_order")
             .returns<VendorPhoto[]>(),
+          supabase
+            .from("menu_items")
+            .select("*")
+            .eq("vendor_id", vendorRow.id)
+            .eq("status", "active")
+            .order("sort_order")
+            .returns<MenuItem[]>(),
         ]);
         if (cancelled) return;
         setCategories(
           (categoryLinks ?? []).map((row) => row.categories as unknown as Category).filter(Boolean),
         );
         setPhotos(photoRows ?? []);
+        setMenuItems(menuRows ?? []);
         setStatus("ready");
       });
 
@@ -141,6 +151,10 @@ function VendorProfile() {
           </a>
         )}
       </div>
+
+      {(vendor.entity_type === "restaurant" || vendor.entity_type === "bar") && vendor.menu_hub_enabled && (
+        <MenuHub items={menuItems} happyHourSpecials={vendor.happy_hour_specials} />
+      )}
 
       {photos.length > 0 && (
         <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3">

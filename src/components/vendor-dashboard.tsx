@@ -4,8 +4,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice, type Category, type PricingTier, type Vendor, type VendorPhoto } from "@/lib/types";
+import { formatPrice, type Category, type LovEntry, type MenuItem, type PricingTier, type Vendor, type VendorPhoto } from "@/lib/types";
 import { VendorPhotoManager } from "@/components/vendor-photo-manager";
+import { MenuHubManager } from "@/components/menu-hub-manager";
+import { MyListingManager } from "@/components/my-listing-manager";
 
 function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] }) {
   const [requestedAt, setRequestedAt] = useState(vendor.boost_requested_at);
@@ -120,14 +122,19 @@ export function VendorDashboard({
   selectedCategoryIds,
   photos,
   tiers,
+  myListings,
+  menuItems,
 }: {
   vendor: Vendor;
   categories: Category[];
   selectedCategoryIds: string[];
   photos: VendorPhoto[];
   tiers: PricingTier[];
+  myListings: LovEntry[];
+  menuItems: MenuItem[];
 }) {
   const router = useRouter();
+  const isMenuHubEntity = vendor.entity_type === "restaurant" || vendor.entity_type === "bar";
 
   const [form, setForm] = useState({
     business_name: vendor.business_name,
@@ -291,6 +298,12 @@ export function VendorDashboard({
           <VendorPhotoManager vendorId={vendor.id} logoUrl={vendor.logo_url} initialPhotos={photos} />
         </div>
       </div>
+
+      <MyListingManager vendorId={vendor.id} initialListings={myListings} />
+
+      {isMenuHubEntity && (
+        <MenuHubManager vendorId={vendor.id} menuHubEnabled={vendor.menu_hub_enabled} initialItems={menuItems} />
+      )}
 
       <BoostRequest vendor={vendor} tiers={tiers} />
 

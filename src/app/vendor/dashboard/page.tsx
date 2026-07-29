@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
-import type { Category, PricingTier, Vendor, VendorPhoto } from "@/lib/types";
+import type { Category, LovEntry, MenuItem, PricingTier, Vendor, VendorPhoto } from "@/lib/types";
 import { VendorDashboard } from "@/components/vendor-dashboard";
 
 const SLUG_RETRY_ATTEMPTS = 5;
@@ -17,6 +17,8 @@ export default function VendorDashboardPage() {
     selectedCategoryIds: string[];
     photos: VendorPhoto[];
     tiers: PricingTier[];
+    myListings: LovEntry[];
+    menuItems: MenuItem[];
   } | null>(null);
   // A signed-up-but-no-vendor-row account (email-confirmation delayed the
   // signup form's insert, so it never ran) has no profile to redirect to
@@ -39,19 +41,28 @@ export default function VendorDashboardPage() {
         return;
       }
 
-      const [{ data: vendor }, { data: categories }, { data: vendorCategories }, { data: photos }, { data: tiers }] =
-        await Promise.all([
-          supabase.from("vendors").select("*").eq("id", user.id).maybeSingle<Vendor>(),
-          supabase.from("categories").select("*").order("sort_order").returns<Category[]>(),
-          supabase.from("vendor_categories").select("category_id").eq("vendor_id", user.id),
-          supabase
-            .from("vendor_photos")
-            .select("*")
-            .eq("vendor_id", user.id)
-            .order("sort_order")
-            .returns<VendorPhoto[]>(),
-          supabase.from("pricing_tiers").select("*").eq("is_active", true).order("sort_order").returns<PricingTier[]>(),
-        ]);
+      const [
+        { data: vendor },
+        { data: categories },
+        { data: vendorCategories },
+        { data: photos },
+        { data: tiers },
+        { data: myListings },
+        { data: menuItems },
+      ] = await Promise.all([
+        supabase.from("vendors").select("*").eq("id", user.id).maybeSingle<Vendor>(),
+        supabase.from("categories").select("*").order("sort_order").returns<Category[]>(),
+        supabase.from("vendor_categories").select("category_id").eq("vendor_id", user.id),
+        supabase
+          .from("vendor_photos")
+          .select("*")
+          .eq("vendor_id", user.id)
+          .order("sort_order")
+          .returns<VendorPhoto[]>(),
+        supabase.from("pricing_tiers").select("*").eq("is_active", true).order("sort_order").returns<PricingTier[]>(),
+        supabase.from("lov_entries").select("*").eq("vendor_id", user.id).returns<LovEntry[]>(),
+        supabase.from("menu_items").select("*").eq("vendor_id", user.id).order("sort_order").returns<MenuItem[]>(),
+      ]);
 
       if (cancelled) return;
 
@@ -66,6 +77,8 @@ export default function VendorDashboardPage() {
         selectedCategoryIds: (vendorCategories ?? []).map((row) => row.category_id),
         photos: photos ?? [],
         tiers: tiers ?? [],
+        myListings: myListings ?? [],
+        menuItems: menuItems ?? [],
       });
     });
 
@@ -152,6 +165,8 @@ export default function VendorDashboardPage() {
       selectedCategoryIds={state.selectedCategoryIds}
       photos={state.photos}
       tiers={state.tiers}
+      myListings={state.myListings}
+      menuItems={state.menuItems}
     />
   );
 }

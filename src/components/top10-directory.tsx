@@ -382,12 +382,21 @@ function DirectoryCard({
       ) : (
         cardBody
       )}
-      <a
-        href={`${BASE_PATH}/board/?openVendor=${encodeURIComponent(item.name)}`}
-        className="mt-3 inline-block self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
-      >
-        {item.pill === "events" ? "📌 View on Board" : "🛒 Vendor Hub"}
-      </a>
+      {(item.pill === "bars" || item.pill === "food") && item.href ? (
+        <Link
+          href={item.href}
+          className="mt-3 inline-block self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
+        >
+          🍽️ Menu Hub
+        </Link>
+      ) : (
+        <a
+          href={`${BASE_PATH}/board/?openVendor=${encodeURIComponent(item.name)}`}
+          className="mt-3 inline-block self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
+        >
+          {item.pill === "events" ? "📌 View on Board" : "🛒 Vendor Hub"}
+        </a>
+      )}
     </div>
   );
 }
