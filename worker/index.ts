@@ -37,6 +37,17 @@ function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 }
 
+// Every required secret has to be set (wrangler secret put ...) before
+// either endpoint can do anything real. Without this check, a request
+// hitting an unset SUPABASE_URL turns into fetch("undefined/rest/v1/...")
+// - an unhandled exception that Cloudflare shows as an opaque "error code
+// 1101" page instead of a message anyone could act on.
+function missingEnvVars(env: Env): string[] {
+  return (["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const).filter(
+    (key) => !env[key],
+  );
+}
+
 function sb(env: Env, path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set("apikey", env.SUPABASE_SERVICE_ROLE_KEY);
@@ -303,15 +314,24 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
 const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const isApiRoute = url.pathname === "/api/create-checkout-session" || url.pathname === "/api/stripe-webhook";
+    if (!isApiRoute || request.method !== "POST") return env.ASSETS.fetch(request);
 
-    if (request.method === "POST" && url.pathname === "/api/create-checkout-session") {
-      return handleCreateCheckoutSession(request, env);
-    }
-    if (request.method === "POST" && url.pathname === "/api/stripe-webhook") {
-      return handleStripeWebhook(request, env);
+    const missing = missingEnvVars(env);
+    if (missing.length > 0) {
+      return json({ error: `Payment isn't configured yet - missing: ${missing.join(", ")}.` }, 503);
     }
 
-    return env.ASSETS.fetch(request);
+    try {
+      if (url.pathname === "/api/create-checkout-session") return await handleCreateCheckoutSession(request, env);
+      return await handleStripeWebhook(request, env);
+    } catch (err) {
+      // Whatever the reason, never let an exception escape to Cloudflare's
+      // opaque "error code 1101" page - a real caller (browser or Stripe)
+      // needs a JSON body it can show or retry on.
+      console.error("Unhandled API error", err);
+      return json({ error: "Internal error." }, 500);
+    }
   },
 };
 
