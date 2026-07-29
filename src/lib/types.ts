@@ -1,4 +1,5 @@
 export type VendorStatus = "pending" | "active" | "suspended" | "rejected";
+export type VendorHubType = "vendor" | "menu" | "hosting";
 export type RegistrationStatus = "pending" | "paid" | "failed" | "refunded";
 export type EntityType = "vendor" | "restaurant" | "bar";
 export type CategoryTier = "top_10" | "featured" | "standard";
@@ -60,6 +61,10 @@ export interface Vendor {
   is_featured: boolean;
   boost_requested_at: string | null;
   menu_hub_enabled: boolean;
+  opens_at: string | null;
+  hub_type: VendorHubType;
+  logo_focal_x: number;
+  logo_focal_y: number;
   created_at: string;
   updated_at: string;
 }
@@ -105,6 +110,7 @@ export interface LovEntry {
   section_zone: string | null;
   publish_at: string | null;
   details: string | null;
+  hosting_vendor_id: string | null;
   status: FlyerStatus;
   category_tier: CategoryTier;
   is_featured: boolean;

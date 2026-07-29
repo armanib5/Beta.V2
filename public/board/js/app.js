@@ -426,6 +426,7 @@ function loadLovEvents(){
         t:r.name,w:r.recurrence||(r.event_date?r.event_date.slice(0,10):""),d:d,
         a:r.location||"",ph:"",wb:r.website_url||"",ds:r.details||r.recurrence||"",
         photo:r.flyer_image_url||"",ed:r.end_date?r.end_date.slice(0,10):undefined,
+        hostVendorId:r.hosting_vendor_id||null,
         top:!!(r.booth_tier==="top"||r.category_tier==="top_10"||r.is_featured)
       });
     });
@@ -529,16 +530,23 @@ function loadRealVendors(){
           hours:{mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""},
           featured:!!r.is_founding_vendor,verified:true,
           boost:{tier:r.is_top10?"anchor":null,active:!!r.is_top10,until:"",radius:null},
-          mx:0,my:0,city:loc.city,hood:loc.hood,events:[],gallery:[],logo:r.logo_url||"",cover:r.logo_url||"",status:"approved"
+          mx:0,my:0,city:loc.city,hood:loc.hood,events:[],gallery:[],logo:r.logo_url||"",cover:r.logo_url||"",status:"approved",
+          slug:r.slug,hubType:r.hub_type
         });
       }
       if(existingEvtIds.indexOf(id)<0){
+        /* opens_at wasn't tracked at all before - every vendor was hardcoded
+           "daily" (always open), so a vendor boosted/featured ahead of their
+           real opening date showed a misleading green "Open Now" badge.
+           Only treat as "daily/ongoing" once that date has actually passed. */
+        var notYetOpen=r.opens_at&&r.opens_at>dateKeyOf(new Date());
         evts.push({
-          id:id,cat:cat,lbl:r.is_top10?"Top 10":(r.is_founding_vendor?"Founding Vendor":"Vendor"),
+          id:id,cat:cat,lbl:notYetOpen?"Opening Soon":(r.is_top10?"Top 10":(r.is_founding_vendor?"Founding Vendor":"Vendor")),
           exp:false,city:loc.city,hood:loc.hood,
-          t:r.business_name+(r.is_top10?" ⭐":""),w:"",d:"daily",
+          t:r.business_name+(r.is_top10?" ⭐":""),w:notYetOpen?("Opens "+r.opens_at):"",
+          d:notYetOpen?r.opens_at:"daily",
           a:"",ph:"",wb:r.website_url||"",ds:r.short_description||"",
-          photo:r.logo_url||"",
+          photo:r.logo_url||"",focalX:r.logo_focal_x,focalY:r.logo_focal_y,
           top:!!(r.is_top10||r.category_tier==="top_10"||r.is_featured)
         });
       }
@@ -628,6 +636,15 @@ function isLiveNow(ev){
    rather than re-deriving "is this happening" from scratch, so the badge
    can never disagree with the live-now pulse/sort logic those already
    drive elsewhere on the board. */
+/* A vendor's flyer photo comes from their circular Logo upload, cropped
+   into a wide rectangle everywhere it's shown on the board - defaults to
+   dead-center, but a vendor can move the focal point (logo_focal_x/y,
+   0-100) so the important part of the photo is the part that survives
+   the crop, instead of always centering it. */
+function photoPos(ev){
+  var x=(ev.focalX!=null?ev.focalX:50),y=(ev.focalY!=null?ev.focalY:50);
+  return x+"% "+y+"%";
+}
 function flyerLiveStatus(ev){
   if(ev.exp)return{emoji:"🔴",label:"Closed",cls:"closed"};
   var today=new Date();
@@ -864,7 +881,7 @@ function mkSpotlightCard(ev){
   card.className="spot-card"+(isLiveNow(ev)?" live-now":"");
   var img=document.createElement("div");
   img.className="spot-img";
-  if(ev.photo){img.style.backgroundImage="url("+ev.photo+")";img.style.backgroundSize="cover";img.style.backgroundPosition="center";}
+  if(ev.photo){img.style.backgroundImage="url("+ev.photo+")";img.style.backgroundSize="cover";img.style.backgroundPosition=photoPos(ev);}
   else{img.innerHTML=ico;}
   var body=document.createElement("div");
   body.className="spot-body";
@@ -923,7 +940,7 @@ function mkTCard(ev,featured){
   d.className="tc"+(isLiveNow(ev)?" live-now":"")+(featured?" featured":"");
   var imgDiv=document.createElement("div");
   imgDiv.className="tcimg";
-  if(ev.photo){imgDiv.style.backgroundImage="url("+ev.photo+")";imgDiv.style.backgroundSize="cover";imgDiv.style.backgroundPosition="center";}
+  if(ev.photo){imgDiv.style.backgroundImage="url("+ev.photo+")";imgDiv.style.backgroundSize="cover";imgDiv.style.backgroundPosition=photoPos(ev);}
   else{imgDiv.innerHTML=ico;}
   var body=document.createElement("div");
   body.className="tcbody";
@@ -1106,7 +1123,7 @@ function mkFlyer(ev){
   var fc=document.createElement("div");fc.className="fc"+(ev.exp?" exp":"")+(live?" live-now":"");
 
   var fimg=document.createElement("div");fimg.className="fimg"+(ev.photo?" hp":"");
-  if(ev.photo){fimg.style.backgroundImage="url("+ev.photo+")";fimg.style.backgroundSize="cover";fimg.style.backgroundPosition="center";}
+  if(ev.photo){fimg.style.backgroundImage="url("+ev.photo+")";fimg.style.backgroundSize="cover";fimg.style.backgroundPosition=photoPos(ev);}
   else{
     fimg.innerHTML=ico;
     if(ev.exp){var etag=document.createElement("div");etag.className="etag";etag.textContent="Past";fimg.appendChild(etag);}
@@ -1145,9 +1162,25 @@ function openDetail(id){
   vhBtn.onclick=function(e){e.stopPropagation();toggleVendorView();};
   dp.appendChild(vhBtn);
 
+  /* This event is hosted at an existing restaurant/venue's own account
+     (e.g. a craft workshop held inside a pizza place) - link straight to
+     that venue's real Menu/Vendor Hub instead of only offering the
+     generic pop-up Vendor Hub for the event's own guest listing. */
+  var host=ev.hostVendorId&&typeof vendors!=="undefined"
+    ?vendors.find(function(v){return v.id==="vendor-"+ev.hostVendorId;})
+    :null;
+  if(host&&host.slug){
+    var hostBtn=document.createElement("a");hostBtn.className="vhbtn";
+    hostBtn.href="../vendor?slug="+encodeURIComponent(host.slug);
+    hostBtn.innerHTML="&#127968; Hosted at "+escHtml(host.name);
+    hostBtn.title="View "+host.name+"'s own hub";
+    hostBtn.style.textDecoration="none";
+    dp.appendChild(hostBtn);
+  }
+
   var hero=document.createElement("div");hero.className="dhero"+(ev.photo?" hp":"");
   if(ev.photo){
-    hero.style.backgroundImage="url("+ev.photo+")";hero.style.backgroundSize="cover";hero.style.backgroundPosition="center";
+    hero.style.backgroundImage="url("+ev.photo+")";hero.style.backgroundSize="cover";hero.style.backgroundPosition=photoPos(ev);
     var zoomBtn=document.createElement("button");zoomBtn.className="photozoom";zoomBtn.innerHTML="&#128269;";zoomBtn.title="View full photo";
     zoomBtn.onclick=function(e){e.stopPropagation();zoomPhoto(ev.photo);};
     hero.appendChild(zoomBtn);

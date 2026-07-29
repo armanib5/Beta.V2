@@ -57,6 +57,12 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
       <p className="mt-1 text-sm text-slate-600">
         Get a gold Top 10 badge and priority placement across the Board, Map, and Directory.
       </p>
+      {vendor.opens_at && new Date(vendor.opens_at) > new Date() && (
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          📅 Your flyer will show &quot;Opens {new Date(vendor.opens_at).toLocaleDateString("en-US")}&quot; until
+          then, even while boosted/featured — boosting doesn&apos;t make you show as open early.
+        </p>
+      )}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {tiers.map((tier) => (
           <div key={tier.id} className="rounded-xl border border-slate-200 p-4">
@@ -143,7 +149,10 @@ export function VendorDashboard({
     instagram_handle: vendor.instagram_handle ?? "",
     website_url: vendor.website_url ?? "",
     short_description: vendor.short_description ?? "",
+    opens_at: vendor.opens_at ?? "",
   });
+  const [hubType, setHubType] = useState(vendor.hub_type);
+  const [savingHubType, setSavingHubType] = useState(false);
   const [location, setLocation] = useState<{ lat: number | null; lng: number | null }>({
     lat: vendor.lat,
     lng: vendor.lng,
@@ -177,6 +186,14 @@ export function VendorDashboard({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function saveHubType(next: typeof hubType) {
+    setSavingHubType(true);
+    const supabase = createClient();
+    const { error: hubError } = await supabase.from("vendors").update({ hub_type: next }).eq("id", vendor.id);
+    setSavingHubType(false);
+    if (!hubError) setHubType(next);
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -194,6 +211,7 @@ export function VendorDashboard({
           instagram_handle: form.instagram_handle || null,
           website_url: form.website_url || null,
           short_description: form.short_description || null,
+          opens_at: form.opens_at || null,
           lat: location.lat,
           lng: location.lng,
         })
@@ -295,7 +313,43 @@ export function VendorDashboard({
       <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
         <h2 className="text-lg font-bold text-slate-900">Photos &amp; Logo</h2>
         <div className="mt-4">
-          <VendorPhotoManager vendorId={vendor.id} logoUrl={vendor.logo_url} initialPhotos={photos} />
+          <VendorPhotoManager
+            vendorId={vendor.id}
+            logoUrl={vendor.logo_url}
+            logoFocalX={vendor.logo_focal_x}
+            logoFocalY={vendor.logo_focal_y}
+            initialPhotos={photos}
+          />
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
+        <h2 className="text-lg font-bold text-slate-900">Account Type</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          What kind of hub is this account? This controls which button people see when they tap through from a
+          flyer or the Directory.
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {(
+            [
+              { key: "vendor" as const, label: "🛒 Vendor Hub", desc: "A pop-up vendor at events (booths, boost/Top 10)." },
+              { key: "menu" as const, label: "🍽️ Menu Hub", desc: "A restaurant/bar with its own menu, specials, and Top Picks." },
+              { key: "hosting" as const, label: "🏠 Hosting Hub", desc: "A venue that hosts other people's events at your location." },
+            ]
+          ).map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              disabled={savingHubType}
+              onClick={() => saveHubType(opt.key)}
+              className={`rounded-xl border p-3 text-left text-sm disabled:opacity-60 ${
+                hubType === opt.key ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <p className="font-bold">{opt.label}</p>
+              <p className={`mt-0.5 text-xs ${hubType === opt.key ? "text-slate-300" : "text-slate-500"}`}>{opt.desc}</p>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -335,6 +389,18 @@ export function VendorDashboard({
               onChange={(e) => updateField("phone", e.target.value)}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
+          </Field>
+          <Field label="Opening date (optional)">
+            <input
+              type="date"
+              value={form.opens_at}
+              onChange={(e) => updateField("opens_at", e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <span className="mt-1 block text-xs text-slate-500">
+              Set this if you&apos;re boosting/featuring before you actually open — the flyer badge will show
+              your real opening date instead of a misleading &quot;Open Now.&quot;
+            </span>
           </Field>
           <Field label="Instagram handle">
             <input

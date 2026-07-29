@@ -3,19 +3,26 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { VendorPhoto } from "@/lib/types";
+import { LogoCropEditor } from "@/components/logo-crop-editor";
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
 export function VendorPhotoManager({
   vendorId,
   logoUrl,
+  logoFocalX,
+  logoFocalY,
   initialPhotos,
 }: {
   vendorId: string;
   logoUrl: string | null;
+  logoFocalX: number;
+  logoFocalY: number;
   initialPhotos: VendorPhoto[];
 }) {
   const [logo, setLogo] = useState(logoUrl);
+  const [focal, setFocal] = useState({ x: logoFocalX, y: logoFocalY });
+  const [croppingLogo, setCroppingLogo] = useState(false);
   const [photos, setPhotos] = useState(initialPhotos);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [removingLogo, setRemovingLogo] = useState(false);
@@ -132,21 +139,45 @@ export function VendorPhotoManager({
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} alt="Vendor logo" className="h-full w-full object-cover" />
+              <img
+                src={logo}
+                alt="Vendor logo"
+                className="h-full w-full object-cover"
+                style={{ objectPosition: `${focal.x}% ${focal.y}%` }}
+              />
             ) : (
               <span className="text-2xl">🏪</span>
             )}
           </div>
           <div className="flex h-16 w-full max-w-xs shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50">
             {logo ? (
-              <button type="button" onClick={() => setZoomUrl(logo)} className="h-full w-full cursor-zoom-in">
+              <button
+                type="button"
+                onClick={() => setCroppingLogo(true)}
+                title="Choose what shows on your flyer"
+                className="h-full w-full cursor-pointer"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logo} alt="Flyer crop preview" className="h-full w-full object-cover" />
+                <img
+                  src={logo}
+                  alt="Flyer crop preview"
+                  className="h-full w-full object-cover"
+                  style={{ objectPosition: `${focal.x}% ${focal.y}%` }}
+                />
               </button>
             ) : (
               <span className="text-xs text-slate-400">Flyer preview</span>
             )}
           </div>
+          {logo && (
+            <button
+              type="button"
+              onClick={() => setCroppingLogo(true)}
+              className="text-xs font-semibold text-slate-500 underline hover:text-slate-700"
+            >
+              ✏️ Adjust crop
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <label className="cursor-pointer rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
               {uploadingLogo ? "Uploading…" : logo ? "Change Logo" : "Upload Logo"}
@@ -229,6 +260,20 @@ export function VendorPhotoManager({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={zoomUrl} alt="Full size" className="max-h-full max-w-full rounded" />
         </div>
+      )}
+
+      {croppingLogo && logo && (
+        <LogoCropEditor
+          vendorId={vendorId}
+          logoUrl={logo}
+          initialFocalX={focal.x}
+          initialFocalY={focal.y}
+          onClose={() => setCroppingLogo(false)}
+          onSaved={(x, y) => {
+            setFocal({ x, y });
+            setCroppingLogo(false);
+          }}
+        />
       )}
     </div>
   );
