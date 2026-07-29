@@ -32,6 +32,7 @@
     <a class="nb" id="nDash" href="../vendor/dashboard/" style="display:none;text-decoration:none;">My Dashboard</a>
     <a class="nb" id="nAdmin" href="../admin/" style="display:none;text-decoration:none;">Admin</a>
     <a class="nb" id="nVendorLogin" href="../vendor/login/" title="Permanent vendor account (paid, separate from free listings above)" style="display:inline-block;text-decoration:none;">&#128274; Vendor Login</a>
+    <button class="nb" id="nReportBug" onclick="openReportForm('app_bug','app','CityPinned App')">&#128027; Report a Bug</button>
     <div class="bgctrl">
       <button class="bgbtn" id="bgBtn" type="button" title="Change background photo for this city" aria-label="Change background photo for this city">&#128247; Background</button>
       <button class="bgxbtn hidden" id="bgResetBtn" type="button" title="Reset to default background photo" aria-label="Reset to default background photo">&#10005;</button>
@@ -43,14 +44,17 @@
 <div class="hoodrow" id="hoodRow"></div>
 <div class="cnav">
   <button class="cc seasonal" data-cat="seasonal" onclick="jumpTo('seasonal')">Seasonal</button>
+  <button class="cc workshop" data-cat="workshop" onclick="jumpTo('workshop')">Workshops &amp; Classes</button>
   <button class="cc market" data-cat="market" onclick="jumpTo('market')">Farmers Market</button>
   <button class="cc foodhall" data-cat="foodhall" onclick="jumpTo('foodhall')">Food Hall</button>
   <button class="cc bars" data-cat="bars" onclick="jumpTo('bars')">Bars &amp; Restaurants</button>
   <button class="cc cityart" data-cat="cityart" onclick="jumpTo('cityart')">City Art</button>
   <button class="cc parks" data-cat="parks" onclick="jumpTo('parks')">Parks</button>
   <button class="cc venue" data-cat="venue" onclick="jumpTo('venue')">Theaters</button>
-  <button class="cc centers" data-cat="centers" onclick="jumpTo('centers')" style="background:#0d6b4f;">Centers</button>
+  <button class="cc centers" data-cat="centers" onclick="jumpTo('centers')">Centers</button>
   <button class="cc shop" data-cat="shop" onclick="jumpTo('shop')">Shops</button>
+  <button class="cc homecook" data-cat="homecook" onclick="jumpTo('homecook')">Home Cook</button>
+  <button class="cc other" data-cat="other" onclick="jumpTo('other')">✨ Other</button>
   <button class="cc" style="background:#4a3520;" id="postBtn2">+ Post Flyer</button>
 </div>
 <div class="hero">

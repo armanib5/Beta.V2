@@ -5,11 +5,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { CITY_CENTERS, nearestCityCenter } from "@/lib/geo";
-import { formatPrice, type ActivityLog, type LovEntry, type PricingTier, type Vendor } from "@/lib/types";
+import { formatPrice, type ActivityLog, type LovEntry, type PricingTier, type Vendor, type VendorStatusLog } from "@/lib/types";
 
 type TimeBucket = "live" | "future" | "past";
 type Kind = "vendor" | "event";
-type ApprovalStatus = "approved" | "pending" | "rejected" | "draft";
+type ApprovalStatus = "approved" | "pending" | "rejected" | "suspended" | "draft";
+
+const PENDING_TIMEOUT_DAYS = 7;
 
 interface Item {
   id: string;
@@ -22,11 +24,15 @@ interface Item {
   subtitle: string;
   dateLabel: string;
   sortDate: string;
+  approvedAtLabel: string | null;
+  timedOut: boolean;
+  reapproved: boolean;
 }
 
 function vendorApproval(status: Vendor["status"]): ApprovalStatus {
   if (status === "active") return "approved";
   if (status === "pending") return "pending";
+  if (status === "suspended") return "suspended";
   return "rejected";
 }
 
@@ -51,9 +57,13 @@ function cityForCoords(lat: number | null, lng: number | null, sectionZone?: str
   return "Unknown";
 }
 
-function vendorToItem(v: Vendor, tierName: string | null): Item {
+function vendorToItem(v: Vendor, tierName: string | null, reapprovedCount: number): Item {
   const bucket: TimeBucket = v.status === "active" ? "live" : v.status === "pending" ? "future" : "past";
   const badge = v.is_top10 ? "⭐ Top 10" : v.is_founding_vendor ? "🏆 Founding" : null;
+  const pendingSince = v.onboarded_at ?? v.created_at;
+  const timedOut =
+    v.status === "pending" &&
+    Date.now() - new Date(pendingSince).getTime() > PENDING_TIMEOUT_DAYS * 24 * 60 * 60 * 1000;
   return {
     id: v.id,
     kind: "vendor",
@@ -65,6 +75,9 @@ function vendorToItem(v: Vendor, tierName: string | null): Item {
     subtitle: `${v.status}${tierName ? ` · ${tierName}` : ""}`,
     dateLabel: new Date(v.onboarded_at ?? v.created_at).toLocaleDateString("en-US"),
     sortDate: v.onboarded_at ?? v.created_at,
+    approvedAtLabel: v.approved_at ? new Date(v.approved_at).toLocaleString("en-US") : null,
+    timedOut,
+    reapproved: reapprovedCount > 1,
   };
 }
 
@@ -89,6 +102,9 @@ function eventToItem(e: LovEntry): Item {
     subtitle: e.recurrence ?? e.location ?? "Event",
     dateLabel: start ? new Date(start).toLocaleDateString("en-US") : "Recurring",
     sortDate: start ?? "9999-99-99",
+    approvedAtLabel: null,
+    timedOut: false,
+    reapproved: false,
   };
 }
 
@@ -102,12 +118,14 @@ const APPROVAL_LABEL: Record<ApprovalStatus, string> = {
   approved: "Approved",
   pending: "Pending",
   rejected: "Rejected",
+  suspended: "Suspended",
   draft: "Draft",
 };
 const APPROVAL_STYLE: Record<ApprovalStatus, string> = {
   approved: "bg-green-600 text-white",
   pending: "bg-amber-500 text-white",
   rejected: "bg-red-600 text-white",
+  suspended: "bg-orange-500 text-white",
   draft: "bg-slate-400 text-white",
 };
 
@@ -116,9 +134,12 @@ export default function LegacyDashboardPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [events, setEvents] = useState<LovEntry[]>([]);
   const [tiers, setTiers] = useState<PricingTier[]>([]);
+  const [statusLog, setStatusLog] = useState<VendorStatusLog[]>([]);
   const [cityFilter, setCityFilter] = useState("All");
   const [kindFilter, setKindFilter] = useState<"all" | Kind>("all");
   const [approvalFilter, setApprovalFilter] = useState<"all" | ApprovalStatus>("all");
+  const [timedOutOnly, setTimedOutOnly] = useState(false);
+  const [reapprovedOnly, setReapprovedOnly] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [history, setHistory] = useState<ActivityLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -132,15 +153,17 @@ export default function LegacyDashboardPage() {
         setStatus("denied");
         return;
       }
-      const [{ data: vendorRows }, { data: eventRows }, { data: tierRows }] = await Promise.all([
+      const [{ data: vendorRows }, { data: eventRows }, { data: tierRows }, { data: logRows }] = await Promise.all([
         supabase.from("vendors").select("*").returns<Vendor[]>(),
         supabase.from("lov_entries").select("*").eq("type", "event").returns<LovEntry[]>(),
         supabase.from("pricing_tiers").select("*").returns<PricingTier[]>(),
+        supabase.from("vendor_status_log").select("*").returns<VendorStatusLog[]>(),
       ]);
       if (cancelled) return;
       setVendors(vendorRows ?? []);
       setEvents(eventRows ?? []);
       setTiers(tierRows ?? []);
+      setStatusLog(logRows ?? []);
       setStatus("ready");
     });
     return () => {
@@ -150,11 +173,22 @@ export default function LegacyDashboardPage() {
 
   const tierById = useMemo(() => new Map(tiers.map((t) => [t.id, t])), [tiers]);
 
+  const approvalCountByVendor = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of statusLog) {
+      if (row.new_status !== "active") continue;
+      counts.set(row.vendor_id, (counts.get(row.vendor_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [statusLog]);
+
   const items = useMemo<Item[]>(() => {
-    const fromVendors = vendors.map((v) => vendorToItem(v, v.tier_id ? (tierById.get(v.tier_id)?.name ?? null) : null));
+    const fromVendors = vendors.map((v) =>
+      vendorToItem(v, v.tier_id ? (tierById.get(v.tier_id)?.name ?? null) : null, approvalCountByVendor.get(v.id) ?? 0),
+    );
     const fromEvents = events.map(eventToItem);
     return [...fromVendors, ...fromEvents].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
-  }, [vendors, events, tierById]);
+  }, [vendors, events, tierById, approvalCountByVendor]);
 
   const cities = useMemo(
     () => ["All", "Unknown", ...CITY_CENTERS.map((c) => c.city).filter((v, i, a) => a.indexOf(v) === i)],
@@ -165,7 +199,9 @@ export default function LegacyDashboardPage() {
     (i) =>
       (cityFilter === "All" || i.city === cityFilter) &&
       (kindFilter === "all" || i.kind === kindFilter) &&
-      (approvalFilter === "all" || i.approval === approvalFilter),
+      (approvalFilter === "all" || i.approval === approvalFilter) &&
+      (!timedOutOnly || i.timedOut) &&
+      (!reapprovedOnly || i.reapproved),
   );
 
   const buckets: TimeBucket[] = ["live", "future", "past"];
@@ -190,9 +226,20 @@ export default function LegacyDashboardPage() {
   }
 
   function downloadCsv() {
-    const header = ["Name", "Type", "City", "Status", "Approval", "Badge", "Date"];
+    const header = ["Name", "Type", "City", "Status", "Approval", "Approved At", "Timed Out", "Reapproved", "Badge", "Date"];
     const lines = filtered.map((i) =>
-      [i.name, i.kind, i.city, BUCKET_LABEL[i.bucket], APPROVAL_LABEL[i.approval], i.badge ?? "", i.dateLabel]
+      [
+        i.name,
+        i.kind,
+        i.city,
+        BUCKET_LABEL[i.bucket],
+        APPROVAL_LABEL[i.approval],
+        i.approvedAtLabel ?? "",
+        i.timedOut ? "Yes" : "",
+        i.reapproved ? "Yes" : "",
+        i.badge ?? "",
+        i.dateLabel,
+      ]
         .map((c) => `"${String(c).replace(/"/g, '""')}"`)
         .join(","),
     );
@@ -213,7 +260,7 @@ export default function LegacyDashboardPage() {
     const rows = filtered
       .map(
         (i) =>
-          `<tr><td>${i.name}</td><td>${i.kind}</td><td>${i.city}</td><td>${BUCKET_LABEL[i.bucket]}</td><td>${APPROVAL_LABEL[i.approval]}</td><td>${i.badge ?? ""}</td><td>${i.dateLabel}</td></tr>`,
+          `<tr><td>${i.name}</td><td>${i.kind}</td><td>${i.city}</td><td>${BUCKET_LABEL[i.bucket]}</td><td>${APPROVAL_LABEL[i.approval]}</td><td>${i.approvedAtLabel ?? ""}</td><td>${i.timedOut ? "Yes" : ""}</td><td>${i.reapproved ? "Yes" : ""}</td><td>${i.badge ?? ""}</td><td>${i.dateLabel}</td></tr>`,
       )
       .join("");
     const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
@@ -222,7 +269,7 @@ export default function LegacyDashboardPage() {
 <h1>CityPinned — Full Inventory</h1>
 <p>Generated ${new Date().toLocaleString("en-US")} — ${filtered.length} of ${items.length} total.</p>
 <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-family:Calibri,Arial,sans-serif;font-size:11pt;">
-<thead><tr><th>Name</th><th>Type</th><th>City</th><th>Live Status</th><th>Approval</th><th>Badge</th><th>Date</th></tr></thead>
+<thead><tr><th>Name</th><th>Type</th><th>City</th><th>Live Status</th><th>Approval</th><th>Approved At</th><th>Timed Out</th><th>Reapproved</th><th>Badge</th><th>Date</th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
 </body></html>`;
@@ -312,7 +359,7 @@ export default function LegacyDashboardPage() {
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2 print:hidden">
-        {(["all", "approved", "pending", "rejected", "draft"] as const).map((a) => (
+        {(["all", "approved", "pending", "rejected", "suspended", "draft"] as const).map((a) => (
           <button
             key={a}
             type="button"
@@ -326,6 +373,24 @@ export default function LegacyDashboardPage() {
             {a === "all" ? "All Approval States" : APPROVAL_LABEL[a]}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setTimedOutOnly((v) => !v)}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+            timedOutOnly ? "bg-amber-600 text-white" : "border border-amber-300 text-amber-700 hover:bg-amber-50"
+          }`}
+        >
+          ⏱ Timed Out ({PENDING_TIMEOUT_DAYS}+ days pending)
+        </button>
+        <button
+          type="button"
+          onClick={() => setReapprovedOnly((v) => !v)}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+            reapprovedOnly ? "bg-indigo-600 text-white" : "border border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+          }`}
+        >
+          🔁 Reapproved
+        </button>
       </div>
 
       {buckets.map((bucket) => {
@@ -359,6 +424,21 @@ export default function LegacyDashboardPage() {
                       <p className="mt-0.5 truncate text-xs text-slate-600">{item.city}</p>
                       <p className="mt-0.5 truncate text-xs text-slate-500">{item.subtitle}</p>
                       {item.badge && <p className="mt-1 text-xs font-semibold text-amber-700">{item.badge}</p>}
+                      {item.approvedAtLabel && (
+                        <p className="mt-0.5 text-[10px] text-green-700">✓ Approved {item.approvedAtLabel}</p>
+                      )}
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {item.timedOut && (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
+                            ⏱ Timed Out
+                          </span>
+                        )}
+                        {item.reapproved && (
+                          <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-bold text-indigo-800">
+                            🔁 Reapproved
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-1 text-[10px] text-slate-400">{item.dateLabel}</p>
                     </button>
                     {expanded && (

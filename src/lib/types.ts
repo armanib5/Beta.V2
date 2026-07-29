@@ -1,4 +1,4 @@
-export type VendorStatus = "pending" | "active" | "suspended";
+export type VendorStatus = "pending" | "active" | "suspended" | "rejected";
 export type RegistrationStatus = "pending" | "paid" | "failed" | "refunded";
 export type EntityType = "vendor" | "restaurant" | "bar";
 export type CategoryTier = "top_10" | "featured" | "standard";
@@ -49,6 +49,8 @@ export interface Vendor {
   lat: number | null;
   lng: number | null;
   onboarded_at: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
   is_internal: boolean;
   entity_type: EntityType;
   category_tier: CategoryTier;
@@ -195,6 +197,14 @@ export interface Registration {
   awarded_top10: boolean;
   paid_at: string | null;
   created_at: string;
+}
+
+export interface VendorStatusLog {
+  id: string;
+  vendor_id: string;
+  old_status: VendorStatus | null;
+  new_status: VendorStatus;
+  changed_at: string;
 }
 
 export type ActivityEntityType = "vendor" | "event" | "booth";

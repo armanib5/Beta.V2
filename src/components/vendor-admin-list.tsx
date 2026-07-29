@@ -16,7 +16,8 @@ function describePatch(patch: Partial<Vendor>): string {
 const STATUS_STYLES: Record<VendorStatus, string> = {
   pending: "bg-amber-50 border-amber-300 text-amber-800",
   active: "bg-green-50 border-green-300 text-green-800",
-  suspended: "bg-red-50 border-red-300 text-red-800",
+  suspended: "bg-orange-50 border-orange-300 text-orange-800",
+  rejected: "bg-red-50 border-red-300 text-red-800",
 };
 
 export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[] }) {
@@ -141,7 +142,7 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
           <button
             type="button"
             disabled={batchBusy}
-            onClick={() => batchUpdate({ status: "suspended" })}
+            onClick={() => batchUpdate({ status: "rejected" })}
             className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
           >
             Reject All
@@ -187,6 +188,16 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
                 {vendor.is_founding_vendor && " · 🏆 Founding"}
                 {vendor.is_top10 && " · ⭐ Top 10"}
               </p>
+              {vendor.approved_at && (
+                <p className="mt-0.5 text-[10px] text-slate-500">
+                  Approved {new Date(vendor.approved_at).toLocaleString("en-US")}
+                </p>
+              )}
+              {vendor.rejected_at && vendor.status === "rejected" && (
+                <p className="mt-0.5 text-[10px] text-slate-500">
+                  Rejected {new Date(vendor.rejected_at).toLocaleString("en-US")}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
@@ -197,17 +208,27 @@ export function VendorAdminList({ vendors: initialVendors }: { vendors: Vendor[]
                   onClick={() => updateVendor(vendor.id, { status: "active" })}
                   className="rounded-full bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
                 >
-                  Approve
+                  {vendor.approved_at ? "Reapprove" : "Approve"}
                 </button>
               )}
-              {vendor.status !== "suspended" && (
+              {vendor.status !== "rejected" && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => updateVendor(vendor.id, { status: "rejected" })}
+                  className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  Reject
+                </button>
+              )}
+              {vendor.status === "active" && (
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => updateVendor(vendor.id, { status: "suspended" })}
-                  className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                  className="rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
                 >
-                  Reject
+                  Suspend
                 </button>
               )}
               {vendor.status !== "pending" && (

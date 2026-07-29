@@ -7,6 +7,7 @@ import { checkIsAdmin } from "@/lib/admin";
 import { logActivity } from "@/lib/activity";
 import type { Booth, BoundaryType, LovEntry, Vendor, ZoneBoundary, ZoneBoundaryPoint } from "@/lib/types";
 import { ZoneMap } from "@/components/zone-map";
+import { ZoneBoundaryDrawer } from "@/components/zone-boundary-drawer";
 
 const STATUS_CYCLE: Record<Booth["status"], Booth["status"]> = {
   open: "reserved",
@@ -49,6 +50,10 @@ export default function AdminZonesPage() {
   const [newBoundaryType, setNewBoundaryType] = useState<BoundaryType>("fence");
   const [newBoundaryLabel, setNewBoundaryLabel] = useState("");
   const [newBoundaryPoints, setNewBoundaryPoints] = useState("");
+  const [drawMode, setDrawMode] = useState(true);
+  const [drawnPoints, setDrawnPoints] = useState<ZoneBoundaryPoint[]>([]);
+  const [copyFromEventId, setCopyFromEventId] = useState("");
+  const [copying, setCopying] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -186,7 +191,7 @@ export default function AdminZonesPage() {
 
   async function addBoundary(e: React.FormEvent) {
     e.preventDefault();
-    const points = parsePoints(newBoundaryPoints);
+    const points = drawMode ? drawnPoints : parsePoints(newBoundaryPoints);
     if (!eventId || points.length === 0) return;
     setError(null);
     const supabase = createClient();
@@ -207,6 +212,73 @@ export default function AdminZonesPage() {
     setBoundaries((prev) => [...prev, data]);
     setNewBoundaryLabel("");
     setNewBoundaryPoints("");
+    setDrawnPoints([]);
+  }
+
+  /** Repost a past event's zone layout onto a new/repeating occurrence
+   * instead of redrawing it from scratch — booths and boundaries copy
+   * over with the same positions/shapes/tiers, but vendor claims and
+   * occupied/reserved status reset since it's a fresh event instance. */
+  async function copyZoneLayout() {
+    if (!eventId || !copyFromEventId || copyFromEventId === eventId) return;
+    setError(null);
+    setCopying(true);
+    const supabase = createClient();
+    const [{ data: sourceBooths }, { data: sourceBoundaries }] = await Promise.all([
+      supabase.from("booths").select("*").eq("event_id", copyFromEventId).returns<Booth[]>(),
+      supabase.from("zone_boundaries").select("*").eq("event_id", copyFromEventId).returns<ZoneBoundary[]>(),
+    ]);
+    if (!sourceBooths?.length && !sourceBoundaries?.length) {
+      setError("That event has no saved zone layout to copy.");
+      setCopying(false);
+      return;
+    }
+    const [boothRes, boundaryRes] = await Promise.all([
+      sourceBooths?.length
+        ? supabase
+            .from("booths")
+            .insert(
+              sourceBooths.map((b) => ({
+                event_id: eventId,
+                label: b.label,
+                booth_number: b.booth_number,
+                tier: b.tier,
+                status: "open" as const,
+                vendor_id: null,
+                lov_entry_id: null,
+                x: b.x,
+                y: b.y,
+                width: b.width,
+                height: b.height,
+              })),
+            )
+            .select("*")
+            .returns<Booth[]>()
+        : Promise.resolve({ data: [] as Booth[], error: null }),
+      sourceBoundaries?.length
+        ? supabase
+            .from("zone_boundaries")
+            .insert(
+              sourceBoundaries.map((b) => ({
+                event_id: eventId,
+                boundary_type: b.boundary_type,
+                label: b.label,
+                points: b.points,
+                vendor_id: null,
+              })),
+            )
+            .select("*")
+            .returns<ZoneBoundary[]>()
+        : Promise.resolve({ data: [] as ZoneBoundary[], error: null }),
+    ]);
+    setCopying(false);
+    if (boothRes.error || boundaryRes.error) {
+      setError(boothRes.error?.message ?? boundaryRes.error?.message ?? "Could not copy zone layout.");
+      return;
+    }
+    setBooths((prev) => [...prev, ...(boothRes.data ?? [])]);
+    setBoundaries((prev) => [...prev, ...(boundaryRes.data ?? [])]);
+    setCopyFromEventId("");
   }
 
   async function deleteBoundary(id: string) {
@@ -325,6 +397,43 @@ export default function AdminZonesPage() {
           )}
         </div>
       </div>
+
+      {eventId && !loadingZone && booths.length === 0 && boundaries.length === 0 && events.length > 1 && (
+        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 print:hidden">
+          <div>
+            <label className="block text-xs font-medium text-indigo-900">
+              🔁 Repeat a past event&apos;s zone layout here
+            </label>
+            <select
+              value={copyFromEventId}
+              onChange={(e) => setCopyFromEventId(e.target.value)}
+              className="mt-1 w-full max-w-xs rounded-lg border border-indigo-300 px-3 py-2 text-sm"
+            >
+              <option value="">Choose a past event to copy from…</option>
+              {events
+                .filter((e) => e.id !== eventId)
+                .map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                    {e.event_date ? ` — ${e.event_date}` : ""}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            disabled={!copyFromEventId || copying}
+            onClick={copyZoneLayout}
+            className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {copying ? "Copying…" : "Copy Zone Layout"}
+          </button>
+          <p className="w-full text-xs text-indigo-700">
+            Copies every booth and boundary shape as-is — vendor claims and booth statuses reset to Open since
+            this is a new occurrence.
+          </p>
+        </div>
+      )}
 
       {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
 
@@ -457,46 +566,65 @@ export default function AdminZonesPage() {
       )}
 
       {eventId && (
-        <form onSubmit={addBoundary} className="mt-3 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-700">Boundary type</label>
-            <select
-              value={newBoundaryType}
-              onChange={(e) => setNewBoundaryType(e.target.value as BoundaryType)}
-              className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        <form onSubmit={addBoundary} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="block text-xs font-medium text-slate-700">Boundary type</label>
+              <select
+                value={newBoundaryType}
+                onChange={(e) => setNewBoundaryType(e.target.value as BoundaryType)}
+                className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              >
+                {BOUNDARY_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">Label (optional)</label>
+              <input
+                type="text"
+                placeholder="North Fence"
+                value={newBoundaryLabel}
+                onChange={(e) => setNewBoundaryLabel(e.target.value)}
+                className="mt-1 w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setDrawMode((v) => !v)}
+              className="rounded-full border border-indigo-300 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
             >
-              {BOUNDARY_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t.replace("_", " ")}
-                </option>
-              ))}
-            </select>
+              {drawMode ? "Switch to typing coordinates" : "✏️ Switch to drawing on map"}
+            </button>
+            <button type="submit" className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+              Add Boundary
+            </button>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700">Label (optional)</label>
-            <input
-              type="text"
-              placeholder="North Fence"
-              value={newBoundaryLabel}
-              onChange={(e) => setNewBoundaryLabel(e.target.value)}
-              className="mt-1 w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+
+          {drawMode ? (
+            <ZoneBoundaryDrawer
+              booths={booths}
+              existingBoundaries={boundaries}
+              points={drawnPoints}
+              onChange={setDrawnPoints}
             />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700">
-              Points <span className="font-normal text-slate-400">(x,y; x,y; … — 0-100 grid)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="10,10; 90,10"
-              value={newBoundaryPoints}
-              onChange={(e) => setNewBoundaryPoints(e.target.value)}
-              className="mt-1 w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <button type="submit" className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
-            Add Boundary
-          </button>
+          ) : (
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Points <span className="font-normal text-slate-400">(x,y; x,y; … — 0-100 grid)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="10,10; 90,10"
+                value={newBoundaryPoints}
+                onChange={(e) => setNewBoundaryPoints(e.target.value)}
+                className="mt-1 w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+          )}
         </form>
       )}
 

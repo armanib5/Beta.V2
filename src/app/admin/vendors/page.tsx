@@ -59,7 +59,7 @@ export default function AdminVendorsPage() {
 
   const counts = vendors.reduce<Record<VendorStatus, number>>(
     (acc, v) => ({ ...acc, [v.status]: acc[v.status] + 1 }),
-    { pending: 0, active: 0, suspended: 0 },
+    { pending: 0, active: 0, suspended: 0, rejected: 0 },
   );
 
   return (
@@ -75,7 +75,7 @@ export default function AdminVendorsPage() {
         boost. Private — every write is re-checked by the database, not just this page.
       </p>
       <p className="mt-3 text-xs font-medium text-slate-500">
-        {counts.pending} pending · {counts.active} active · {counts.suspended} suspended
+        {counts.pending} pending · {counts.active} active · {counts.rejected} rejected · {counts.suspended} suspended
       </p>
       <VendorAdminList vendors={vendors} />
     </div>

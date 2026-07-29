@@ -89,6 +89,15 @@ export default function AdminHubPage() {
           </p>
         </Link>
         <Link
+          href="/admin/reports"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">🐞 Bug / Report Log</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Every app bug report and vendor/event report, timestamped — new / reviewed / resolved.
+          </p>
+        </Link>
+        <Link
           href="/admin/legacy"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >

@@ -306,9 +306,10 @@ function openFlyerFromQuery(){
    Measuring the actual rendered heights keeps the nav -> hoodrow -> cnav
    stack aligned at any width, hood count, or font-load state. */
 function syncStickyOffsets(){
-  var nav=document.querySelector(".nav"),hood=document.getElementById("hoodRow");
+  var nav=document.querySelector(".nav"),hood=document.getElementById("hoodRow"),cnav=document.querySelector(".cnav");
   if(nav)document.documentElement.style.setProperty("--nav-h",nav.offsetHeight+"px");
   if(hood)document.documentElement.style.setProperty("--hood-h",hood.offsetHeight+"px");
+  if(cnav)document.documentElement.style.setProperty("--cnav-h",cnav.offsetHeight+"px");
 }
 function setupStickyOffsetWatcher(){
   var raf=null;
@@ -868,11 +869,18 @@ function mkSpotlightCard(ev){
   var body=document.createElement("div");
   body.className="spot-body";
   var live=flyerLiveStatus(ev);
+  /* The $ moneybadge is a paid-placement claim - only true for a genuine
+     Top 10/Featured/boosted listing (ev.top). Showing it unconditionally
+     made every plain recurring market (Wednesday farmers markets etc.)
+     look like it had paid for a featured spot whenever it won the
+     spotlight by fallback (nothing else scheduled today) - misleading,
+     and it buried the actual name/schedule under a fake promo badge. */
   body.innerHTML=
     "<span class='rib "+ev.cat+"'>"+ev.lbl+"</span> "+
     "<span class='livebadge "+live.cls+"'>"+live.emoji+" "+live.label+"</span><br>"+
-    "<span class='moneybadge'>💰 Featured / Boosted Spot ($50–$100 Boost Tier)</span>"+
+    (ev.top?"<span class='moneybadge'>💰 Featured / Boosted Spot ($50–$100 Boost Tier)</span>":"")+
     "<h2>"+ev.t+"</h2>"+
+    (ev.w?"<div class='fw'>"+ev.w+"</div>":"")+
     (ev.ds?"<p class='spot-desc'>"+ev.ds+"</p>":"")+
     (ev.a?"<div class='fa'>"+ev.a.split(",")[0]+"</div>":"");
   card.appendChild(img);card.appendChild(body);
