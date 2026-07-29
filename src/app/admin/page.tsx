@@ -144,6 +144,16 @@ export default function AdminHubPage() {
             Every event/flyer by city and month, same treatment as Bookkeeping — exportable as CSV or a printable PDF.
           </p>
         </Link>
+        <Link
+          href="/admin/placements"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">📊 Placements</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Active/upcoming paid boosts and the 5 Top 10 Featured vendors, with grant/end-early controls — kept
+            separate from Founder Vendor status.
+          </p>
+        </Link>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Vendor, VendorStatus, VendorStatusLog } from "@/lib/types";
 import { logActivity } from "@/lib/activity";
@@ -249,6 +250,18 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
 
   return (
     <div className="mt-6 space-y-3">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 print:hidden">
+        <p>
+          <strong>🏆 Founding</strong> and <strong>⭐ Top 10</strong> below are the permanent, admin-granted vendor
+          badges (original/official or specially-designated accounts) — completely separate from paid Quick
+          Boost/Top 10 Placement purchases. Turning either off here only affects that one vendor&apos;s badge; it
+          never touches any vendor&apos;s purchases or paid boosts. Paid boosts are managed on{" "}
+          <Link href="/admin/placements" className="underline">
+            Placements
+          </Link>{" "}
+          instead.
+        </p>
+      </div>
       {confirmation && (
         <div className="sticky top-2 z-20 rounded-xl border-2 border-green-400 bg-green-50 px-4 py-2.5 text-sm font-semibold text-green-800 shadow-md">
           {confirmation}
@@ -479,6 +492,7 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
                 type="button"
                 disabled={busy}
                 onClick={() => updateVendor(vendor.id, { is_founding_vendor: !vendor.is_founding_vendor })}
+                title="Permanent badge for an original/official or specially-designated account. Independent of paid boosts — toggling this never affects purchases."
                 className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
                   vendor.is_founding_vendor
                     ? "bg-amber-500 text-white hover:bg-amber-600"
@@ -496,6 +510,7 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
                     boost_expires_at: vendor.is_top10 ? null : vendor.boost_expires_at,
                   })
                 }
+                title="Permanent Top 10/Featured badge (one of 5 total slots). Independent of paid Quick Boost/Placement purchases — manage those on the Placements page instead."
                 className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
                   vendor.is_top10
                     ? "bg-indigo-500 text-white hover:bg-indigo-600"

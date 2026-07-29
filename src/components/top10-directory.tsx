@@ -264,13 +264,19 @@ export function Top10Directory() {
     });
   }, [allItems, pill, cityFilter, sectionFilter, search]);
 
-  const top10 = useMemo(() => filtered.filter((item) => item.isTop10), [filtered]);
+  // Top 10 = 5 permanent Featured slots (paid $50/$100 tiers, capped by
+  // pricing_tiers.max_slots server-side) + 5 rotating Boost slots (paid
+  // $15/$30 slot bookings, capped by the 5-per-10-minute-window booking
+  // limit) - sliced to 5 here too as a display-side backstop in case
+  // either cap is ever bypassed (e.g. an admin manually flipping is_top10).
+  const featured = useMemo(() => filtered.filter((item) => item.isTop10).slice(0, 5), [filtered]);
 
   const boostedNow = useMemo(
     () =>
       filtered
         .filter((item) => item.boostActiveUntil && new Date(item.boostActiveUntil).getTime() > now)
-        .sort((a, b) => new Date(a.boostActiveUntil!).getTime() - new Date(b.boostActiveUntil!).getTime()),
+        .sort((a, b) => new Date(a.boostActiveUntil!).getTime() - new Date(b.boostActiveUntil!).getTime())
+        .slice(0, 5),
     [filtered, now],
   );
 
@@ -354,27 +360,38 @@ export function Top10Directory() {
         />
       </div>
 
-      {boostedNow.length > 0 && (
-        <section className="mt-8">
-          <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">⭐ Boosted Now</h2>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {boostedNow.map((item) => (
-              <DirectoryCard key={item.id} item={item} gold now={now} />
-            ))}
-          </div>
-        </section>
-      )}
+      {(featured.length > 0 || boostedNow.length > 0) && (
+        <section className="mt-8 rounded-2xl border border-amber-200 bg-amber-50/40 p-5">
+          <h2 className="flex items-center gap-2 text-xl font-extrabold text-slate-900">🏆 {TOP10_TITLE[pill]}</h2>
+          <p className="mt-1 text-xs text-slate-600">
+            5 permanent Featured spots + 5 rotating Boost spots — always up to 10 total.
+          </p>
 
-      {top10.length > 0 && (
-        <section className="mt-8">
-          <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-            🏆 {TOP10_TITLE[pill]}
-          </h2>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {top10.map((item) => (
-              <DirectoryCard key={item.id} item={item} gold />
-            ))}
-          </div>
+          <h3 className="mt-4 text-sm font-bold uppercase tracking-wide text-slate-700">
+            Featured ({featured.length}/5)
+          </h3>
+          {featured.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">No Featured vendors yet.</p>
+          ) : (
+            <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {featured.map((item) => (
+                <DirectoryCard key={item.id} item={item} gold />
+              ))}
+            </div>
+          )}
+
+          <h3 className="mt-6 text-sm font-bold uppercase tracking-wide text-slate-700">
+            Rotating Boost ({boostedNow.length}/5)
+          </h3>
+          {boostedNow.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">No active boosts right now.</p>
+          ) : (
+            <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {boostedNow.map((item) => (
+                <DirectoryCard key={item.id} item={item} gold now={now} />
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -419,8 +436,11 @@ function DirectoryCard({
           <p className="font-bold text-slate-900">{item.name}</p>
           <div className="flex flex-wrap items-center gap-2">
             {boostRemainingMs > 0 && (
-              <span className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-slate-900">
-                🔥 BOOSTED ({formatCountdown(boostRemainingMs)} left)
+              <span
+                className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-slate-900"
+                title="Paid boost placement"
+              >
+                🚀 PAID BOOST — {formatCountdown(boostRemainingMs)} left
               </span>
             )}
             {item.isTop10 && <span className="text-xs font-semibold text-amber-600">🏆 Top 10</span>}
