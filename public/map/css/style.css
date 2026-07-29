@@ -40,8 +40,13 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 .mstype{font-size:10px;color:rgba(255,255,255,.4);flex-shrink:0;}
 .msempty{padding:14px;color:rgba(255,255,255,.4);font-size:12.5px;font-style:italic;}
 
-/* Mini city selector */
-.hoodrow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:12px;}
+/* Mini city selector - these rows use pale-gold text on a near-transparent
+   fill (originally styled for the Board's dark cork-texture backdrop).
+   The Map page's own backdrop (.bg) is near-white (#f8fafc), not dark, so
+   without their own opaque dark panel these rows nearly vanish against it
+   - same #1f2937 dark panel already used by .mapsearch on this same page,
+   for contrast that actually works against a white background. */
+.hoodrow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:9px 10px 5px;margin-bottom:12px;background:#1f2937;border-radius:14px;}
 .hoodrow::-webkit-scrollbar{display:none;}
 .hoodbtn{flex-shrink:0;font-family:'Special Elite',monospace;font-size:12px;background:rgba(255,255,255,.05);color:rgba(218,184,112,.75);border:1px solid rgba(218,184,112,.22);padding:9px 16px;border-radius:18px;cursor:pointer;white-space:nowrap;min-height:44px;transition:all .2s;}
 .hoodbtn:hover{border-color:rgba(218,184,112,.5);}
@@ -49,14 +54,14 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 /* City tabs - always visible, one level above the neighborhood row.
    Switching cities swaps the whole neighborhood row below it rather
    than adding a second row alongside the San Jose one. */
-.cityrow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid rgba(218,184,112,.18);}
+.cityrow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:9px 10px 9px;margin-bottom:10px;background:#1f2937;border-radius:14px;}
 .cityrow::-webkit-scrollbar{display:none;}
 .citytab{flex-shrink:0;font-family:'Special Elite',monospace;font-size:12.5px;font-weight:700;background:rgba(255,255,255,.04);color:rgba(218,184,112,.6);border:1px solid rgba(218,184,112,.22);padding:8px 16px;border-radius:16px;cursor:pointer;white-space:nowrap;min-height:40px;transition:all .2s;}
 .citytab:hover{border-color:rgba(218,184,112,.5);}
 .citytab.on{background:var(--go);color:#fff;border-color:var(--go);}
 
 /* Category filters */
-.filtrow{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;margin-bottom:16px;}
+.filtrow{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding:9px 10px 5px;margin-bottom:16px;background:#1f2937;border-radius:14px;}
 .filtrow::-webkit-scrollbar{display:none;}
 .filtbtn{flex-shrink:0;font-size:11.5px;font-weight:700;background:rgba(255,255,255,.05);color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.16);padding:8px 14px;border-radius:14px;cursor:pointer;white-space:nowrap;min-height:44px;display:flex;align-items:center;gap:6px;transition:all .2s;}
 .filtbtn:hover{border-color:rgba(218,184,112,.5);}
