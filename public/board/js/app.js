@@ -216,7 +216,6 @@ function init(){
   setupStickyOffsetWatcher();
   setupBgUpload();
   setCityBg(curCity,curHood);
-  openFlyerFromQuery();
   loadLovEvents();
   loadLovVendors();
   loadRealVendors();
@@ -228,6 +227,11 @@ function init(){
   setupAuthNav();
   checkAdminPendingBadge();
   setInterval(checkAdminPendingBadge,45000);
+  /* Safety net: if a fetch above silently fails (network hiccup) its
+     normal openFlyerFromQuery() call never happens, so this forces a
+     final resolution after giving both loaders a fair chance - a no-op
+     if the deep link already resolved by then. */
+  setTimeout(function(){openFlyerAttempts=2;openFlyerFromQuery();},6000);
 }
 
 /* The Board uses a completely different Supabase client (plain
@@ -317,14 +321,35 @@ function applySharedAnchorOnLoad(){
    "View/Edit on Board" button, which passes the pin's title in the
    URL. Matches by exact title (case-insensitive) since that's the only
    thing both sides share; if you rename a flyer after pinning it on the
-   map, the link stops matching until the pin/flyer titles agree again. */
+   map, the link stops matching until the pin/flyer titles agree again.
+
+   Called multiple times on purpose: evts only holds the real Supabase
+   data once loadLovEvents()/loadRealVendors() finish (both async, both
+   still in flight when init() first runs this), so an early check
+   against the still-empty/seed-only evts array would wrongly claim a
+   flyer "doesn't exist" even when it's actually sitting right there in
+   the database - exactly what was happening to every real flyer before
+   this fix. Only gives up (and offers to create one) after both of the
+   loaders that populate evts have had their turn. */
+var openFlyerTitle=null,openFlyerAttempts=0;
 function openFlyerFromQuery(){
-  var params=new URLSearchParams(location.search);
-  var title=params.get("openFlyer");
-  if(!title)return;
-  var match=evts.find(function(e){return e.t.toLowerCase()===title.toLowerCase();});
-  if(match)openDetail(match.id);
-  else alert("Couldn't find a flyer titled \""+title+"\" on the Board yet - post it here first, then the map link will work.");
+  if(openFlyerTitle===undefined)return;
+  if(openFlyerTitle===null){
+    var params=new URLSearchParams(location.search);
+    openFlyerTitle=params.get("openFlyer")||undefined;
+    if(!openFlyerTitle)return;
+  }
+  openFlyerAttempts++;
+  var match=evts.find(function(e){return e.t.toLowerCase()===openFlyerTitle.toLowerCase();});
+  if(match){openDetail(match.id);openFlyerTitle=undefined;return;}
+  if(openFlyerAttempts>=2){
+    var wantsToCreate=confirm("Couldn't find a flyer titled \""+openFlyerTitle+"\" on the Board yet.\n\nPost one now with this title pre-filled?");
+    if(wantsToCreate){
+      openForm("");
+      setTimeout(function(){var ft=document.getElementById("ft");if(ft)ft.value=openFlyerTitle;},50);
+    }
+    openFlyerTitle=undefined;
+  }
 }
 
 /* The top nav wraps to 2-3 rows on narrow screens (logo/buttons/city
@@ -462,6 +487,7 @@ function loadLovEvents(){
     expire();
     renderToday();
     renderBoards();
+    openFlyerFromQuery();
   }).catch(function(){});
 }
 
@@ -584,6 +610,7 @@ function loadRealVendors(){
     if(typeof renderToday==="function")renderToday();
     if(typeof renderBoards==="function")renderBoards();
     openVendorFromQuery();
+    openFlyerFromQuery();
   }).catch(function(){});
 }
 
