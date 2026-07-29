@@ -5,10 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:worker": "esbuild worker/index.ts --bundle --format=esm --target=es2022 --outfile=out/_worker.js",
     "preview": "npx serve out",
     "lint": "eslint",
     "seed:lov": "tsx scripts/seed-lov.ts",
-    "geocode:lov": "tsx scripts/geocode-lov.ts"
+    "geocode:lov": "tsx scripts/geocode-lov.ts",
+    "deploy": "npm run build && npm run build:worker && wrangler pages deploy out --project-name=citypinned-v2-check --commit-dirty=true",
+    "deploy:workers-dev-legacy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
@@ -30,6 +33,7 @@
     "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.115.0"
   }
 }
