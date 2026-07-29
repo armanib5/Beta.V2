@@ -259,6 +259,7 @@ export default function EventLogPage() {
                     <th className="py-2 pr-3">Host</th>
                     <th className="py-2 pr-3">Recurring</th>
                     <th className="py-2 pr-3">Date</th>
+                    <th className="py-2 pr-3 print:hidden"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -278,6 +279,11 @@ export default function EventLogPage() {
                       <td className="py-2 pr-3">{r.hostName ?? "—"}</td>
                       <td className="py-2 pr-3">{r.recurring ? "Yes" : "No"}</td>
                       <td className="py-2 pr-3 text-slate-500">{new Date(r.date).toLocaleDateString("en-US")}</td>
+                      <td className="py-2 pr-3 print:hidden">
+                        <Link href={`/admin/history?type=event&id=${r.id}`} className="text-xs font-semibold text-slate-500 underline">
+                          🗂️ History
+                        </Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

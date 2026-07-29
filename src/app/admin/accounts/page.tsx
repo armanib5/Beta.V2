@@ -258,6 +258,7 @@ export default function AccountsDirectoryPage() {
                     <th className="py-2 pr-3">Kind</th>
                     <th className="py-2 pr-3">Status</th>
                     <th className="py-2 pr-3">Onboarded</th>
+                    <th className="py-2 pr-3 print:hidden"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -281,6 +282,11 @@ export default function AccountsDirectoryPage() {
                         </span>
                       </td>
                       <td className="py-2 pr-3 text-slate-500">{r.onboardedAt ? new Date(r.onboardedAt).toLocaleDateString("en-US") : "—"}</td>
+                      <td className="py-2 pr-3 print:hidden">
+                        <Link href={`/admin/history?type=vendor&id=${r.id}`} className="text-xs font-semibold text-slate-500 underline">
+                          🗂️ History
+                        </Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

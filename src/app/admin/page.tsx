@@ -154,6 +154,16 @@ export default function AdminHubPage() {
             separate from Founder Vendor status.
           </p>
         </Link>
+        <Link
+          href="/admin/history"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">🗂️ Notes &amp; History</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Private CRM notes, follow-up tracking, and a full chronological timeline for any vendor/account/host or
+            event — private, never visible to vendors or the public.
+          </p>
+        </Link>
       </div>
     </div>
   );

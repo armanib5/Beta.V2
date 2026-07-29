@@ -32,6 +32,14 @@ export interface PricingTier {
   updated_at: string;
 }
 
+export type RelationshipStatus =
+  | "contacted"
+  | "interested"
+  | "onboarding"
+  | "active_vendor"
+  | "inactive"
+  | "needs_followup";
+
 export interface Vendor {
   id: string;
   slug: string;
@@ -67,6 +75,9 @@ export interface Vendor {
   hub_type: VendorHubType;
   logo_focal_x: number;
   logo_focal_y: number;
+  relationship_status: RelationshipStatus | null;
+  last_contact_date: string | null;
+  next_followup_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -179,6 +190,29 @@ export interface VendorBoostBooking {
   slot_start: string;
   slot_end: string;
   created_at: string;
+}
+
+export type AdminNoteEntityType = "vendor" | "event";
+export type AdminNoteType = "meeting" | "followup" | "partnership" | "conversation" | "communication" | "context";
+
+export interface AdminNote {
+  id: string;
+  entity_type: AdminNoteEntityType;
+  entity_id: string;
+  note_type: AdminNoteType;
+  body: string;
+  created_by_email: string;
+  created_at: string;
+  updated_at: string;
+  updated_by_email: string | null;
+}
+
+export interface AdminNoteRevision {
+  id: string;
+  note_id: string;
+  previous_body: string;
+  edited_by_email: string;
+  edited_at: string;
 }
 
 export interface VendorPhoto {
