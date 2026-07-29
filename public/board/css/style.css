@@ -14,7 +14,7 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 .wafflebtn{font-size:18px;background:rgba(255,255,255,.07);color:var(--cl);border:1px solid rgba(218,184,112,.22);height:36px;padding:0 10px 0 8px;border-radius:10px;cursor:pointer;flex-shrink:0;display:inline-flex;align-items:center;gap:5px;}
 .wafflebtn .wtxt{font-size:11px;font-weight:700;font-family:'Libre Franklin',sans-serif;letter-spacing:.3px;}
 @keyframes approvalBlink{0%,49%{opacity:1;}50%,100%{opacity:.25;}}
-#adminPendingBadge{animation:approvalBlink 1s step-start infinite;}
+#adminPendingBadge,#adminPendingBadgeFloat{animation:approvalBlink 1s step-start infinite;}
 .wafflebtn:hover,.wafflebtn.on{background:var(--go);color:#fff;border-color:var(--go);}
 .csel{margin-left:auto;position:relative;flex-shrink:0;}
 .csel select{font-family:'Special Elite',monospace;font-size:12px;background:rgba(218,184,112,.12);color:var(--cl);border:1px solid rgba(218,184,112,.3);padding:7px 28px 7px 12px;border-radius:16px;cursor:pointer;outline:none;appearance:none;}

@@ -20,6 +20,13 @@ const STATUS_STYLES: Record<VendorStatus, string> = {
   rejected: "bg-red-50 border-red-300 text-red-800",
 };
 
+const STATUS_BADGE: Record<VendorStatus, { label: string; style: string }> = {
+  pending: { label: "⏳ PENDING REVIEW", style: "bg-amber-500 text-white" },
+  active: { label: "✅ APPROVED", style: "bg-green-600 text-white" },
+  suspended: { label: "⏸ SUSPENDED", style: "bg-orange-500 text-white" },
+  rejected: { label: "✕ REJECTED", style: "bg-red-600 text-white" },
+};
+
 type FilterKey = "all" | VendorStatus | "top10" | "boost" | "featured" | "reapproved";
 
 function relativeTime(iso: string): string {
@@ -373,14 +380,26 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
             )}
 
             <div className="min-w-0 flex-1">
-              <p className="truncate font-bold text-slate-900">{vendor.business_name}</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="truncate font-bold text-slate-900">{vendor.business_name}</p>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold tracking-wide ${STATUS_BADGE[vendor.status].style}`}
+                >
+                  {STATUS_BADGE[vendor.status].label}
+                </span>
+              </div>
               <p className="truncate text-xs text-slate-600">{vendor.contact_email}</p>
-              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide">
-                {vendor.status}
-                {vendor.is_founding_vendor && " · 🏆 Founding"}
-                {vendor.is_top10 && " · ⭐ Top 10"}
-                {reapprovedIds.has(vendor.id) && " · 🔁 Reapproved"}
-              </p>
+              {(vendor.is_founding_vendor || vendor.is_top10 || reapprovedIds.has(vendor.id)) && (
+                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                  {[
+                    vendor.is_founding_vendor && "🏆 Founding",
+                    vendor.is_top10 && "⭐ Top 10",
+                    reapprovedIds.has(vendor.id) && "🔁 Reapproved",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
               {vendor.approved_at && (
                 <p className="mt-0.5 text-[10px] text-slate-500">
                   Approved {relativeTime(vendor.approved_at)} ({new Date(vendor.approved_at).toLocaleString("en-US")})

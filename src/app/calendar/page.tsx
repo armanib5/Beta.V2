@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, LovEntry } from "@/lib/types";
 import { EventCalendar } from "@/components/event-calendar";
@@ -70,6 +71,12 @@ export default function CalendarPage() {
           <p className="mt-2 text-sm text-slate-600">
             Tap a day with events to see its flyer and details.
           </p>
+          <Link
+            href="/vendor/signup?type=venue"
+            className="mt-2 inline-block rounded-full border border-amber-400 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+          >
+            🏛️ Own a venue? Become a Venue Hub →
+          </Link>
         </div>
         <select
           value={city}

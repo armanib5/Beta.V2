@@ -121,6 +121,16 @@ export function SiteHeader() {
   }, [isAdmin]);
 
   return (
+    <>
+    {isAdmin && pendingCount > 0 && (
+      <Link
+        href="/admin/vendors"
+        title={`${pendingCount} waiting on approval — click to review`}
+        className="approval-blink fixed bottom-4 right-4 z-[999] flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-lg font-bold text-white shadow-lg ring-4 ring-white print:hidden"
+      >
+        {pendingCount}
+      </Link>
+    )}
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
       <div className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
@@ -190,5 +200,6 @@ export function SiteHeader() {
         <MobileNav links={[...boardLinks, ...appLinks]} isSignedIn={isSignedIn} profile={profile} />
       </div>
     </header>
+    </>
   );
 }

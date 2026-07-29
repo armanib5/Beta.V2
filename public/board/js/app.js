@@ -267,19 +267,30 @@ function setupAuthNav(){
    CityPinned (V2) page instead. */
 function checkAdminPendingBadge(){
   var badge=document.getElementById("adminPendingBadge");
-  if(!badge||typeof V2_SUPABASE_URL==="undefined")return;
+  var floatBadge=document.getElementById("adminPendingBadgeFloat");
+  if((!badge&&!floatBadge)||typeof V2_SUPABASE_URL==="undefined")return;
   var hint=null;
   try{
     var raw=window.localStorage.getItem("citypinned_session_hint");
     if(raw)hint=JSON.parse(raw);
   }catch(e){}
-  if(!hint||!hint.isAdmin){badge.style.display="none";return;}
+  if(!hint||!hint.isAdmin){
+    if(badge)badge.style.display="none";
+    if(floatBadge)floatBadge.style.display="none";
+    return;
+  }
   fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=id&status=eq.pending",{
     headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY,Prefer:"count=exact"}
   }).then(function(res){return res.json();}).then(function(rows){
     var n=Array.isArray(rows)?rows.length:0;
-    if(n>0){badge.textContent=n;badge.style.display="inline-block";}
-    else{badge.style.display="none";}
+    if(badge){
+      if(n>0){badge.textContent=n;badge.style.display="inline-block";}
+      else badge.style.display="none";
+    }
+    if(floatBadge){
+      if(n>0){floatBadge.textContent=n;floatBadge.style.display="flex";}
+      else floatBadge.style.display="none";
+    }
   }).catch(function(){});
 }
 

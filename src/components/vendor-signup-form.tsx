@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
+import type { VendorHubType } from "@/lib/types";
 
 const SLUG_RETRY_ATTEMPTS = 5;
 
-export function VendorSignupForm() {
+export function VendorSignupForm({ defaultHubType }: { defaultHubType?: VendorHubType }) {
   const router = useRouter();
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
@@ -62,6 +63,7 @@ export function VendorSignupForm() {
           business_name: businessName,
           contact_email: email,
           status: "pending",
+          ...(defaultHubType ? { hub_type: defaultHubType } : {}),
         });
 
         if (!insertError) {
