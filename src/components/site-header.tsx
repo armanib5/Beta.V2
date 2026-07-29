@@ -132,7 +132,7 @@ export function SiteHeader() {
             <Link
               href="/admin/vendors"
               title={`${pendingCount} waiting on approval`}
-              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-bold text-white animate-pulse"
+              className="approval-blink flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-bold text-white"
             >
               {pendingCount}
             </Link>

@@ -47,6 +47,7 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
   const [batchBusy, setBatchBusy] = useState(false);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [expiryDrafts, setExpiryDrafts] = useState<Record<string, string>>({});
+  const [confirmation, setConfirmation] = useState<string | null>(null);
 
   const reapprovedIds = useMemo(() => {
     const counts = new Map<string, number>();
@@ -120,6 +121,8 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
     }
     logActivity(supabase, "vendor", data.id, data.business_name, "Updated", describePatch(patch));
     setVendors((prev) => prev.map((v) => (v.id === id ? data : v)));
+    setConfirmation(`✓ Saved — ${data.business_name}: ${describePatch(patch)}`);
+    window.setTimeout(() => setConfirmation((c) => (c?.startsWith("✓") ? null : c)), 4000);
   }
 
   function toggleSelected(id: string) {
@@ -239,6 +242,11 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
 
   return (
     <div className="mt-6 space-y-3">
+      {confirmation && (
+        <div className="sticky top-2 z-20 rounded-xl border-2 border-green-400 bg-green-50 px-4 py-2.5 text-sm font-semibold text-green-800 shadow-md">
+          {confirmation}
+        </div>
+      )}
       {error && <p className="text-sm font-medium text-red-600">{error}</p>}
 
       <div className="flex flex-wrap items-center gap-2 print:hidden">
@@ -415,7 +423,7 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
                   onClick={() => updateVendor(vendor.id, { status: "active" })}
                   className="rounded-full bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
                 >
-                  {vendor.approved_at ? "Reapprove" : "Approve"}
+                  {busy ? "Saving…" : vendor.approved_at ? "Reapprove" : "Approve"}
                 </button>
               )}
               {vendor.status !== "rejected" && (
@@ -425,7 +433,7 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
                   onClick={() => updateVendor(vendor.id, { status: "rejected" })}
                   className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                 >
-                  Reject
+                  {busy ? "Saving…" : "Reject"}
                 </button>
               )}
               {vendor.status === "active" && (
@@ -435,7 +443,7 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
                   onClick={() => updateVendor(vendor.id, { status: "suspended" })}
                   className="rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
                 >
-                  Suspend
+                  {busy ? "Saving…" : "Suspend"}
                 </button>
               )}
               {vendor.status !== "pending" && (
@@ -445,7 +453,7 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
                   onClick={() => updateVendor(vendor.id, { status: "pending" })}
                   className="rounded-full bg-slate-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-600 disabled:opacity-50"
                 >
-                  Reset to Pending
+                  {busy ? "Saving…" : "Reset to Pending"}
                 </button>
               )}
               <button
