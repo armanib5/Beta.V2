@@ -125,6 +125,25 @@ export default function AdminHubPage() {
             Every vendor, tier, and timestamp — by city and month, exportable as CSV or a printable PDF.
           </p>
         </Link>
+        <Link
+          href="/admin/accounts"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">📇 Accounts Directory</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Every vendor account — business ID, email, kind, and status — with Total/Active/New Today counts,
+            organized by city.
+          </p>
+        </Link>
+        <Link
+          href="/admin/event-log"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">📋 LOV Event Log</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Every event/flyer by city and month, same treatment as Bookkeeping — exportable as CSV or a printable PDF.
+          </p>
+        </Link>
       </div>
     </div>
   );
