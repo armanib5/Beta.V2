@@ -226,6 +226,8 @@ function init(){
   setupMidnightRotation();
   setupCorkToggle();
   setupAuthNav();
+  checkAdminPendingBadge();
+  setInterval(checkAdminPendingBadge,45000);
 }
 
 /* The Board uses a completely different Supabase client (plain
@@ -249,6 +251,32 @@ function setupAuthNav(){
   admin.style.display=(signedIn&&hint.isAdmin)?"inline-block":"none";
   login.style.display=signedIn?"none":"inline-block";
   if(signedIn&&hint.businessName)dash.textContent=hint.businessName;
+}
+
+/* Site-wide "needs approval" badge next to the brand name - mirrors the
+   one in the V2 app's header (site-header.tsx) so it follows the admin
+   wherever they are (Board, Map, anywhere), not just on Next.js pages.
+   Only pending FLYERS are countable here (lov_entries has a public read
+   policy regardless of status) - pending VENDORS require the real admin
+   session, which only exists in the V2 app's cookie-based client, not
+   this page's separate one, so that count shows accurately once on any
+   CityPinned (V2) page instead. */
+function checkAdminPendingBadge(){
+  var badge=document.getElementById("adminPendingBadge");
+  if(!badge||typeof V2_SUPABASE_URL==="undefined")return;
+  var hint=null;
+  try{
+    var raw=window.localStorage.getItem("citypinned_session_hint");
+    if(raw)hint=JSON.parse(raw);
+  }catch(e){}
+  if(!hint||!hint.isAdmin){badge.style.display="none";return;}
+  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=id&status=eq.pending",{
+    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY,Prefer:"count=exact"}
+  }).then(function(res){return res.json();}).then(function(rows){
+    var n=Array.isArray(rows)?rows.length:0;
+    if(n>0){badge.textContent=n;badge.style.display="inline-block";}
+    else{badge.style.display="none";}
+  }).catch(function(){});
 }
 
 /* Nav buttons (Main/Boards/Map/Today/Dashboard/Admin/Login/Background)

@@ -287,6 +287,27 @@ function loadLovEvents() {
    vendor's first tagged category (vendor_categories join); anything not
    already a Map category key falls back to "shop" rather than vanishing. */
 var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars", "home-cook": "homecook", other: "other" };
+
+/* Site-wide "needs approval" badge next to the brand name, mirroring the
+   Board's copy of the same thing - see app.js's checkAdminPendingBadge()
+   for why only pending flyers (not vendors) are countable from here. */
+function checkAdminPendingBadge() {
+  var badge = document.getElementById("adminPendingBadge");
+  if (!badge || typeof V2_SUPABASE_URL === "undefined") return;
+  var hint = null;
+  try {
+    var raw = window.localStorage.getItem("citypinned_session_hint");
+    if (raw) hint = JSON.parse(raw);
+  } catch (e) {}
+  if (!hint || !hint.isAdmin) { badge.style.display = "none"; return; }
+  fetch(V2_SUPABASE_URL + "/rest/v1/lov_entries?select=id&status=eq.pending", {
+    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
+  }).then(function (res) { return res.json(); }).then(function (rows) {
+    var n = Array.isArray(rows) ? rows.length : 0;
+    if (n > 0) { badge.textContent = n; badge.style.display = "inline-block"; }
+    else { badge.style.display = "none"; }
+  }).catch(function () {});
+}
 function loadVendorPins() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
   return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&is_internal=eq.false&lat=not.is.null&lng=not.is.null", {
@@ -672,6 +693,8 @@ function initMap() {
   loadApprovedPins().then(handleSearchQuery);
   loadLovEvents();
   loadVendorPins();
+  checkAdminPendingBadge();
+  setInterval(checkAdminPendingBadge, 45000);
 
   document.getElementById("zIn").onclick = function () { map.stop(); map.zoomIn(); };
   document.getElementById("zOut").onclick = function () { map.stop(); map.zoomOut(); };

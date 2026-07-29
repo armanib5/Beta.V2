@@ -54,6 +54,8 @@ type Profile = Pick<Vendor, "business_name" | "logo_url"> | null;
 export function SiteHeader() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [profile, setProfile] = useState<Profile>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -65,8 +67,9 @@ export function SiteHeader() {
         .eq("id", userId)
         .maybeSingle<Profile>();
       setProfile(data ?? null);
-      const isAdmin = await checkIsAdmin(supabase);
-      writeSessionHint(true, data?.business_name, isAdmin);
+      const admin = await checkIsAdmin(supabase);
+      setIsAdmin(admin);
+      writeSessionHint(true, data?.business_name, admin);
     }
 
     supabase.auth.getUser().then(({ data }) => {
@@ -81,19 +84,60 @@ export function SiteHeader() {
       if (session?.user) loadProfile(session.user.id);
       else {
         setProfile(null);
+        setIsAdmin(false);
         writeSessionHint(false);
       }
     });
     return () => subscription.unsubscribe();
   }, []);
 
+  // The site-wide "needs approval" badge next to the CityPinned logo -
+  // only the admin account ever sees this, since it's gated on isAdmin.
+  // Polls every 45s so it stays live while the admin is parked on any
+  // page (Board/Map/Directory/wherever), not just on refresh.
+  useEffect(() => {
+    // Not resetting pendingCount to 0 here on purpose - the badge only
+    // ever renders while isAdmin is also true, so a stale nonzero count
+    // sitting unused in state after sign-out is harmless, and avoids a
+    // synchronous setState-in-effect on every non-admin render.
+    if (!isAdmin) return;
+    const supabase = createClient();
+    let cancelled = false;
+    async function loadPending() {
+      const [{ count: pendingVendors }, { count: pendingFlyers }, { count: boostRequests }] = await Promise.all([
+        supabase.from("vendors").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("lov_entries").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("vendors").select("id", { count: "exact", head: true }).not("boost_requested_at", "is", null).eq("is_top10", false),
+      ]);
+      if (cancelled) return;
+      setPendingCount((pendingVendors ?? 0) + (pendingFlyers ?? 0) + (boostRequests ?? 0));
+    }
+    loadPending();
+    const interval = setInterval(loadPending, 45000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isAdmin]);
+
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
       <div className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 text-lg font-bold text-slate-900">
-          <span aria-hidden="true">📍</span>
-          CityPinned
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2 text-lg font-bold text-slate-900">
+            <span aria-hidden="true">📍</span>
+            CityPinned
+          </Link>
+          {isAdmin && pendingCount > 0 && (
+            <Link
+              href="/admin/vendors"
+              title={`${pendingCount} waiting on approval`}
+              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-bold text-white animate-pulse"
+            >
+              {pendingCount}
+            </Link>
+          )}
+        </div>
 
         <span className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 sm:block">
           Beta V2
