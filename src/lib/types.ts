@@ -1,5 +1,5 @@
 export type VendorStatus = "pending" | "active" | "suspended" | "rejected";
-export type VendorHubType = "vendor" | "menu" | "hosting";
+export type VendorHubType = "vendor" | "menu" | "hosting" | "show";
 export type RegistrationStatus = "pending" | "paid" | "failed" | "refunded";
 export type EntityType = "vendor" | "restaurant" | "bar";
 export type CategoryTier = "top_10" | "featured" | "standard";

@@ -244,7 +244,7 @@ var LOV_CAT_SLUG_TO_MAP = {
   "music-festival": "venue", "comedy-show": "venue", "live-show": "venue",
   "cultural-festival": "venue", "gaming-festival": "venue", "outdoor-movie": "venue",
   "community-event": "seasonal", "restaurant": "restaurants", "bar": "bars",
-  "workshop-class": "workshop"
+  "workshop-class": "workshop", "park-event": "parks"
 };
 
 function loadLovEvents() {

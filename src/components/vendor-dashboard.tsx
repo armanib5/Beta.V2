@@ -329,12 +329,13 @@ export function VendorDashboard({
           What kind of hub is this account? This controls which button people see when they tap through from a
           flyer or the Directory.
         </p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {(
             [
               { key: "vendor" as const, label: "🛒 Vendor Hub", desc: "A pop-up vendor at events (booths, boost/Top 10)." },
               { key: "menu" as const, label: "🍽️ Menu Hub", desc: "A restaurant/bar with its own menu, specials, and Top Picks." },
               { key: "hosting" as const, label: "🏠 Hosting Hub", desc: "A venue that hosts other people's events at your location." },
+              { key: "show" as const, label: "🎭 Show Hub", desc: "A theater or performance center hosting ticketed shows." },
             ]
           ).map((opt) => (
             <button

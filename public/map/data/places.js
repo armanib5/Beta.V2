@@ -20,6 +20,7 @@ var CATS = {
   "shop": { "l": "Shops", "c": "#c0392b", "icon": "bag" },
   "homecook": { "l": "Home Cook", "c": "#c26a1d", "icon": "pot" },
   "other": { "l": "✨ Other", "c": "#6b7280", "icon": "sparkle" },
+  "parks": { "l": "Parks", "c": "#5a8c3a", "icon": "leaf" },
   "parking": { "l": "Parking", "c": "#2c5f8a", "icon": "P" },
   "restrooms": { "l": "Restrooms", "c": "#64748b", "icon": "restroom" },
   "transit": { "l": "Transit", "c": "#1f8a4c", "icon": "train" },
