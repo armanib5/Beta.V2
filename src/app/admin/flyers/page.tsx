@@ -5,6 +5,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import type { FlyerBoard, FlyerRotation, FlyerStatus, LovEntry } from "@/lib/types";
+import { FlyerCropEditor } from "@/components/flyer-crop-editor";
+
+const MAX_FLYER_PHOTO_BYTES = 8 * 1024 * 1024;
 
 const WEEKDAYS: { code: string; label: string }[] = [
   { code: "mon", label: "Monday" },
@@ -34,6 +37,8 @@ export default function AdminFlyersPage() {
   const [todayDate, setTodayDate] = useState("");
   const [category, setCategory] = useState("");
   const [rotStatus, setRotStatus] = useState<FlyerStatus>("active");
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const [croppingFlyer, setCroppingFlyer] = useState<LovEntry | null>(null);
 
   async function loadAll() {
     const supabase = createClient();
@@ -129,6 +134,37 @@ export default function AdminFlyersPage() {
       return;
     }
     setRotations((prev) => prev.map((r) => (r.id === rotation.id ? data : r)));
+  }
+
+  async function uploadFlyerPhoto(flyer: LovEntry, file: File) {
+    setError(null);
+    if (file.size > MAX_FLYER_PHOTO_BYTES) {
+      setError("Images must be under 8MB.");
+      return;
+    }
+    setUploadingPhotoId(flyer.id);
+    try {
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not signed in.");
+      const ext = file.name.split(".").pop() ?? "jpg";
+      // eslint-disable-next-line react-hooks/purity -- runs only inside this async upload handler, never during render
+      const ts = Date.now();
+      const path = `${userData.user.id}/flyers/${flyer.id}-${ts}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("vendor-photos").upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: publicUrl } = supabase.storage.from("vendor-photos").getPublicUrl(path);
+      const { error: updateError } = await supabase
+        .from("lov_entries")
+        .update({ flyer_image_url: publicUrl.publicUrl })
+        .eq("id", flyer.id);
+      if (updateError) throw updateError;
+      setFlyers((prev) => prev.map((f) => (f.id === flyer.id ? { ...f, flyer_image_url: publicUrl.publicUrl } : f)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not upload photo.");
+    } finally {
+      setUploadingPhotoId(null);
+    }
   }
 
   if (status === "loading") {
@@ -327,23 +363,77 @@ export default function AdminFlyersPage() {
         <div className="mt-3 space-y-2">
           {flyers.map((f) => (
             <div key={f.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-sm font-medium text-slate-900">
-                {f.name} <span className="text-xs font-normal text-slate-400">({f.type})</span>
-              </p>
-              <select
-                value={f.status}
-                onChange={(e) => setFlyerStatus(f.id, e.target.value as FlyerStatus)}
-                className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
-              >
-                <option value="active">Active</option>
-                <option value="pending">Pending</option>
-                <option value="draft">Draft</option>
-                <option value="archived">Archived</option>
-              </select>
+              <div className="flex min-w-0 items-center gap-3">
+                <label className="relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  {f.flyer_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={f.flyer_image_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      style={{ objectPosition: `${f.flyer_focal_x}% ${f.flyer_focal_y}%` }}
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-xl text-slate-300">📌</span>
+                  )}
+                  <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[8px] font-semibold text-white">
+                    {uploadingPhotoId === f.id ? "…" : f.flyer_image_url ? "Change" : "Upload"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingPhotoId === f.id}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadFlyerPhoto(f, file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <p className="truncate text-sm font-medium text-slate-900">
+                  {f.name} <span className="text-xs font-normal text-slate-400">({f.type})</span>
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {f.flyer_image_url && (
+                  <button
+                    type="button"
+                    onClick={() => setCroppingFlyer(f)}
+                    className="rounded-full border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    ✏️ Crop
+                  </button>
+                )}
+                <select
+                  value={f.status}
+                  onChange={(e) => setFlyerStatus(f.id, e.target.value as FlyerStatus)}
+                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                >
+                  <option value="active">Active</option>
+                  <option value="pending">Pending</option>
+                  <option value="draft">Draft</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {croppingFlyer && croppingFlyer.flyer_image_url && (
+        <FlyerCropEditor
+          flyerId={croppingFlyer.id}
+          photoUrl={croppingFlyer.flyer_image_url}
+          initialFocalX={croppingFlyer.flyer_focal_x}
+          initialFocalY={croppingFlyer.flyer_focal_y}
+          onClose={() => setCroppingFlyer(null)}
+          onSaved={(x, y) => {
+            setFlyers((prev) => prev.map((f) => (f.id === croppingFlyer.id ? { ...f, flyer_focal_x: x, flyer_focal_y: y } : f)));
+            setCroppingFlyer(null);
+          }}
+        />
+      )}
     </div>
   );
 }

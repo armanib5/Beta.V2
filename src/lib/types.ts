@@ -112,6 +112,8 @@ export interface LovEntry {
   publish_at: string | null;
   details: string | null;
   hosting_vendor_id: string | null;
+  flyer_focal_x: number;
+  flyer_focal_y: number;
   status: FlyerStatus;
   category_tier: CategoryTier;
   is_featured: boolean;

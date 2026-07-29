@@ -455,6 +455,7 @@ function loadLovEvents(){
         a:r.location||"",ph:"",wb:r.website_url||"",ds:r.details||r.recurrence||"",
         photo:r.flyer_image_url||"",ed:r.end_date?r.end_date.slice(0,10):undefined,
         hostVendorId:r.hosting_vendor_id||null,
+        focalX:r.flyer_focal_x,focalY:r.flyer_focal_y,
         top:!!(r.booth_tier==="top"||r.category_tier==="top_10"||r.is_featured)
       });
     });
