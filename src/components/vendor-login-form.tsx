@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 const ADMIN_EMAIL = "citypinned@gmail.com";
@@ -135,6 +136,11 @@ export function VendorLoginForm() {
           >
             {loading ? "Logging in…" : "Log In"}
           </button>
+          <p className="text-center text-sm">
+            <Link href="/vendor/forgot-password" className="font-semibold text-slate-600 underline hover:text-slate-900">
+              Forgot password?
+            </Link>
+          </p>
         </form>
       ) : (
         <form onSubmit={handlePinSubmit} className="mt-4 space-y-3">

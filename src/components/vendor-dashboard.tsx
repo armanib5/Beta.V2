@@ -8,6 +8,14 @@ import { formatPrice, type Category, type LovEntry, type MenuItem, type PricingT
 import { VendorPhotoManager } from "@/components/vendor-photo-manager";
 import { MenuHubManager } from "@/components/menu-hub-manager";
 import { MyListingManager } from "@/components/my-listing-manager";
+import type { VendorStatus } from "@/lib/types";
+
+const STATUS_DISPLAY: Record<VendorStatus, { label: string; style: string }> = {
+  active: { label: "✅ Approved / Active", style: "border-green-300 bg-green-50 text-green-800" },
+  pending: { label: "⏳ Unapproved / Pending Review", style: "border-amber-300 bg-amber-50 text-amber-800" },
+  suspended: { label: "⏸ Suspended / Inactive", style: "border-orange-300 bg-orange-50 text-orange-800" },
+  rejected: { label: "✕ Not Approved", style: "border-red-300 bg-red-50 text-red-800" },
+};
 
 function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] }) {
   const [requestedAt, setRequestedAt] = useState(vendor.boost_requested_at);
@@ -261,8 +269,15 @@ export function VendorDashboard({
     });
   }
 
+  const statusDisplay = STATUS_DISPLAY[vendor.status];
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
+      <div
+        className={`mb-4 inline-flex items-center gap-2 rounded-full border-2 px-4 py-2 text-sm font-extrabold ${statusDisplay.style}`}
+      >
+        {statusDisplay.label}
+      </div>
       {vendor.status === "pending" && (
         <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <strong>Pending review.</strong> We&apos;ll activate your account after confirming your
@@ -272,6 +287,12 @@ export function VendorDashboard({
       {vendor.status === "suspended" && (
         <div className="mb-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
           Your account is currently suspended. Contact us if you think this is a mistake.
+        </div>
+      )}
+      {vendor.status === "rejected" && (
+        <div className="mb-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+          Your account was not approved. Contact us if you think this is a mistake or want to
+          resubmit.
         </div>
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">
