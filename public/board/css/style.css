@@ -84,6 +84,11 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 .tcbody .tw{font-size:10.5px;font-weight:700;color:#8B2500;}
 .tc.featured{border:2px solid #dab870;}
 .tcpin{display:block;font-size:9px;font-weight:700;letter-spacing:.5px;color:#8B6508;margin-bottom:3px;}
+.livebadge{font-size:9px;font-weight:700;display:inline-block;margin:0 0 5px 5px;padding:1px 6px;border-radius:8px;vertical-align:middle;}
+.livebadge.open{background:rgba(34,197,94,.16);color:#15803d;}
+.livebadge.soon{background:rgba(234,179,8,.18);color:#a16207;}
+.livebadge.closed{background:rgba(239,68,68,.16);color:#b91c1c;}
+.livebadge.upcoming{background:rgba(100,116,139,.16);color:#475569;}
 .boards{max-width:1060px;margin:4px auto;padding:0 14px 20px;}
 .bsec{margin-bottom:44px;animation:bi .55s ease both;}
 @keyframes bi{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:none;}}

@@ -128,6 +128,7 @@ export function Top10Directory() {
       .from("vendors")
       .select("*")
       .eq("status", "active")
+      .eq("is_internal", false)
       .returns<Vendor[]>()
       .then(({ data }) => setVendors(data ?? []));
     supabase

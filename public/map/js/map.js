@@ -287,7 +287,7 @@ function loadLovEvents() {
 var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars" };
 function loadVendorPins() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
-  return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&lat=not.is.null&lng=not.is.null", {
+  return fetch(V2_SUPABASE_URL + "/rest/v1/vendors?select=*,vendor_categories(categories(slug))&status=eq.active&is_internal=eq.false&lat=not.is.null&lng=not.is.null", {
     headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
   }).then(function (res) { return res.json(); }).then(function (rows) {
     if (!Array.isArray(rows)) return;

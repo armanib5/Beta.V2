@@ -49,6 +49,7 @@ export interface Vendor {
   lat: number | null;
   lng: number | null;
   onboarded_at: string | null;
+  is_internal: boolean;
   entity_type: EntityType;
   category_tier: CategoryTier;
   operating_hours: Record<string, string> | null;
