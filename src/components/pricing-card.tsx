@@ -1,27 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import QRCode from "qrcode";
+import Link from "next/link";
 import type { PricingTier } from "@/lib/types";
 import { formatPrice } from "@/lib/types";
 
 export function PricingCard({ tier }: { tier: PricingTier }) {
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [generatingQr, setGeneratingQr] = useState(false);
-
   const soldOut = tier.max_slots !== null && tier.slots_claimed >= tier.max_slots;
   const slotsLeft = tier.max_slots !== null ? tier.max_slots - tier.slots_claimed : null;
-  const paymentLink = tier.stripe_payment_link;
-
-  async function showQr() {
-    if (!paymentLink) return;
-    setGeneratingQr(true);
-    try {
-      setQrDataUrl(await QRCode.toDataURL(paymentLink, { width: 240, margin: 1 }));
-    } finally {
-      setGeneratingQr(false);
-    }
-  }
 
   return (
     <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -46,44 +31,15 @@ export function PricingCard({ tier }: { tier: PricingTier }) {
 
       {!soldOut && (
         <div className="mt-4 space-y-2">
-          {paymentLink ? (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <a
-                href={paymentLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 rounded-full bg-slate-900 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-slate-700"
-              >
-                Pay Online
-              </a>
-              <button
-                type="button"
-                onClick={showQr}
-                disabled={generatingQr}
-                className="flex-1 rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-              >
-                {generatingQr ? "Generating…" : "Show QR (in person)"}
-              </button>
-            </div>
-          ) : (
-            <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              Payment link coming soon — check back shortly.
-            </p>
-          )}
-
-          {qrDataUrl && (
-            <div className="mt-3 flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qrDataUrl} alt="Scan to pay with Stripe" width={200} height={200} />
-              <p className="text-center text-xs text-slate-500">
-                Have the vendor scan this with their phone to pay securely via Stripe.
-              </p>
-            </div>
-          )}
-
+          <Link
+            href={`/vendor/signup?tier=${tier.id}`}
+            className="block rounded-full bg-slate-900 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-slate-700"
+          >
+            Get Started
+          </Link>
           <p className="pt-1 text-center text-[11px] text-slate-400">
-            After paying, come back and create your vendor login — your account is reviewed and
-            activated manually for now.
+            Create your account first, then pay securely with Stripe — your Founding Vendor / Top
+            10 badge activates automatically the moment payment clears.
           </p>
         </div>
       )}

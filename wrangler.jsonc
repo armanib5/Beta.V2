@@ -1,10 +1,14 @@
 {
-  // Lets Cloudflare's existing "npx wrangler deploy" command serve the
-  // static export directly (Workers with static assets), so no change to
-  // the Cloudflare project's dashboard settings is needed.
+  // "npx wrangler deploy" still serves the static export as before, but
+  // now runs through worker/index.ts first - it handles two JSON API
+  // routes (Stripe Checkout Session creation + webhook) and falls through
+  // to the ASSETS binding (unchanged static-file serving) for everything
+  // else, so no other page/route's behavior changes.
   "name": "beta-v2",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-07-26",
   "assets": {
-    "directory": "out"
+    "directory": "out",
+    "binding": "ASSETS"
   }
 }

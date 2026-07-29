@@ -23,6 +23,31 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
   const [promoCode, setPromoCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
   const [redeemError, setRedeemError] = useState<string | null>(null);
+  const [checkoutTierId, setCheckoutTierId] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  async function payWithStripe(tier: PricingTier) {
+    setCheckoutError(null);
+    setCheckoutTierId(tier.id);
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ vendor_id: vendor.id, tier_id: tier.id }),
+      });
+      const data: { url?: string; error?: string } = await res.json();
+      if (res.ok && data.url) {
+        // eslint-disable-next-line react-hooks/immutability -- navigation runs only inside this async click handler, never during render
+        window.location.href = data.url;
+        return;
+      }
+      setCheckoutError(data.error ?? "Could not start checkout. Please try again.");
+    } catch {
+      setCheckoutError("Could not reach payment. Please try again.");
+    } finally {
+      setCheckoutTierId(null);
+    }
+  }
 
   if (vendor.is_top10) {
     return (
@@ -76,23 +101,24 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
           <div key={tier.id} className="rounded-xl border border-slate-200 p-4">
             <p className="font-bold text-slate-900">{tier.name}</p>
             <p className="text-sm text-slate-600">{formatPrice(tier.price_cents)}</p>
-            {tier.stripe_payment_link ? (
-              <a
-                href={tier.stripe_payment_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-block rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
-              >
-                Pay & Upgrade
-              </a>
-            ) : (
-              <p className="mt-2 text-xs text-slate-400">Contact us to pay for this tier.</p>
-            )}
+            <button
+              type="button"
+              onClick={() => payWithStripe(tier)}
+              disabled={checkoutTierId === tier.id}
+              className="mt-2 inline-block rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+            >
+              {checkoutTierId === tier.id ? "Starting checkout…" : "Pay & Upgrade"}
+            </button>
           </div>
         ))}
       </div>
+      {checkoutError && <p className="mt-3 text-sm font-medium text-red-600">{checkoutError}</p>}
+      <p className="mt-4 text-xs text-slate-500">
+        Paying with Stripe above activates your badge automatically, usually within seconds. Paid
+        another way (cash, check, in person)?
+      </p>
       {requestedAt ? (
-        <p className="mt-4 text-sm font-medium text-amber-700">
+        <p className="mt-1 text-sm font-medium text-amber-700">
           ⏳ Requested {new Date(requestedAt).toLocaleDateString("en-US")} — an admin will review and activate it.
         </p>
       ) : (
@@ -100,9 +126,9 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
           type="button"
           onClick={requestBoost}
           disabled={requesting}
-          className="mt-4 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          className="mt-1 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
         >
-          {requesting ? "Requesting…" : "I've paid — request activation"}
+          {requesting ? "Requesting…" : "Request manual activation"}
         </button>
       )}
 

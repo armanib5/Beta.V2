@@ -2,13 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
 import type { VendorHubType } from "@/lib/types";
 
 const SLUG_RETRY_ATTEMPTS = 5;
 
-export function VendorSignupForm({ defaultHubType }: { defaultHubType?: VendorHubType }) {
+export function VendorSignupForm({
+  defaultHubType,
+  tierId,
+}: {
+  defaultHubType?: VendorHubType;
+  tierId?: string;
+}) {
   const router = useRouter();
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
@@ -16,6 +23,7 @@ export function VendorSignupForm({ defaultHubType }: { defaultHubType?: VendorHu
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,6 +89,31 @@ export function VendorSignupForm({ defaultHubType }: { defaultHubType?: VendorHu
         return;
       }
 
+      if (tierId) {
+        try {
+          const res = await fetch("/api/create-checkout-session", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ vendor_id: user.id, tier_id: tierId }),
+          });
+          const data: { url?: string; error?: string } = await res.json();
+          if (res.ok && data.url) {
+            window.location.href = data.url;
+            return;
+          }
+          // Account exists either way — stay put and show it, rather than
+          // navigating away before the message is even visible. Boost/
+          // Feature on the dashboard offers the same checkout again.
+          setCheckoutError(
+            data.error ?? "Your account was created, but we couldn't start checkout. You can pay from your dashboard instead.",
+          );
+          return;
+        } catch {
+          setCheckoutError("Your account was created, but we couldn't reach payment. You can pay from your dashboard instead.");
+          return;
+        }
+      }
+
       router.push("/vendor/dashboard");
       router.refresh();
     } catch {
@@ -88,6 +121,22 @@ export function VendorSignupForm({ defaultHubType }: { defaultHubType?: VendorHu
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checkoutError) {
+    return (
+      <div className="mt-6 space-y-3">
+        <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {checkoutError}
+        </p>
+        <Link
+          href="/vendor/dashboard"
+          className="block w-full rounded-full bg-slate-900 px-6 py-3 text-center text-sm font-semibold text-white hover:bg-slate-700"
+        >
+          Go to My Dashboard
+        </Link>
+      </div>
+    );
   }
 
   return (

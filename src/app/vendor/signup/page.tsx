@@ -1,7 +1,9 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { formatPrice, type PricingTier } from "@/lib/types";
 import { VendorSignupForm } from "@/components/vendor-signup-form";
 
 export default function VendorSignupPage() {
@@ -13,7 +15,21 @@ export default function VendorSignupPage() {
 }
 
 function VendorSignupContent() {
-  const isVenue = useSearchParams().get("type") === "venue";
+  const searchParams = useSearchParams();
+  const isVenue = searchParams.get("type") === "venue";
+  const tierId = searchParams.get("tier") ?? undefined;
+  const [tier, setTier] = useState<PricingTier | null>(null);
+
+  useEffect(() => {
+    if (!tierId) return;
+    const supabase = createClient();
+    supabase
+      .from("pricing_tiers")
+      .select("*")
+      .eq("id", tierId)
+      .maybeSingle<PricingTier>()
+      .then(({ data }) => setTier(data));
+  }, [tierId]);
 
   return (
     <div className="mx-auto max-w-md px-4 py-16">
@@ -29,9 +45,21 @@ function VendorSignupContent() {
       <p className="mt-2 text-center text-sm text-slate-600">
         {isVenue
           ? "Your venue gets its own flyer/hub — every show or event you host links straight back to it. Set up your account now; you can switch between Hosting Hub and Show Hub any time from your dashboard."
-          : "This account is permanent — it's how you'll manage your CityPinned profile going forward. Already paid? Great — we'll activate your account after confirming your payment, but you can set everything up right now."}
+          : "This account is permanent — it's how you'll manage your CityPinned profile going forward."}
       </p>
-      <VendorSignupForm defaultHubType={isVenue ? "hosting" : undefined} />
+      {tierId && (
+        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
+          {tier ? (
+            <>
+              You&apos;re signing up for <strong>{tier.name}</strong> ({formatPrice(tier.price_cents, tier.currency)}
+              ). Create your account below, then you&apos;ll go straight to secure Stripe checkout.
+            </>
+          ) : (
+            "Loading your selected plan…"
+          )}
+        </div>
+      )}
+      <VendorSignupForm defaultHubType={isVenue ? "hosting" : undefined} tierId={tierId} />
     </div>
   );
 }
