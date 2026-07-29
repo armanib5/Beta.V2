@@ -305,10 +305,11 @@ function checkAdminPendingBadge() {
     if (floatBadge) floatBadge.style.display = "none";
     return;
   }
-  fetch(V2_SUPABASE_URL + "/rest/v1/lov_entries?select=id&status=eq.pending", {
-    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
-  }).then(function (res) { return res.json(); }).then(function (rows) {
-    var n = Array.isArray(rows) ? rows.length : 0;
+  fetch(V2_SUPABASE_URL + "/rest/v1/rpc/admin_pending_count", {
+    method: "POST",
+    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY, "Content-Type": "application/json" }
+  }).then(function (res) { return res.json(); }).then(function (n) {
+    n = typeof n === "number" ? n : 0;
     if (badge) {
       if (n > 0) { badge.textContent = n; badge.style.display = "inline-block"; }
       else badge.style.display = "none";

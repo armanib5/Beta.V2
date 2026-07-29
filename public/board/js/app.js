@@ -260,11 +260,13 @@ function setupAuthNav(){
 /* Site-wide "needs approval" badge next to the brand name - mirrors the
    one in the V2 app's header (site-header.tsx) so it follows the admin
    wherever they are (Board, Map, anywhere), not just on Next.js pages.
-   Only pending FLYERS are countable here (lov_entries has a public read
-   policy regardless of status) - pending VENDORS require the real admin
-   session, which only exists in the V2 app's cookie-based client, not
-   this page's separate one, so that count shows accurately once on any
-   CityPinned (V2) page instead. */
+   Calls the admin_pending_count() RPC (pending vendors + pending flyers
+   + boost requests, same 3-part sum site-header.tsx computes with a real
+   admin session) instead of only counting pending flyers directly -
+   this page's anon client has no real admin session to read pending
+   vendors with, but the RPC returns only a bare number (security
+   definer, granted to anon), so it can safely show the exact same total
+   the Next.js app shows without exposing any vendor data here. */
 function checkAdminPendingBadge(){
   var badge=document.getElementById("adminPendingBadge");
   var floatBadge=document.getElementById("adminPendingBadgeFloat");
@@ -279,10 +281,11 @@ function checkAdminPendingBadge(){
     if(floatBadge)floatBadge.style.display="none";
     return;
   }
-  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=id&status=eq.pending",{
-    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY,Prefer:"count=exact"}
-  }).then(function(res){return res.json();}).then(function(rows){
-    var n=Array.isArray(rows)?rows.length:0;
+  fetch(V2_SUPABASE_URL+"/rest/v1/rpc/admin_pending_count",{
+    method:"POST",
+    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY,"Content-Type":"application/json"}
+  }).then(function(res){return res.json();}).then(function(n){
+    n=typeof n==="number"?n:0;
     if(badge){
       if(n>0){badge.textContent=n;badge.style.display="inline-block";}
       else badge.style.display="none";
