@@ -64,14 +64,15 @@ export default function HomePage() {
         <div className="mx-auto max-w-6xl px-4">
           <div className="text-center">
             <p className="text-sm font-semibold uppercase tracking-widest text-amber-700">
-              📌 BayPinned SJ
+              📌 BayPinned
             </p>
             <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-              The live Downtown San Jose board &amp; map
+              The live board &amp; map for Bay Area downtowns
             </h2>
             <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600 sm:text-base">
-              Flyers, markets, events, and an interactive map of Downtown San Jose — free for
-              everyone, no account needed.
+              Flyers, markets, events, and an interactive map covering local downtowns across the
+              Bay Area — Top 10 bites, sips, vendors, and events, free for everyone, no account
+              needed.
             </p>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
