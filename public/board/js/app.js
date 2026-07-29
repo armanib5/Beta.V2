@@ -552,7 +552,7 @@ function loadLovVendors(){
   }).catch(function(){});
 }
 
-var BOARD_CAT_SLUGS={restaurant:"bars",bar:"bars","home-cook":"homecook",other:"other"};
+var BOARD_CAT_SLUGS={restaurant:"bars",bar:"bars","home-cook":"homecook",other:"other","live-show":"venue"};
 /* Real paid/comped vendor accounts (V2's `vendors` table) - same merge as
    loadLovVendors, sourced from the actual vendor accounts instead of the
    LOV guest listings, so a vendor who's actually signed up (or been

@@ -286,7 +286,7 @@ function loadLovEvents() {
    merge pattern, live from the same project. Category comes from the
    vendor's first tagged category (vendor_categories join); anything not
    already a Map category key falls back to "shop" rather than vanishing. */
-var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars", "home-cook": "homecook", other: "other" };
+var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars", "home-cook": "homecook", other: "other", "live-show": "venue" };
 
 /* Site-wide "needs approval" badge next to the brand name, mirroring the
    Board's copy of the same thing - see app.js's checkAdminPendingBadge()
