@@ -39,6 +39,17 @@ export default function TermsPage() {
       </section>
 
       <section className="mt-8">
+        <h2 className="text-lg font-bold text-slate-900">Notice &amp; Takedown Policy</h2>
+        <p className="mt-3 text-sm leading-relaxed text-slate-700">
+          CityPinned and regional network sites (including BayPinned) operate strictly as an informational map
+          directory. We do not organize, manage, permit, or host events or vendor listings. If you believe a
+          listing on our platform constitutes unauthorized solicitation, trademark infringement, or a safety
+          issue, please use the on-site &quot;Report Listing&quot; feature. CityPinned reserves the right to
+          immediately remove or suspend any pin or business profile upon receiving a report or notification.
+        </p>
+      </section>
+
+      <section className="mt-8">
         <h2 className="text-lg font-bold text-slate-900">Questions</h2>
         <p className="mt-3 text-sm leading-relaxed text-slate-700">
           Questions about these terms can be sent to{" "}

@@ -60,6 +60,20 @@ export default function AdminReportsPage() {
     setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status: next } : r)));
   }
 
+  // A report on a vendor/event auto-suspends it the moment it's submitted
+  // (migration 0049) - marking the report resolved doesn't undo that on
+  // its own, so this is the loop-closer once an admin has actually
+  // reviewed it and decided the report doesn't hold up.
+  async function reactivateListing(r: Report) {
+    if (!r.target_id) return;
+    const supabase = createClient();
+    if (r.target_type === "vendor") {
+      await supabase.from("vendors").update({ status: "active" }).eq("id", r.target_id);
+    } else if (r.target_type === "event") {
+      await supabase.from("lov_entries").update({ status: "active" }).eq("id", r.target_id);
+    }
+  }
+
   if (status === "loading") {
     return <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
   }
@@ -87,8 +101,9 @@ export default function AdminReportsPage() {
         </Link>
       </div>
       <p className="mt-1 text-sm text-slate-600">
-        Every submission from the Report form on a flyer/vendor, or the waffle menu&apos;s &quot;Report a
-        Bug,&quot; timestamped as it comes in.
+        Every submission from the Report form on a flyer/vendor/pin, or the waffle menu&apos;s &quot;Report a
+        Bug,&quot; timestamped as it comes in. A vendor or event report immediately suspends/hides that listing
+        from the public site — use &quot;Reactivate Listing&quot; below if a report doesn&apos;t hold up.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -165,6 +180,16 @@ export default function AdminReportsPage() {
                   className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200"
                 >
                   Reopen
+                </button>
+              )}
+              {(r.target_type === "vendor" || r.target_type === "event") && (
+                <button
+                  type="button"
+                  onClick={() => reactivateListing(r)}
+                  className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800 hover:bg-blue-200"
+                  title="Undo the automatic suspend this report triggered"
+                >
+                  ↩️ Reactivate Listing
                 </button>
               )}
             </div>

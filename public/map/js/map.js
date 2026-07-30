@@ -113,6 +113,7 @@ function flyerHtml(p) {
   html += '<a class="bp-btn blue" href="' + mu + '" target="_blank" rel="noopener">Directions</a>';
   html += '<button class="bp-btn gold" onclick="showFullDetail(\'' + p.id + '\')">Full Details</button>';
   if (p.wb) html += '<a class="bp-btn purple" href="' + p.wb + '" target="_blank" rel="noopener">Website</a>';
+  html += '<button class="bp-btn gray" onclick="openReportForm(\'' + p.id + '\', \'' + p.t.replace(/'/g, "&#39;") + '\')" title="Report Listing / Unauthorized Pin">🚩 Report</button>';
   html += '</div></div>';
   return html;
 }
@@ -155,6 +156,7 @@ function showFullDetail(id) {
   html += '<a class="bp-btn blue" href="' + mu + '" target="_blank" rel="noopener">Directions</a>';
   if (p.wb) html += '<a class="bp-btn purple" href="' + p.wb + '" target="_blank" rel="noopener">Website</a>';
   html += '<a class="bp-btn gold" href="../board/index.html?openFlyer=' + encodeURIComponent(p.t) + '">View/Edit on Board</a>';
+  html += '<button class="bp-btn gray" onclick="openReportForm(\'' + p.id + '\', \'' + p.t.replace(/'/g, "&#39;") + '\')" title="Report Listing / Unauthorized Pin">🚩 Report</button>';
   html += '</div>';
   document.getElementById("detailPanel").innerHTML = html;
   document.getElementById("detailOv").classList.add("on");
@@ -165,6 +167,84 @@ function hideFullDetail() {
 }
 document.getElementById("detailOv").addEventListener("click", function (e) {
   if (e.target.id === "detailOv") hideFullDetail();
+});
+
+/* "Report Listing / Unauthorized Pin" - every pin's popup gets this, not
+   just events (Board's version only ever covered vendors/events reached
+   through its own cards). Writes straight to V2's `reports` table via
+   fetch (anon INSERT is publicly allowed - see migration 0026), same
+   pattern every other V2 write in this file already uses. A report on a
+   real vendor/event pin (id prefixed "vendor-"/"lov-") immediately hides
+   it pending admin review (migration 0049's auto-suspend trigger) - a
+   legacy static seed pin has no real row to suspend, so the report is
+   still logged but nothing gets hidden. */
+var REPORT_TAKEDOWN_DISCLAIMER = "Citypinned and Baypinned operate solely as user-driven directories. We do not host, authorize, or endorse listed events. Report flags trigger immediate review and temporary listing suspension pending investigation.";
+
+function reportTargetInfo(p) {
+  if (p.id.indexOf("vendor-") === 0) return { type: "vendor", id: p.id.slice(7) };
+  if (p.id.indexOf("lov-") === 0) return { type: "event", id: p.id.slice(4) };
+  return { type: "listing", id: p.id };
+}
+
+function openReportForm(placeId, placeName) {
+  var html = '<button class="xbtn" id="reportClose">&times;</button>';
+  html += '<h2>Report ' + placeName + '</h2>';
+  html += '<div class="rpform">';
+  html += '<label>Reason *</label><select id="rpReason">';
+  html += '<option value="">Select a reason</option>';
+  ["Unauthorized Solicitation", "Incorrect Event Info", "Safety Hazard", "Intellectual Property / Trademark", "Other"].forEach(function (r) {
+    html += '<option value="' + r + '">' + r + '</option>';
+  });
+  html += '</select>';
+  html += '<label>Details (optional)</label><textarea id="rpDetails" placeholder="Describe the issue..."></textarea>';
+  html += '<div id="rpErr" style="color:#c0392b;font-size:12px;margin-top:6px;display:none;"></div>';
+  html += '<p style="font-size:11px;line-height:1.5;color:rgba(90,65,30,.75);margin-top:14px;">' + REPORT_TAKEDOWN_DISCLAIMER + '</p>';
+  html += '<div class="rpbtnrow"><button class="rpcancel" id="rpCancel">Cancel</button><button class="rpsubmit" id="rpSubmit">Submit Report</button></div>';
+  html += '</div>';
+  document.getElementById("reportPanel").innerHTML = html;
+  document.getElementById("reportOv").classList.add("on");
+  document.getElementById("reportClose").onclick = closeReportForm;
+  document.getElementById("rpCancel").onclick = closeReportForm;
+  document.getElementById("rpSubmit").onclick = function () { submitReport(placeId, placeName); };
+}
+
+function closeReportForm() {
+  document.getElementById("reportOv").classList.remove("on");
+  document.getElementById("reportPanel").innerHTML = "";
+}
+
+function submitReport(placeId, placeName) {
+  var p = PLACES.find(function (x) { return x.id === placeId; });
+  var target = reportTargetInfo(p || { id: placeId });
+  var reason = document.getElementById("rpReason").value;
+  var details = document.getElementById("rpDetails").value.trim();
+  var err = document.getElementById("rpErr");
+  if (!reason) { err.textContent = "Please pick a reason."; err.style.display = "block"; return; }
+  if (typeof V2_SUPABASE_URL === "undefined") {
+    err.textContent = "Couldn't reach the reporting service right now."; err.style.display = "block"; return;
+  }
+  var btn = document.getElementById("rpSubmit");
+  btn.disabled = true; btn.textContent = "Submitting…";
+  fetch(V2_SUPABASE_URL + "/rest/v1/reports", {
+    method: "POST",
+    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ target_type: target.type, target_id: target.id, target_name: placeName, reason: reason, details: details || null })
+  }).then(function (res) {
+    btn.disabled = false; btn.textContent = "Submit Report";
+    if (!res.ok) { err.textContent = "Could not submit report. Please try again."; err.style.display = "block"; return; }
+    document.getElementById("reportPanel").innerHTML =
+      '<button class="xbtn" id="reportClose2">&times;</button><h2>Report Submitted</h2>' +
+      '<p style="font-size:13px;">Thanks — our moderation team will review this. The listing has been temporarily hidden pending review.</p>' +
+      '<div class="rpbtnrow"><button class="rpsubmit" id="rpDone">Done</button></div>';
+    document.getElementById("reportClose2").onclick = closeReportForm;
+    document.getElementById("rpDone").onclick = closeReportForm;
+  }).catch(function () {
+    btn.disabled = false; btn.textContent = "Submit Report";
+    err.textContent = "Could not reach the reporting service. Please try again."; err.style.display = "block";
+  });
+}
+document.getElementById("reportOv").addEventListener("click", function (e) {
+  if (e.target.id === "reportOv") closeReportForm();
 });
 
 function addPlaceMarker(p) {

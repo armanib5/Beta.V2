@@ -176,3 +176,12 @@ footer{text-align:center;color:rgba(200,160,70,.35);font-size:12px;padding:20px 
 
 @keyframes approvalBlink{0%,49%{opacity:1;}50%,100%{opacity:.25;}}
 #adminPendingBadge,#adminPendingBadgeFloat{animation:approvalBlink 1s step-start infinite;}
+
+.bp-btn.gray{background:#6b7280;}
+.rpform label{display:block;font-family:'Special Elite',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:#8a6030;margin:12px 0 4px;}
+.rpform select,.rpform textarea{width:100%;padding:9px 10px;border-radius:5px;border:1px solid rgba(90,65,30,.3);font-size:13px;font-family:inherit;background:#fff;color:#2a1800;}
+.rpform textarea{min-height:70px;resize:vertical;}
+.rpform .rpbtnrow{display:flex;gap:8px;margin-top:16px;}
+.rpform .rpbtnrow button{flex:1;padding:10px;border-radius:5px;border:none;font-weight:700;font-size:13px;cursor:pointer;}
+.rpform .rpcancel{background:rgba(0,0,0,.08);color:#3a2810;}
+.rpform .rpsubmit{background:var(--go);color:#1a0800;}
