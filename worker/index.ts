@@ -131,7 +131,7 @@ async function bookedCounts(env: Env, bucketStartsMs: number[]): Promise<Map<num
 }
 
 async function handleCreateCheckoutSession(request: Request, env: Env): Promise<Response> {
-  let body: { vendor_id?: string; tier_id?: string; slots?: string[] };
+  let body: { vendor_id?: string; tier_id?: string; slots?: string[]; terms_accepted?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -140,6 +140,11 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
   const vendorId = body.vendor_id;
   const tierId = body.tier_id;
   if (!vendorId || !tierId) return json({ error: "vendor_id and tier_id are required." }, 400);
+  // Server-side backstop behind the disabled-until-checked button in every
+  // checkout UI (signup, Quick Boost/Top 10 Placement, Founding/Featured
+  // upgrade) - all three funnel through this one endpoint, so enforcing it
+  // here once covers every entry point instead of trusting client state.
+  if (body.terms_accepted !== true) return json({ error: "You must accept the Terms of Service to check out." }, 400);
 
   const [vendorRes, tierRes] = await Promise.all([
     sb(env, `/vendors?id=eq.${vendorId}&select=id,business_name,contact_email`),
@@ -258,6 +263,21 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
     method: "PATCH",
     body: JSON.stringify({ stripe_checkout_session_id: session.id }),
   });
+
+  // Timestamped record that this vendor accepted the Terms of Service and
+  // started checkout, independent of the separate "Stripe payment
+  // completed" entry logged later by the webhook - covers all three
+  // checkout entry points since they all call this one function.
+  await sb(env, "/activity_log", {
+    method: "POST",
+    body: JSON.stringify({
+      entity_type: "vendor",
+      entity_id: vendorId,
+      entity_name: vendor.business_name,
+      action: "Accepted Terms of Service — started checkout",
+      detail: `${tier.name} — $${((tier.price_cents + platformFeeCents) / 100).toFixed(2)}`,
+    }),
+  }).catch(() => {});
 
   return json({ url: session.url });
 }

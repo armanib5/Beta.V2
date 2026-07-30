@@ -17,6 +17,7 @@ import {
 import { VendorPhotoManager } from "@/components/vendor-photo-manager";
 import { MenuHubManager } from "@/components/menu-hub-manager";
 import { MyListingManager } from "@/components/my-listing-manager";
+import { CheckoutTermsCheckbox, CheckoutTermsNotice } from "@/components/checkout-terms";
 import type { VendorStatus } from "@/lib/types";
 
 const STATUS_DISPLAY: Record<VendorStatus, { label: string; style: string }> = {
@@ -72,6 +73,7 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
   const [myBookings, setMyBookings] = useState<VendorBoostBooking[]>([]);
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -140,6 +142,10 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
 
   async function confirmAndPay() {
     if (!selectedTier) return;
+    if (!termsAccepted) {
+      setError("Please accept the Terms of Service to continue.");
+      return;
+    }
     setError(null);
     setCheckingOut(true);
     try {
@@ -150,6 +156,7 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
           vendor_id: vendor.id,
           tier_id: selectedTier.id,
           slots: selectedTier.slug === "vendor-boost" ? selectedSlots.map((ms) => new Date(ms).toISOString()) : undefined,
+          terms_accepted: termsAccepted,
         }),
       });
       const data: { url?: string; error?: string } = await res.json();
@@ -316,13 +323,17 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
               <span>{formatPrice(selectedTier.price_cents + PLATFORM_FEE_CENTS)}</span>
             </div>
           </div>
+          <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <CheckoutTermsNotice />
+            <CheckoutTermsCheckbox id="boost-terms" checked={termsAccepted} onChange={setTermsAccepted} />
+          </div>
           <button
             type="button"
             onClick={confirmAndPay}
-            disabled={checkingOut}
-            className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+            disabled={checkingOut || !termsAccepted}
+            className="mt-3 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
           >
-            {checkingOut ? "Starting checkout…" : `Confirm & Pay ${formatPrice(selectedTier.price_cents + PLATFORM_FEE_CENTS)}`}
+            {checkingOut ? "Starting checkout…" : "Secure Checkout"}
           </button>
         </div>
       )}
@@ -340,15 +351,20 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
   const [redeemError, setRedeemError] = useState<string | null>(null);
   const [checkoutTierId, setCheckoutTierId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   async function payWithStripe(tier: PricingTier) {
+    if (!termsAccepted) {
+      setCheckoutError("Please accept the Terms of Service to continue.");
+      return;
+    }
     setCheckoutError(null);
     setCheckoutTierId(tier.id);
     try {
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ vendor_id: vendor.id, tier_id: tier.id }),
+        body: JSON.stringify({ vendor_id: vendor.id, tier_id: tier.id, terms_accepted: termsAccepted }),
       });
       const data: { url?: string; error?: string } = await res.json();
       if (res.ok && data.url) {
@@ -411,6 +427,12 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
           then, even while boosted/featured — boosting doesn&apos;t make you show as open early.
         </p>
       )}
+      {tiers.length > 0 && (
+        <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <CheckoutTermsNotice />
+          <CheckoutTermsCheckbox id="upgrade-terms" checked={termsAccepted} onChange={setTermsAccepted} />
+        </div>
+      )}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {tiers.map((tier) => (
           <div key={tier.id} className="rounded-xl border border-slate-200 p-4">
@@ -419,10 +441,10 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
             <button
               type="button"
               onClick={() => payWithStripe(tier)}
-              disabled={checkoutTierId === tier.id}
+              disabled={checkoutTierId === tier.id || !termsAccepted}
               className="mt-2 inline-block rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
             >
-              {checkoutTierId === tier.id ? "Starting checkout…" : "Pay & Upgrade"}
+              {checkoutTierId === tier.id ? "Starting checkout…" : "Secure Checkout"}
             </button>
           </div>
         ))}

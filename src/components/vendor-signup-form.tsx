@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
 import type { VendorHubType } from "@/lib/types";
+import { CheckoutTermsCheckbox, CheckoutTermsNotice } from "@/components/checkout-terms";
 
 const SLUG_RETRY_ATTEMPTS = 5;
 
@@ -24,6 +25,7 @@ export function VendorSignupForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,6 +41,14 @@ export function VendorSignupForm({
     }
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
+      return;
+    }
+    // Only a paid signup (a tier was picked) needs terms acceptance — a
+    // free account isn't a sale. Re-checked here even though the button
+    // is already disabled until this is true, so the guard can't be
+    // bypassed by submitting the form directly.
+    if (tierId && !termsAccepted) {
+      setError("Please accept the Terms of Service to continue.");
       return;
     }
 
@@ -94,7 +104,7 @@ export function VendorSignupForm({
           const res = await fetch("/api/create-checkout-session", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ vendor_id: user.id, tier_id: tierId }),
+            body: JSON.stringify({ vendor_id: user.id, tier_id: tierId, terms_accepted: termsAccepted }),
           });
           const data: { url?: string; error?: string } = await res.json();
           if (res.ok && data.url) {
@@ -173,13 +183,19 @@ export function VendorSignupForm({
         onChange={(e) => setConfirmPassword(e.target.value)}
         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
       />
+      {tierId && (
+        <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <CheckoutTermsNotice />
+          <CheckoutTermsCheckbox id="signup-terms" checked={termsAccepted} onChange={setTermsAccepted} />
+        </div>
+      )}
       {error && <p className="text-sm font-medium text-red-600">{error}</p>}
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || (Boolean(tierId) && !termsAccepted)}
         className="w-full rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
       >
-        {loading ? "Creating account…" : "Create Vendor Login"}
+        {loading ? "Creating account…" : tierId ? "Secure Checkout" : "Create Vendor Login"}
       </button>
     </form>
   );
