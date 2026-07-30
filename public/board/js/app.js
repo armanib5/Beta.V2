@@ -442,7 +442,7 @@ var LOV_CAT_SLUG_TO_BOARD={
   "music-festival":"venue","comedy-show":"venue","live-show":"venue",
   "cultural-festival":"venue","gaming-festival":"venue","outdoor-movie":"venue",
   "community-event":"seasonal","restaurant":"bars","bar":"bars",
-  "workshop-class":"workshop","park-event":"parks"
+  "workshop-class":"workshop","park-event":"parks","city-art":"cityart"
 };
 /* Resolves a real city+hood from the row's own lat/lng (every seeded row
    has one) instead of only trusting section_zone, which is null on every
