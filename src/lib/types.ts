@@ -236,6 +236,13 @@ export interface PromoCode {
   created_at: string;
 }
 
+export interface CartItem {
+  id: string;
+  vendor_id: string;
+  tier_id: string;
+  added_at: string;
+}
+
 export interface Registration {
   id: string;
   tier_id: string;

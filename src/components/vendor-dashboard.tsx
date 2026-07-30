@@ -19,8 +19,9 @@ import { VendorPhotoManager } from "@/components/vendor-photo-manager";
 import { MenuHubManager } from "@/components/menu-hub-manager";
 import { MyListingManager } from "@/components/my-listing-manager";
 import { MyReceipts } from "@/components/my-receipts";
+import { MyCart } from "@/components/my-cart";
 import { CheckoutTermsCheckbox, CheckoutTermsNotice, EventLiabilityCheckbox, PlatformFeeNotice } from "@/components/checkout-terms";
-import { PLATFORM_FEE_CENTS } from "@/lib/fees";
+import { CART_INELIGIBLE_TIER_SLUGS, PLATFORM_FEE_CENTS } from "@/lib/fees";
 import type { VendorStatus } from "@/lib/types";
 
 const STATUS_DISPLAY: Record<VendorStatus, { label: string; style: string }> = {
@@ -348,7 +349,15 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
   );
 }
 
-function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] }) {
+function BoostRequest({
+  vendor,
+  tiers,
+  onAddedToCart,
+}: {
+  vendor: Vendor;
+  tiers: PricingTier[];
+  onAddedToCart: () => void;
+}) {
   const [requestedAt, setRequestedAt] = useState(vendor.boost_requested_at);
   const [requesting, setRequesting] = useState(false);
   const [promoCode, setPromoCode] = useState("");
@@ -358,6 +367,23 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [liabilityAccepted, setLiabilityAccepted] = useState(false);
+  const [addingTierId, setAddingTierId] = useState<string | null>(null);
+
+  async function addToCart(tier: PricingTier) {
+    setCheckoutError(null);
+    setAddingTierId(tier.id);
+    const supabase = createClient();
+    const { error } = await supabase.from("cart_items").insert({ vendor_id: vendor.id, tier_id: tier.id });
+    setAddingTierId(null);
+    if (error) {
+      // Unique (vendor_id, tier_id) violation just means it's already in
+      // the cart - not worth surfacing as an error, "My Cart" already
+      // shows it's there.
+      if (error.code !== "23505") setCheckoutError(error.message);
+      return;
+    }
+    onAddedToCart();
+  }
 
   async function payWithStripe(tier: PricingTier) {
     if (!termsAccepted || !liabilityAccepted) {
@@ -449,14 +475,26 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
               {formatPrice(tier.price_cents)} + {formatPrice(PLATFORM_FEE_CENTS)} fee ={" "}
               <span className="font-semibold text-slate-900">{formatPrice(tier.price_cents + PLATFORM_FEE_CENTS)}</span>
             </p>
-            <button
-              type="button"
-              onClick={() => payWithStripe(tier)}
-              disabled={checkoutTierId === tier.id || !termsAccepted || !liabilityAccepted}
-              className="mt-2 inline-block rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
-            >
-              {checkoutTierId === tier.id ? "Starting checkout…" : "Secure Checkout"}
-            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => payWithStripe(tier)}
+                disabled={checkoutTierId === tier.id || !termsAccepted || !liabilityAccepted}
+                className="inline-block rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+              >
+                {checkoutTierId === tier.id ? "Starting checkout…" : "Secure Checkout"}
+              </button>
+              {!CART_INELIGIBLE_TIER_SLUGS.includes(tier.slug) && (
+                <button
+                  type="button"
+                  onClick={() => addToCart(tier)}
+                  disabled={addingTierId === tier.id}
+                  className="inline-block rounded-full border border-slate-300 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {addingTierId === tier.id ? "Adding…" : "🛒 Add to Cart"}
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -523,6 +561,7 @@ export function VendorDashboard({
 }) {
   const router = useRouter();
   const isMenuHubEntity = vendor.entity_type === "restaurant" || vendor.entity_type === "bar";
+  const [cartRefreshKey, setCartRefreshKey] = useState(0);
 
   const [form, setForm] = useState({
     business_name: vendor.business_name,
@@ -757,7 +796,9 @@ export function VendorDashboard({
 
       <QuickBoost vendor={vendor} tiers={tiers} />
 
-      <BoostRequest vendor={vendor} tiers={tiers} />
+      <BoostRequest vendor={vendor} tiers={tiers} onAddedToCart={() => setCartRefreshKey((k) => k + 1)} />
+
+      <MyCart vendorId={vendor.id} refreshKey={cartRefreshKey} />
 
       <MyReceipts vendorId={vendor.id} />
 

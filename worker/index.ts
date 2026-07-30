@@ -322,6 +322,149 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
   return json({ url: session.url });
 }
 
+// Slot-based tiers (Quick Boost, Top 10 Placement) need a per-item slot
+// picker and aren't cart-compatible yet - mirrored in src/lib/fees.ts.
+const CART_INELIGIBLE_TIER_SLUGS = ["vendor-boost", "top10-30min"];
+
+/** Cart checkout - phase 1 of the cart architecture. A completely separate
+ * function from handleCreateCheckoutSession above, on its own route, so
+ * the existing single-item checkout is never touched by anything in
+ * here. Pays for every tier currently in the vendor's cart_items in ONE
+ * Stripe session with ONE $1.00 platform fee, instead of one fee per
+ * item. */
+async function handleCreateCartCheckoutSession(request: Request, env: Env): Promise<Response> {
+  let body: { vendor_id?: string; terms_accepted?: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body." }, 400);
+  }
+  const vendorId = body.vendor_id;
+  if (!vendorId) return json({ error: "vendor_id is required." }, 400);
+  if (body.terms_accepted !== true) return json({ error: "You must accept the Terms of Service to check out." }, 400);
+
+  const [vendorRes, cartRes] = await Promise.all([
+    sb(env, `/vendors?id=eq.${vendorId}&select=id,business_name,contact_email`),
+    sb(
+      env,
+      `/cart_items?vendor_id=eq.${vendorId}&select=id,tier_id,pricing_tiers(id,slug,name,description,price_cents,currency,is_active)`,
+    ),
+  ]);
+  const [vendors] = [(await vendorRes.json()) as Array<{ id: string; business_name: string; contact_email: string }>];
+  const vendor = vendors[0];
+  if (!vendor) return json({ error: "Vendor not found." }, 404);
+
+  const cartRows = (await cartRes.json()) as Array<{
+    id: string;
+    tier_id: string;
+    pricing_tiers: {
+      id: string;
+      slug: string;
+      name: string;
+      description: string | null;
+      price_cents: number;
+      currency: string;
+      is_active: boolean;
+    } | null;
+  }>;
+  if (cartRows.length === 0) return json({ error: "Your cart is empty." }, 400);
+
+  const items = cartRows
+    .map((row) => row.pricing_tiers)
+    .filter((tier): tier is NonNullable<typeof tier> => tier !== null);
+  const ineligible = items.find((t) => CART_INELIGIBLE_TIER_SLUGS.includes(t.slug));
+  if (ineligible) {
+    return json({ error: `"${ineligible.name}" needs to be purchased on its own (it needs a time slot picked), not through the cart.` }, 400);
+  }
+  const inactive = items.find((t) => !t.is_active);
+  if (inactive) return json({ error: `"${inactive.name}" is no longer available - remove it from your cart.` }, 400);
+
+  const currency = items[0]?.currency ?? "usd";
+  const platformFeeCents = PLATFORM_FEE_CENTS;
+
+  // One registration row per cart item (keeps every existing report/
+  // receipt view - which reads registrations one row at a time - working
+  // unchanged for cart orders too), all sharing one Stripe session id.
+  const regRes = await sb(env, "/registrations", {
+    method: "POST",
+    headers: { prefer: "return=representation" },
+    body: JSON.stringify(
+      items.map((tier) => ({
+        tier_id: tier.id,
+        claimed_by_vendor_id: vendorId,
+        business_name: vendor.business_name,
+        contact_email: vendor.contact_email,
+        amount_cents: tier.price_cents,
+        currency: tier.currency ?? "usd",
+        status: "pending",
+      })),
+    ),
+  });
+  if (!regRes.ok) return json({ error: `Could not start registration: ${await regRes.text()}` }, 500);
+  const registrations = (await regRes.json()) as Array<{ id: string }>;
+  if (registrations.length !== items.length) return json({ error: "Could not start registration for every cart item." }, 500);
+
+  const origin = new URL(request.url).origin;
+  const lineItems: Record<string, unknown>[] = items.map((tier) => ({
+    quantity: 1,
+    price_data: {
+      currency: tier.currency ?? "usd",
+      unit_amount: tier.price_cents,
+      product_data: { name: tier.name, description: tier.description ?? undefined },
+    },
+  }));
+  lineItems.push({
+    quantity: 1,
+    price_data: { currency, unit_amount: platformFeeCents, product_data: { name: "Platform Processing Fee" } },
+  });
+
+  let session: { id: string; url: string };
+  try {
+    session = (await stripeRequest(env, "checkout/sessions", {
+      mode: "payment",
+      customer_email: vendor.contact_email,
+      client_reference_id: vendorId,
+      line_items: lineItems,
+      metadata: {
+        vendor_id: vendorId,
+        is_cart: "true",
+        registration_ids: JSON.stringify(registrations.map((r) => r.id)),
+      },
+      success_url: `${origin}/register/confirmation?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/vendor/dashboard`,
+    })) as { id: string; url: string };
+  } catch (err) {
+    return json({ error: err instanceof Error ? err.message : "Stripe error." }, 502);
+  }
+
+  await sb(env, `/registrations?id=in.(${registrations.map((r) => r.id).join(",")})`, {
+    method: "PATCH",
+    body: JSON.stringify({ stripe_checkout_session_id: session.id }),
+  });
+
+  const itemsTotalCents = items.reduce((sum, t) => sum + t.price_cents, 0);
+  await sb(env, "/activity_log", {
+    method: "POST",
+    body: JSON.stringify({
+      entity_type: "vendor",
+      entity_id: vendorId,
+      entity_name: vendor.business_name,
+      action: "Accepted Terms of Service — started cart checkout",
+      detail: `${items.length} item${items.length === 1 ? "" : "s"} (${items.map((t) => t.name).join(", ")}) — $${((itemsTotalCents + platformFeeCents) / 100).toFixed(2)}`,
+    }),
+  }).catch(() => {});
+
+  await logTermsAgreement(env, request, vendorId).catch(() => {});
+
+  // Cart clears once checkout has actually started - if the vendor
+  // abandons the Stripe page, they're back to an empty cart the same way
+  // most cart abandonment works elsewhere; re-adding items is one click
+  // each in "My Cart".
+  await sb(env, `/cart_items?vendor_id=eq.${vendorId}`, { method: "DELETE" }).catch(() => {});
+
+  return json({ url: session.url });
+}
+
 /** Called once right after a new vendor account is created, since that
  * signup happens via supabase.auth.signUp() straight from the browser
  * (no server involved) and so has no other point where a real
@@ -372,6 +515,13 @@ async function verifyStripeSignature(payload: string, header: string, secret: st
   return signatures.some((sig) => timingSafeEqual(sig, expected));
 }
 
+type CheckoutSession = {
+  id: string;
+  payment_intent: string | { id: string } | null;
+  client_reference_id: string | null;
+  metadata: { vendor_id?: string; tier_id?: string; slots?: string; is_cart?: string; registration_ids?: string } | null;
+};
+
 async function handleStripeWebhook(request: Request, env: Env): Promise<Response> {
   const signatureHeader = request.headers.get("stripe-signature");
   const payload = await request.text();
@@ -379,12 +529,6 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
     return json({ error: "Invalid signature." }, 400);
   }
 
-  type CheckoutSession = {
-    id: string;
-    payment_intent: string | { id: string } | null;
-    client_reference_id: string | null;
-    metadata: { vendor_id?: string; tier_id?: string; slots?: string } | null;
-  };
   let event: { type: string; data: { object: CheckoutSession } };
   try {
     event = JSON.parse(payload);
@@ -395,6 +539,15 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
   if (event.type !== "checkout.session.completed") return json({ received: true });
 
   const session = event.data.object;
+
+  // Cart checkouts (multiple tiers, one Stripe session) branch off here to
+  // their own handler and never fall through to the single-item logic
+  // below - that logic is completely unchanged/untouched for every
+  // existing checkout, which never sets is_cart in its metadata.
+  if (session.metadata?.is_cart === "true") {
+    return handleCartCheckoutCompleted(session, env);
+  }
+
   const vendorId = session.metadata?.vendor_id ?? session.client_reference_id ?? undefined;
   const tierId = session.metadata?.tier_id ?? undefined;
 
@@ -516,10 +669,137 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
   }
 }
 
+/** Cart order payment completed - a separate function the webhook
+ * delegates to before it ever reaches the single-item logic above, so
+ * that logic runs exactly as it always has for every non-cart checkout. */
+async function handleCartCheckoutCompleted(session: CheckoutSession, env: Env): Promise<Response> {
+  const vendorId = session.metadata?.vendor_id ?? session.client_reference_id ?? undefined;
+  let registrationIds: string[] = [];
+  try {
+    registrationIds = session.metadata?.registration_ids ? JSON.parse(session.metadata.registration_ids) : [];
+  } catch {
+    registrationIds = [];
+  }
+  if (!vendorId || registrationIds.length === 0) {
+    console.error("Cart webhook missing vendor_id/registration_ids in metadata", session.id);
+    return json({ received: true });
+  }
+
+  try {
+    const idsFilter = registrationIds.join(",");
+    const [regsRes, vendorRes] = await Promise.all([
+      sb(env, `/registrations?id=in.(${idsFilter})&select=id,status,amount_cents,tier_id,pricing_tiers(name,is_top10,is_founding,price_cents)`),
+      sb(env, `/vendors?id=eq.${vendorId}&select=*`),
+    ]);
+    const registrations = (await regsRes.json()) as Array<{
+      id: string;
+      status: string;
+      amount_cents: number;
+      tier_id: string;
+      pricing_tiers: { name: string; is_top10: boolean; is_founding: boolean; price_cents: number } | null;
+    }>;
+    const [vendor] = (await vendorRes.json()) as Array<{
+      business_name: string;
+      is_founding_vendor: boolean;
+      is_top10: boolean;
+      is_featured: boolean;
+      category_tier: string;
+    }>;
+    if (registrations.length === 0 || !vendor) throw new Error(`Cart registrations or vendor not found (vendor=${vendorId}, session=${session.id})`);
+    if (registrations[0].status === "paid") return json({ received: true, alreadyProcessed: true });
+
+    const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null);
+    const itemsTotalCents = registrations.reduce((sum, r) => sum + r.amount_cents, 0);
+    const grossCents = itemsTotalCents + PLATFORM_FEE_CENTS;
+    const stripeFeeTotalCents = estimateStripeFeeCents(grossCents);
+
+    // Same OR-together pattern the single-item path uses for the boolean
+    // badges - multiple flag-granting tiers in one cart just OR cleanly.
+    // vendors.tier_id is a single column though, so it can't point at
+    // every tier bought at once - it's set to whichever cart tier (if
+    // any) is the Top 10 one, since that's the most significant, else
+    // the first item; the flags below are what's actually authoritative.
+    let mergedFounding = vendor.is_founding_vendor;
+    let mergedTop10 = vendor.is_top10;
+    let mergedFeatured = vendor.is_featured;
+    let representativeTierId = registrations[0].tier_id;
+    let stripeFeeAllocated = 0;
+
+    for (let i = 0; i < registrations.length; i++) {
+      const reg = registrations[i];
+      const tier = reg.pricing_tiers;
+      if (!tier) continue;
+      mergedFounding = mergedFounding || tier.is_founding;
+      mergedTop10 = mergedTop10 || tier.is_top10;
+      mergedFeatured = mergedFeatured || tier.is_top10;
+      if (tier.is_top10) representativeTierId = reg.tier_id;
+
+      // Proportional Stripe-fee split by item price; the last item
+      // absorbs whatever rounding remainder is left so the parts sum
+      // exactly to stripeFeeTotalCents.
+      const isLast = i === registrations.length - 1;
+      const shareCents = isLast
+        ? stripeFeeTotalCents - stripeFeeAllocated
+        : Math.round((stripeFeeTotalCents * reg.amount_cents) / itemsTotalCents);
+      stripeFeeAllocated += shareCents;
+      const platformShare = i === 0 ? PLATFORM_FEE_CENTS : 0;
+
+      const regPatchRes = await sb(env, `/registrations?id=eq.${reg.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          stripe_payment_intent_id: paymentIntentId,
+          awarded_top10: tier.is_top10,
+          stripe_fee_cents: shareCents,
+          platform_fee_cents: platformShare,
+          net_payout_cents: reg.amount_cents - shareCents - platformShare,
+        }),
+      });
+      if (!regPatchRes.ok) throw new Error(`Cart registration update failed: ${await regPatchRes.text()}`);
+    }
+
+    const vendorPatchRes = await sb(env, `/vendors?id=eq.${vendorId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: "active",
+        approved_at: new Date().toISOString(),
+        tier_id: representativeTierId,
+        is_founding_vendor: mergedFounding,
+        is_top10: mergedTop10,
+        is_featured: mergedFeatured,
+        category_tier: mergedTop10 ? "top_10" : vendor.category_tier,
+      }),
+    });
+    if (!vendorPatchRes.ok) throw new Error(`Vendor update failed: ${await vendorPatchRes.text()}`);
+
+    await sb(env, "/activity_log", {
+      method: "POST",
+      body: JSON.stringify({
+        entity_type: "vendor",
+        entity_id: vendorId,
+        entity_name: vendor.business_name,
+        action: "Stripe cart payment completed",
+        detail: `${registrations.length} item${registrations.length === 1 ? "" : "s"} — session ${session.id}`,
+      }),
+    }).catch(() => {});
+
+    return json({ received: true });
+  } catch (err) {
+    console.error("Cart webhook processing failed", err);
+    return json({ error: "Processing failed." }, 500);
+  }
+}
+
 const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const apiRoutes = ["/api/create-checkout-session", "/api/stripe-webhook", "/api/log-terms-agreement"];
+    const apiRoutes = [
+      "/api/create-checkout-session",
+      "/api/create-cart-checkout-session",
+      "/api/stripe-webhook",
+      "/api/log-terms-agreement",
+    ];
     if (!apiRoutes.includes(url.pathname) || request.method !== "POST") return env.ASSETS.fetch(request);
 
     // /api/log-terms-agreement only touches Supabase, never Stripe - don't
@@ -534,6 +814,7 @@ const worker = {
 
     try {
       if (url.pathname === "/api/create-checkout-session") return await handleCreateCheckoutSession(request, env);
+      if (url.pathname === "/api/create-cart-checkout-session") return await handleCreateCartCheckoutSession(request, env);
       if (url.pathname === "/api/log-terms-agreement") return await handleLogTermsAgreement(request, env);
       return await handleStripeWebhook(request, env);
     } catch (err) {
