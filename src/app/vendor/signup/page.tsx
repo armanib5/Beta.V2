@@ -9,9 +9,24 @@ import { PLATFORM_FEE_CENTS } from "@/lib/fees";
 
 export default function VendorSignupPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<SignupLoadingFallback />}>
       <VendorSignupContent />
     </Suspense>
+  );
+}
+
+// This route reads useSearchParams (?type=venue / ?tier=...), which forces
+// the static export to bail to client-side rendering entirely — the HTML
+// Cloudflare serves has nothing in <main> until this JS hydrates. A null
+// fallback meant that window was a blank, unstyled gap with zero feedback;
+// a real fallback at least proves the page is loading instead of looking
+// broken while the bundle downloads/executes (e.g. on a slower in-app
+// browser connection).
+function SignupLoadingFallback() {
+  return (
+    <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">
+      Loading…
+    </div>
   );
 }
 
