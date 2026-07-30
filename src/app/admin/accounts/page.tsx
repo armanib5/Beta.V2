@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { CITY_CENTERS, nearestCityCenter } from "@/lib/geo";
-import type { Vendor } from "@/lib/types";
+import type { LovEntry, Vendor } from "@/lib/types";
 
 interface Row {
   id: string;
   name: string;
   slug: string;
   email: string;
+  phone: string | null;
   city: string;
   hasPin: boolean;
   entityType: string;
@@ -68,9 +69,11 @@ function toCsv(rows: Row[]): string {
 export default function AccountsDirectoryPage() {
   const [status, setStatus] = useState<"loading" | "denied" | "ready">("loading");
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [flyersByVendor, setFlyersByVendor] = useState<Map<string, LovEntry[]>>(new Map());
   const [cityFilter, setCityFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,9 +84,20 @@ export default function AccountsDirectoryPage() {
         setStatus("denied");
         return;
       }
-      const { data } = await supabase.from("vendors").select("*").order("onboarded_at", { ascending: false }).returns<Vendor[]>();
+      const [{ data }, { data: flyerRows }] = await Promise.all([
+        supabase.from("vendors").select("*").order("onboarded_at", { ascending: false }).returns<Vendor[]>(),
+        supabase.from("lov_entries").select("*").not("vendor_id", "is", null).returns<LovEntry[]>(),
+      ]);
       if (cancelled) return;
       setVendors(data ?? []);
+      const byVendor = new Map<string, LovEntry[]>();
+      (flyerRows ?? []).forEach((f) => {
+        if (!f.vendor_id) return;
+        const list = byVendor.get(f.vendor_id) ?? [];
+        list.push(f);
+        byVendor.set(f.vendor_id, list);
+      });
+      setFlyersByVendor(byVendor);
       setStatus("ready");
     });
     return () => {
@@ -100,6 +114,7 @@ export default function AccountsDirectoryPage() {
         name: v.business_name,
         slug: v.slug,
         email: v.contact_email,
+        phone: v.phone,
         city: cityOf(v),
         hasPin: v.lat !== null && v.lng !== null,
         entityType: v.entity_type,
@@ -263,11 +278,16 @@ export default function AccountsDirectoryPage() {
                 </thead>
                 <tbody>
                   {cityRows.map((r) => (
-                    <tr key={r.id} className="border-b border-slate-100">
+                    <Fragment key={r.id}>
+                      <tr className="border-b border-slate-100">
                       <td className="py-2 pr-3 font-medium text-slate-900">
-                        <Link href={`/vendor?slug=${encodeURIComponent(r.slug)}`} className="underline hover:no-underline">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                          className="underline hover:no-underline"
+                        >
                           {r.name}
-                        </Link>
+                        </button>
                         {r.isToday && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">NEW</span>}
                       </td>
                       <td className="py-2 pr-3 font-mono text-xs text-slate-500">{r.slug}</td>
@@ -283,11 +303,74 @@ export default function AccountsDirectoryPage() {
                       </td>
                       <td className="py-2 pr-3 text-slate-500">{r.onboardedAt ? new Date(r.onboardedAt).toLocaleDateString("en-US") : "—"}</td>
                       <td className="py-2 pr-3 print:hidden">
-                        <Link href={`/admin/history?type=vendor&id=${r.id}`} className="text-xs font-semibold text-slate-500 underline">
-                          🗂️ History
-                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                          className="text-xs font-semibold text-slate-500 underline"
+                        >
+                          {expandedId === r.id ? "▲ Close" : "▸ View"}
+                        </button>
                       </td>
-                    </tr>
+                      </tr>
+                      {expandedId === r.id && (
+                        <tr className="border-b border-slate-100 bg-slate-50 print:hidden">
+                          <td colSpan={8} className="px-3 py-4">
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                              <div className="text-xs text-slate-600">
+                                <p>
+                                  <span className="font-semibold text-slate-800">Phone:</span> {r.phone ?? "—"}
+                                </p>
+                                <p className="mt-1">
+                                  <span className="font-semibold text-slate-800">Email:</span> {r.email}
+                                </p>
+                                <p className="mt-1">
+                                  <span className="font-semibold text-slate-800">Kind:</span> {r.entityType} ·{" "}
+                                  {HUB_LABELS[r.hubType as Vendor["hub_type"]] ?? r.hubType}
+                                </p>
+                                <p className="mt-1">
+                                  <span className="font-semibold text-slate-800">City:</span> {r.city}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {(r.hubType === "menu" || r.hubType === "vendor") && (
+                                  <Link
+                                    href={`/vendor?slug=${encodeURIComponent(r.slug)}`}
+                                    target="_blank"
+                                    className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                  >
+                                    {r.hubType === "menu" ? "🍽️ Menu Hub" : "🛒 Vendor Hub"}
+                                  </Link>
+                                )}
+                                {r.hasPin && (
+                                  <Link
+                                    href={`/map?q=${encodeURIComponent(r.name)}`}
+                                    target="_blank"
+                                    className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                  >
+                                    📍 Our Pin on Map
+                                  </Link>
+                                )}
+                                {(flyersByVendor.get(r.id) ?? []).map((f) => (
+                                  <Link
+                                    key={f.id}
+                                    href={`/admin/flyers`}
+                                    className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                  >
+                                    🗒️ Flyer: {f.name}
+                                  </Link>
+                                ))}
+                                <Link
+                                  href={`/admin/history?type=vendor&id=${r.id}`}
+                                  className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                >
+                                  🗂️ Notes &amp; History
+                                </Link>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

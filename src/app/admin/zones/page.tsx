@@ -1,13 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { logActivity } from "@/lib/activity";
+import { CITY_CENTERS, nearestCityCenter } from "@/lib/geo";
 import type { Booth, BoundaryType, LovEntry, Vendor, ZoneBoundary, ZoneBoundaryPoint } from "@/lib/types";
 import { ZoneMap } from "@/components/zone-map";
 import { ZoneBoundaryDrawer } from "@/components/zone-boundary-drawer";
+
+function cityOfEvent(e: LovEntry): string {
+  if (e.section_zone) {
+    const bySection = CITY_CENTERS.find((c) => c.section === e.section_zone);
+    if (bySection) return bySection.city;
+  }
+  if (e.lat !== null && e.lng !== null) return nearestCityCenter(e.lat, e.lng).city;
+  return "Unknown";
+}
+
+type EventTiming = "now" | "soon" | "upcoming" | "past";
+
+/** "now"/"soon" cover multi-day or recurring events currently in their
+ * window; "past" is what should get cleaned up (suspended/removed) — this
+ * is purely a sort/label helper, it never writes anything. */
+function timingOfEvent(e: LovEntry, today: string): EventTiming {
+  const start = e.event_date?.slice(0, 10) ?? null;
+  const end = (e.end_date ?? e.event_date)?.slice(0, 10) ?? null;
+  if (!start) return e.recurrence ? "now" : "upcoming";
+  if (end && end < today) return "past";
+  if (start > today) {
+    const daysOut = (new Date(start).getTime() - new Date(today).getTime()) / 86400000;
+    return daysOut <= 7 ? "soon" : "upcoming";
+  }
+  return "now";
+}
+
+const TIMING_LABEL: Record<EventTiming, string> = {
+  now: "🟢 Happening Now",
+  soon: "🟡 Happening Soon",
+  upcoming: "🔵 Upcoming",
+  past: "⚪ Past",
+};
+const TIMING_ORDER: Record<EventTiming, number> = { now: 0, soon: 1, upcoming: 2, past: 3 };
 
 const STATUS_CYCLE: Record<Booth["status"], Booth["status"]> = {
   open: "reserved",
@@ -108,6 +143,26 @@ export default function AdminZonesPage() {
       cancelled = true;
     };
   }, [eventId]);
+
+  const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const groupedEventsByCity = useMemo(() => {
+    const map = new Map<string, LovEntry[]>();
+    for (const e of events) {
+      const city = cityOfEvent(e);
+      const list = map.get(city) ?? [];
+      list.push(e);
+      map.set(city, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => {
+        const timingDiff = TIMING_ORDER[timingOfEvent(a, todayKey)] - TIMING_ORDER[timingOfEvent(b, todayKey)];
+        if (timingDiff !== 0) return timingDiff;
+        return (b.event_date ?? "").localeCompare(a.event_date ?? "");
+      });
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [events, todayKey]);
 
   async function handleBoothClick(booth: Booth) {
     setError(null);
@@ -370,11 +425,15 @@ export default function AdminZonesPage() {
             className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
           >
             {events.length === 0 && <option value="">No events yet — create one in Venue Board</option>}
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-                {event.event_date ? ` — ${event.event_date}` : ""}
-              </option>
+            {groupedEventsByCity.map(([city, cityEvents]) => (
+              <optgroup key={city} label={city}>
+                {cityEvents.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {TIMING_LABEL[timingOfEvent(event, todayKey)]} — {event.name}
+                    {event.event_date ? ` — ${event.event_date}` : ""}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           {eventId && (

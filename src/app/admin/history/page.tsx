@@ -66,6 +66,14 @@ interface TimelineEntry {
   detail?: string | null;
 }
 
+function timelineToCsv(entityName: string, entries: TimelineEntry[]): string {
+  const header = ["Date", "Event", "Detail"];
+  const lines = entries.map((e) =>
+    [new Date(e.ts).toLocaleString("en-US"), e.label, e.detail ?? ""].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+  );
+  return [`"${entityName} — Activity Timeline"`, header.join(","), ...lines].join("\n");
+}
+
 export default function AdminHistoryPage() {
   return (
     <Suspense fallback={null}>
@@ -403,12 +411,37 @@ function EntityDetail({
   }
 
   return (
-    <div className="mt-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="mt-6 space-y-6 print:max-w-full">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-slate-900">{entityName}</h2>
-        <button type="button" onClick={onBack} className="text-xs font-semibold text-slate-500 underline">
-          ← Choose different {entityType}
-        </button>
+        <div className="flex items-center gap-3 print:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              const csv = timelineToCsv(entityName, timeline);
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `citypinned-history-${entityName.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            ⬇️ Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            🖨️ Print / Save as PDF
+          </button>
+          <button type="button" onClick={onBack} className="text-xs font-semibold text-slate-500 underline">
+            ← Choose different {entityType}
+          </button>
+        </div>
       </div>
 
       {/* CRM / RELATIONSHIP TRACKING (vendors only) */}

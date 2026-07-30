@@ -129,6 +129,30 @@ function ListingRow({
       </div>
       {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
       {message && <p className="mt-2 text-xs font-medium text-green-600">{message}</p>}
+
+      <div className="mt-4 border-t border-slate-100 pt-3">
+        <p className="text-xs font-medium text-slate-700">Preview — how this looks on the board</p>
+        <div className="mt-1 max-w-xs overflow-hidden rounded-xl border border-slate-200">
+          <div className="relative h-28 w-full bg-slate-100">
+            {listing.flyer_image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={listing.flyer_image_url}
+                alt=""
+                className="h-full w-full object-cover"
+                style={{ objectPosition: `${listing.flyer_focal_x}% ${listing.flyer_focal_y}%` }}
+              />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center text-3xl text-slate-300">📌</span>
+            )}
+          </div>
+          <div className="p-3">
+            <p className="text-sm font-bold text-slate-900">{listing.name}</p>
+            {listing.location && <p className="mt-0.5 text-xs text-slate-500">📍 {listing.location}</p>}
+            {details && <p className="mt-1.5 whitespace-pre-wrap text-xs text-slate-600">{details}</p>}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

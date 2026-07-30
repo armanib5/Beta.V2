@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
-import type { FlyerBoard, FlyerRotation, FlyerStatus, LovEntry } from "@/lib/types";
+import { logActivity } from "@/lib/activity";
+import type { Category, FlyerBoard, FlyerRotation, FlyerStatus, LovEntry, Vendor } from "@/lib/types";
 import { FlyerCropEditor } from "@/components/flyer-crop-editor";
 
 const MAX_FLYER_PHOTO_BYTES = 8 * 1024 * 1024;
@@ -39,15 +40,69 @@ export default function AdminFlyersPage() {
   const [rotStatus, setRotStatus] = useState<FlyerStatus>("active");
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const [croppingFlyer, setCroppingFlyer] = useState<LovEntry | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [hosts, setHosts] = useState<Vendor[]>([]);
+  const [editingFlyerId, setEditingFlyerId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    event_date: "",
+    end_date: "",
+    location: "",
+    details: "",
+    category_id: "",
+    hosting_vendor_id: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   async function loadAll() {
     const supabase = createClient();
-    const [{ data: flyerRows }, { data: rotationRows }] = await Promise.all([
+    const [{ data: flyerRows }, { data: rotationRows }, { data: categoryRows }, { data: hostRows }] = await Promise.all([
       supabase.from("lov_entries").select("*").order("event_date", { ascending: false }).returns<LovEntry[]>(),
       supabase.from("flyer_rotation").select("*").order("assigned_board").returns<FlyerRotation[]>(),
+      supabase.from("categories").select("*").order("name").returns<Category[]>(),
+      supabase.from("vendors").select("*").eq("status", "active").order("business_name").returns<Vendor[]>(),
     ]);
     setFlyers(flyerRows ?? []);
     setRotations(rotationRows ?? []);
+    setCategories(categoryRows ?? []);
+    setHosts(hostRows ?? []);
+  }
+
+  function startEditFlyer(f: LovEntry) {
+    setEditingFlyerId(f.id);
+    setEditForm({
+      name: f.name,
+      event_date: f.event_date ?? "",
+      end_date: f.end_date ?? "",
+      location: f.location ?? "",
+      details: f.details ?? "",
+      category_id: f.category_id ?? "",
+      hosting_vendor_id: f.hosting_vendor_id ?? "",
+    });
+  }
+
+  async function saveFlyerEdit(f: LovEntry) {
+    setSavingEdit(true);
+    setError(null);
+    const supabase = createClient();
+    const patch = {
+      name: editForm.name.trim(),
+      event_date: editForm.event_date || null,
+      end_date: editForm.end_date || null,
+      location: editForm.location.trim() || null,
+      details: editForm.details.trim() || null,
+      category_id: editForm.category_id || null,
+      hosting_vendor_id: editForm.hosting_vendor_id || null,
+    };
+    const { error: updateError } = await supabase.from("lov_entries").update(patch).eq("id", f.id);
+    setSavingEdit(false);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setFlyers((prev) => prev.map((row) => (row.id === f.id ? { ...row, ...patch } : row)));
+    logActivity(supabase, "event", f.id, patch.name, "CityPinned Admin edited flyer", `Updated by admin`);
+    setEditingFlyerId(null);
   }
 
   useEffect(() => {
@@ -362,60 +417,199 @@ export default function AdminFlyersPage() {
         </p>
         <div className="mt-3 space-y-2">
           {flyers.map((f) => (
-            <div key={f.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <label className="relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                  {f.flyer_image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={f.flyer_image_url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      style={{ objectPosition: `${f.flyer_focal_x}% ${f.flyer_focal_y}%` }}
+            <div key={f.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-3">
+                  <label className="relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                    {f.flyer_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={f.flyer_image_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        style={{ objectPosition: `${f.flyer_focal_x}% ${f.flyer_focal_y}%` }}
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-xl text-slate-300">📌</span>
+                    )}
+                    <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[8px] font-semibold text-white">
+                      {uploadingPhotoId === f.id ? "…" : f.flyer_image_url ? "Change" : "Upload"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingPhotoId === f.id}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadFlyerPhoto(f, file);
+                        e.target.value = "";
+                      }}
                     />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center text-xl text-slate-300">📌</span>
-                  )}
-                  <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[8px] font-semibold text-white">
-                    {uploadingPhotoId === f.id ? "…" : f.flyer_image_url ? "Change" : "Upload"}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={uploadingPhotoId === f.id}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) uploadFlyerPhoto(f, file);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-                <p className="truncate text-sm font-medium text-slate-900">
-                  {f.name} <span className="text-xs font-normal text-slate-400">({f.type})</span>
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {f.flyer_image_url && (
+                  </label>
+                  <p className="truncate text-sm font-medium text-slate-900">
+                    {f.name} <span className="text-xs font-normal text-slate-400">({f.type})</span>
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setCroppingFlyer(f)}
+                    onClick={() => (editingFlyerId === f.id ? setEditingFlyerId(null) : startEditFlyer(f))}
                     className="rounded-full border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                   >
-                    ✏️ Crop
+                    {editingFlyerId === f.id ? "✕ Close" : "📝 Edit Details"}
                   </button>
-                )}
-                <select
-                  value={f.status}
-                  onChange={(e) => setFlyerStatus(f.id, e.target.value as FlyerStatus)}
-                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
-                >
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="draft">Draft</option>
-                  <option value="archived">Archived</option>
-                </select>
+                  {f.flyer_image_url && (
+                    <button
+                      type="button"
+                      onClick={() => setCroppingFlyer(f)}
+                      className="rounded-full border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      ✏️ Crop
+                    </button>
+                  )}
+                  <select
+                    value={f.status}
+                    onChange={(e) => setFlyerStatus(f.id, e.target.value as FlyerStatus)}
+                    className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                  >
+                    <option value="active">Active</option>
+                    <option value="pending">Pending</option>
+                    <option value="draft">Draft</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
               </div>
+
+              {editingFlyerId === f.id && (
+                <div className="mt-3 grid gap-4 border-t border-slate-100 pt-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">Name</label>
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-slate-700">Date</label>
+                        <input
+                          type="date"
+                          value={editForm.event_date}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, event_date: e.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-slate-700">End date (optional)</label>
+                        <input
+                          type="date"
+                          value={editForm.end_date}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, end_date: e.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">Location</label>
+                      <input
+                        type="text"
+                        value={editForm.location}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, location: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">Description</label>
+                      <textarea
+                        rows={3}
+                        value={editForm.details}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, details: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-slate-700">Category</label>
+                        <select
+                          value={editForm.category_id}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, category_id: e.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                        >
+                          <option value="">—</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.icon ? `${c.icon} ` : ""}
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-slate-700">Hosted / mentions vendor</label>
+                        <select
+                          value={editForm.hosting_vendor_id}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, hosting_vendor_id: e.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                        >
+                          <option value="">— none —</option>
+                          {hosts.map((h) => (
+                            <option key={h.id} value={h.id}>
+                              {h.business_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => saveFlyerEdit(f)}
+                      disabled={savingEdit || !editForm.name.trim()}
+                      className="rounded-full bg-slate-900 px-4 py-1.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      {savingEdit ? "Saving…" : "Save"}
+                    </button>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-medium text-slate-700">Preview — how this looks on the board</p>
+                    <div className="mt-1 overflow-hidden rounded-xl border border-slate-200">
+                      <div className="relative h-32 w-full bg-slate-100">
+                        {f.flyer_image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={f.flyer_image_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            style={{ objectPosition: `${f.flyer_focal_x}% ${f.flyer_focal_y}%` }}
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-3xl text-slate-300">📌</span>
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <p className="text-sm font-bold text-slate-900">{editForm.name || "(untitled)"}</p>
+                        {editForm.event_date && (
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {new Date(editForm.event_date + "T00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            {editForm.end_date ? ` – ${new Date(editForm.end_date + "T00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
+                          </p>
+                        )}
+                        {editForm.location && <p className="mt-0.5 text-xs text-slate-500">📍 {editForm.location}</p>}
+                        {editForm.details && <p className="mt-1.5 whitespace-pre-wrap text-xs text-slate-600">{editForm.details}</p>}
+                        {editForm.hosting_vendor_id && (
+                          <p className="mt-1.5 text-xs font-semibold text-slate-500">
+                            Hosted at {hosts.find((h) => h.id === editForm.hosting_vendor_id)?.business_name}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
