@@ -73,14 +73,6 @@ function sortByProximity(list,getLat,getLng){
   });
 }
 var DEF=[
-{id:"mariachi2026",cat:"seasonal",lbl:"Live Festival",exp:false,mapId:"u1783885081451",
- t:"Silicon Valley Mariachi Festival",w:"Today 1pm - 8pm",d:"2026-07-12",sh:13,eh:20,
- a:"Plaza de Cesar Chavez, San Jose, CA 95113",ph:"",wb:"https://tr.ee/6G_IJFtshX",
- ds:"Silicon Valley Mariachi Festival at Plaza de Cesar Chavez, 1-8pm today - live music with vendors along the street. Supported in part by a Cultural Affairs grant from the City of San Jose.",
- tags:["Live Music","Festival","Tickets","Family"],photo:"img/mariachi-festival-flyer.jpg",g:[],mx:342,my:498,ed:"2026-07-12",ms:"",
- pk:"Contact organizer.",tr:"VTA Convention Center stop, short walk.",
- ac:"Contact organizer.",fam:"Family friendly festival.",
- fp:"At Plaza de Cesar Chavez",fd:"See Google Maps",vg:[]},
 {id:"fm",cat:"market",lbl:"Weekly Market",exp:false,
  t:"Downtown SJ Farmers Market",w:"Wednesdays 9:00am - 1:30pm",d:"wed",
  a:"101 Paseo de San Antonio, San Jose, CA 95113",ph:"(408) 555-0100",wb:"https://downtownsanjosefarmersmarket.com",

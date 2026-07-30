@@ -220,20 +220,6 @@ var PLACES = [
   { "id": "es1", "cat": "market", "hood": "east", "t": "Story Road Market", "a": "Story Rd, San Jose, CA", "lat": 37.3444, "lng": -121.8394, "ds": "Community market along Story Road." },
   { "id": "es2", "cat": "cityart", "hood": "east", "t": "East Side Community Mural", "a": "King Rd, San Jose, CA", "lat": 37.3465, "lng": -121.8362, "ds": "Community mural celebrating East San Jose." },
   { "id": "u1783435013531", "cat": "restaurants", "hood": "downtown", "t": "Eos & Nyx", "a": "201 S Second St #120, San Jose, CA 95113", "lat": 37.3332, "lng": -121.8872, "w": "tue-fri 5pm-9pm", "sh": 17, "eh": 21, "wb": "https://www.eosnyxsj.com/", "ds": "" },
-  {
-    "id": "u1783885081451", "cat": "seasonal", "hood": "downtown",
-    "t": "Mariachi Festival", "w": "Today 1pm - 8pm", "d": "2026-07-12", "sh": 13, "eh": 20, "ed": "2026-07-12",
-    "a": "Plaza de Cesar Chavez, San Jose, CA 95113",
-    "lat": 37.3323, "lng": -121.8897,
-    "ds": "Mariachi Festival at Plaza de Cesar Chavez, 1-8pm today - live music with vendors along the street.",
-    "wb": "https://tr.ee/6G_IJFtshX",
-    "zone": [
-      [37.332885505776645, -121.8904833386006],
-      [37.333125469382146, -121.88995105608795],
-      [37.3324186353823, -121.88950861424625],
-      [37.332231567565415, -121.88996315002443]
-    ]
-  },
   { "id": "jt-fm", "cat": "market", "hood": "japantown", "t": "Japantown Farmers Market", "a": "357 E. Taylor St (Gordon Biersch Brewery parking lot), San Jose, CA", "lat": 37.3533052, "lng": -121.8925223, "w": "Sundays, 8:00am - 12:00pm (May - Oct)", "d": "sun", "sh": 8, "eh": 12, "ds": "Organized by the Japantown Farmers Market Committee / Gordon Biersch." },
   { "id": "sr-fm", "cat": "market", "hood": "santana", "t": "Santana Row Farmers Market", "a": "Santana Row (between Olin Ave & Olsen Dr), San Jose, CA", "lat": 37.3209796, "lng": -121.9486002, "w": "Wednesdays, 4:00pm - 8:00pm (May - Sept)", "d": "wed", "sh": 16, "eh": 20, "ds": "Organized by the California Farmers' Markets Association (CFMA)." },
   { "id": "vmc-fm", "cat": "market", "hood": "santana", "t": "Santa Clara Valley Medical Center Farmers Market", "a": "751 S. Bascom Ave (hospital parking lot), San Jose, CA", "lat": 37.3151936, "lng": -121.9332862, "w": "Wednesdays, 9:00am - 1:00pm (May - Nov)", "d": "wed", "sh": 9, "eh": 13, "ds": "Organized by West Coast Farmers Markets (WCFMA)." },

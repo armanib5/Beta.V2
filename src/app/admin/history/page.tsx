@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
+import { CITY_CENTERS, nearestCityCenter } from "@/lib/geo";
 import {
   formatPrice,
   type AdminNote,
@@ -40,6 +41,31 @@ interface ActivityLogRow {
 }
 
 type EntityKind = "vendor" | "event";
+
+function cityOfVendor(v: Vendor): string {
+  if (v.lat === null || v.lng === null) return "Unknown";
+  return nearestCityCenter(v.lat, v.lng).city;
+}
+
+function cityOfEvent(e: LovEntry): string {
+  if (e.section_zone) {
+    const bySection = CITY_CENTERS.find((c) => c.section === e.section_zone);
+    if (bySection) return bySection.city;
+  }
+  if (e.lat !== null && e.lng !== null) return nearestCityCenter(e.lat, e.lng).city;
+  return "Unknown";
+}
+
+function groupByCity<T>(rows: T[], cityOf: (row: T) => string): [string, T[]][] {
+  const map = new Map<string, T[]>();
+  for (const row of rows) {
+    const city = cityOf(row);
+    const list = map.get(city) ?? [];
+    list.push(row);
+    map.set(city, list);
+  }
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
 
 const NOTE_TYPE_LABELS: Record<AdminNoteType, string> = {
   meeting: "🗓️ Meeting",
@@ -121,15 +147,18 @@ function AdminHistoryContent() {
 
   const filteredVendors = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return vendors.slice(0, 30);
+    if (!q) return vendors;
     return vendors.filter((v) => v.business_name.toLowerCase().includes(q) || v.contact_email.toLowerCase().includes(q));
   }, [vendors, search]);
 
   const filteredEvents = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return events.slice(0, 30);
+    if (!q) return events;
     return events.filter((e) => e.name.toLowerCase().includes(q));
   }, [events, search]);
+
+  const groupedVendorsByCity = useMemo(() => groupByCity(filteredVendors, cityOfVendor), [filteredVendors]);
+  const groupedEventsByCity = useMemo(() => groupByCity(filteredEvents, cityOfEvent), [filteredEvents]);
 
   const selectedVendor = entityType === "vendor" ? vendors.find((v) => v.id === entityId) : undefined;
   const selectedEvent = entityType === "event" ? events.find((e) => e.id === entityId) : undefined;
@@ -198,28 +227,42 @@ function AdminHistoryContent() {
         </div>
 
         {!entityId && (
-          <div className="mt-3 max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-100">
+          <div className="mt-3 max-h-80 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-100">
             {entityType === "vendor"
-              ? filteredVendors.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setEntityId(v.id)}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                  >
-                    <span className="font-medium text-slate-900">{v.business_name}</span>{" "}
-                    <span className="text-xs text-slate-400">{v.contact_email}</span>
-                  </button>
+              ? groupedVendorsByCity.map(([city, cityVendors]) => (
+                  <div key={city}>
+                    <p className="sticky top-0 bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      {city} <span className="font-normal normal-case">({cityVendors.length})</span>
+                    </p>
+                    {cityVendors.map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setEntityId(v.id)}
+                        className="block w-full border-t border-slate-50 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      >
+                        <span className="font-medium text-slate-900">{v.business_name}</span>{" "}
+                        <span className="text-xs text-slate-400">{v.contact_email}</span>
+                      </button>
+                    ))}
+                  </div>
                 ))
-              : filteredEvents.map((e) => (
-                  <button
-                    key={e.id}
-                    type="button"
-                    onClick={() => setEntityId(e.id)}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                  >
-                    <span className="font-medium text-slate-900">{e.name}</span>
-                  </button>
+              : groupedEventsByCity.map(([city, cityEvents]) => (
+                  <div key={city}>
+                    <p className="sticky top-0 bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      {city} <span className="font-normal normal-case">({cityEvents.length})</span>
+                    </p>
+                    {cityEvents.map((e) => (
+                      <button
+                        key={e.id}
+                        type="button"
+                        onClick={() => setEntityId(e.id)}
+                        className="block w-full border-t border-slate-50 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      >
+                        <span className="font-medium text-slate-900">{e.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 ))}
             {entityType === "vendor" && filteredVendors.length === 0 && <p className="px-3 py-4 text-sm text-slate-400">No matches.</p>}
             {entityType === "event" && filteredEvents.length === 0 && <p className="px-3 py-4 text-sm text-slate-400">No matches.</p>}

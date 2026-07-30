@@ -1,94 +1,69 @@
-/* Public "Add a Pin" page — drop a pin on the map, we reverse-geocode
-   it (free Nominatim/OpenStreetMap API, no key needed) to fill in the
-   address so people don't have to hunt for their own street address,
-   then submit to the shared `pins` Supabase table with status
-   'pending' for an admin to approve on /admin/. */
+/* "Update My Pin" page — edits a logged-in vendor's OWN business_name
+   location (vendors.lat/lng in the V2 project) directly, instead of
+   submitting to the old anonymous/admin-reviewed `pins` staging table
+   (V1 project). That old flow let anyone drop a pin with no login at
+   all, which is how stray/leftover pins (e.g. a one-off festival pin
+   nobody ever cleaned up) accumulated with no owner to trace them back
+   to. Requiring a real vendor session and writing straight to that
+   vendor's own row means every pin on the map traces to a real account,
+   and RLS ("vendor can update own profile") already allows this
+   self-edit with no admin review needed. */
 
-var pinMap, marker;
+var pinMap, marker, v2sb, currentVendor;
 
 function init() {
-  var gate = document.getElementById("sbGate");
-  if (!isSupabaseConfigured()) {
-    renderSupabaseNotConfigured(gate, "Adding a pin");
+  if (typeof V2_SUPABASE_URL === "undefined" || typeof supabase === "undefined") {
+    document.getElementById("loginGateMsg").textContent = "This page isn't connected yet — see supabase/README.md.";
+    document.getElementById("loginGate").style.display = "block";
     return;
   }
-  document.getElementById("pinApp").style.display = "block";
+  v2sb = supabase.createClient(V2_SUPABASE_URL, V2_SUPABASE_ANON_KEY);
+  v2sb.auth.getSession().then(function (res) {
+    var session = res.data && res.data.session;
+    if (!session) {
+      document.getElementById("loginGate").style.display = "block";
+      return;
+    }
+    v2sb.from("vendors").select("*").eq("id", session.user.id).single().then(function (vRes) {
+      if (vRes.error || !vRes.data) {
+        document.getElementById("loginGateMsg").textContent = "Couldn't find a business account for this login.";
+        document.getElementById("loginGate").style.display = "block";
+        return;
+      }
+      currentVendor = vRes.data;
+      startPinEditor();
+    });
+  });
+}
 
-  pinMap = L.map("pinMap", { zoomControl: true, center: [37.3382, -121.8863], zoom: 15 });
+function startPinEditor() {
+  document.getElementById("pinApp").style.display = "block";
+  document.getElementById("pinHeading").textContent = "Pin for " + currentVendor.business_name;
+  document.getElementById("pinIntro").textContent =
+    "Tap the map (or drag the pin) to set exactly where " + currentVendor.business_name + "'s pin shows on CityPinned's map.";
+
+  var hasPin = currentVendor.lat !== null && currentVendor.lng !== null;
+  var center = hasPin ? { lat: currentVendor.lat, lng: currentVendor.lng } : { lat: 37.3382, lng: -121.8863 };
+
+  pinMap = L.map("pinMap", { zoomControl: true, center: center, zoom: hasPin ? 16 : 12 });
   L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: "abcd", maxZoom: 20
+    attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 20
   }).addTo(pinMap);
 
   pinMap.on("click", function (e) { placeMarker(e.latlng); });
 
-  document.getElementById("btnSubmitPin").onclick = submitPin;
+  if (hasPin) placeMarker(center, true);
+
+  document.getElementById("btnSubmitPin").onclick = savePin;
   document.getElementById("btnClearPin").onclick = clearPin;
-  drawEventZones();
-  suggestExistingNames();
-  prefillFromQuery();
 }
 
-/* Populates the name/title fields' suggestion lists from pins already
-   submitted (any status) so someone placing themselves notices a
-   lookalike already exists instead of quietly creating a duplicate. */
-function suggestExistingNames() {
-  var sb = getSupabase();
-  sb.from("pins").select("title, owner_name").then(function (res) {
-    if (res.error || !res.data) return;
-    var titles = {}, owners = {};
-    res.data.forEach(function (p) {
-      if (p.title) titles[p.title] = true;
-      if (p.owner_name) owners[p.owner_name] = true;
-    });
-    function esc(s) { return s.replace(/'/g, "&#39;"); }
-    document.getElementById("pTitleList").innerHTML = Object.keys(titles).map(function (t) { return "<option value='" + esc(t) + "'>"; }).join("");
-    document.getElementById("pOwnerList").innerHTML = Object.keys(owners).map(function (o) { return "<option value='" + esc(o) + "'>"; }).join("");
-  });
-}
-
-/* Shows any active event's street-closure zone (drawn in map/admin.html)
-   as a dashed reference outline, so someone placing their own pin can see
-   where the event actually is instead of guessing from the address alone. */
-function drawEventZones() {
-  if (typeof PLACES === "undefined") return;
-  PLACES.forEach(function (p) {
-    if (!p.zone || p.zone.length < 3) return;
-    L.polygon(p.zone, { color: "#f59e0b", weight: 2, dashArray: "5 5", fillColor: "#f59e0b", fillOpacity: 0.08 })
-      .addTo(pinMap).bindTooltip(p.t, { permanent: false, direction: "center" });
-  });
-}
-
-/* "Add to Map" on a flyer/vendor's own detail view links here with
-   ?title=&addr=&cat= instead of making someone manually retype an
-   address they already entered once - board flyers only ever store a
-   free-text address (no real lat/lng), so this forward-geocodes it via
-   the same Nominatim service /pins/ already uses in reverse. */
-function prefillFromQuery() {
-  var params = new URLSearchParams(location.search);
-  var title = params.get("title"), addr = params.get("addr"), cat = params.get("cat");
-  if (!addr) return;
-  var hint = document.getElementById("locHint");
-  document.getElementById("pinPanel").style.display = "block";
-  hint.textContent = "Looking up " + addr + "…";
-  fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=" + encodeURIComponent(addr))
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      if (!data || !data.length) { hint.textContent = "Couldn't find that address automatically - tap the map to place your pin."; return; }
-      var latlng = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-      pinMap.setView(latlng, 17);
-      placeMarker(latlng);
-      if (title) document.getElementById("pTitle").value = title;
-      if (cat && document.querySelector("#pCat option[value='" + cat + "']")) document.getElementById("pCat").value = cat;
-    })
-    .catch(function () { hint.textContent = "Couldn't look up that address - tap the map to place your pin."; });
-}
-
-function placeMarker(latlng) {
+function placeMarker(latlng, skipGeocode) {
   if (marker) pinMap.removeLayer(marker);
   marker = L.marker(latlng, { draggable: true }).addTo(pinMap);
   marker.on("dragend", function () { reverseGeocode(marker.getLatLng()); });
   document.getElementById("pinPanel").style.display = "block";
-  reverseGeocode(latlng);
+  if (!skipGeocode) reverseGeocode(latlng);
 }
 
 function reverseGeocode(latlng) {
@@ -110,44 +85,27 @@ function reverseGeocode(latlng) {
 function clearPin() {
   if (marker) { pinMap.removeLayer(marker); marker = null; }
   document.getElementById("pinPanel").style.display = "none";
-  ["pOwner", "pTitle", "pAddr", "pNote"].forEach(function (id) { document.getElementById(id).value = ""; });
+  document.getElementById("pAddr").value = "";
 }
 
-function submitPin() {
+function savePin() {
   if (!marker) { alert("Tap the map to place your pin first."); return; }
-  var owner = document.getElementById("pOwner").value.trim();
-  var title = document.getElementById("pTitle").value.trim();
-  if (!owner || !title) { alert("Please add your name/business and what's here."); return; }
   var latlng = marker.getLatLng();
   var status = document.getElementById("pinStatus");
   var btn = document.getElementById("btnSubmitPin");
-  btn.disabled = true; btn.textContent = "Submitting…";
+  btn.disabled = true; btn.textContent = "Saving…";
 
-  var sb = getSupabase();
-  var eventSel = document.getElementById("pEvent");
-  var eventLabel = eventSel.options[eventSel.selectedIndex].text;
-  var note = document.getElementById("pNote").value.trim();
-  if (eventSel.value) note = "[" + eventLabel + "] " + note;
-
-  sb.from("pins").insert({
-    source: "vendor",
-    cat_id: document.getElementById("pCat").value,
-    owner_name: owner,
-    title: title,
-    description: note,
-    lat: latlng.lat,
-    lng: latlng.lng,
-    status: "pending"
-  }).then(function (res) {
-    btn.disabled = false; btn.textContent = "Submit Pin";
+  v2sb.from("vendors").update({ lat: latlng.lat, lng: latlng.lng }).eq("id", currentVendor.id).then(function (res) {
+    btn.disabled = false; btn.textContent = "Save My Pin";
     status.style.display = "block";
     if (res.error) {
       status.className = "savestatus bad";
       status.textContent = res.error.message;
     } else {
       status.className = "savestatus ok";
-      status.textContent = "Submitted! An organizer will review it before it shows up on the map.";
-      clearPin();
+      status.textContent = "Saved! Your pin is updated on the map.";
+      currentVendor.lat = latlng.lat;
+      currentVendor.lng = latlng.lng;
     }
   });
 }

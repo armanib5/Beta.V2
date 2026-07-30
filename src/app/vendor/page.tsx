@@ -129,6 +129,27 @@ function VendorProfile() {
         <p className="mt-6 text-slate-700">{vendor.short_description}</p>
       )}
 
+      {vendor.lat !== null && vendor.lng !== null && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${vendor.lat},${vendor.lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+          >
+            🧭 Get Directions
+          </a>
+          <a
+            href={`/map/index.html?q=${encodeURIComponent(vendor.business_name)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full border border-slate-300 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            📍 View on Our Map
+          </a>
+        </div>
+      )}
+
       <div className="mt-4 flex flex-wrap gap-4 text-sm">
         {vendor.instagram_handle && (
           <a
