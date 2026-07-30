@@ -103,16 +103,24 @@ export default function AdminReceiptsPage() {
       .filter((r) => cityFilter === "All" || cityOfReceipt(r) === cityFilter);
   }, [receipts, monthFilter, cityFilter, now]);
 
+  // Multiple registrations can share one stripe_checkout_session_id - a
+  // cart checkout pays for N items in one Stripe session (see
+  // handleCreateCartCheckoutSession in worker/index.ts), so those should
+  // read as one order here, not N unrelated receipts.
   const groupedByCity = useMemo(() => {
-    const map = new Map<string, ReceiptRow[]>();
+    const map = new Map<string, ReceiptRow[][]>();
     for (const r of filteredReceipts) {
       const city = cityOfReceipt(r);
-      const list = map.get(city) ?? [];
-      list.push(r);
-      map.set(city, list);
+      const orders = map.get(city) ?? [];
+      const existingOrder = r.stripe_checkout_session_id
+        ? orders.find((o) => o[0].stripe_checkout_session_id === r.stripe_checkout_session_id)
+        : undefined;
+      if (existingOrder) existingOrder.push(r);
+      else orders.push([r]);
+      map.set(city, orders);
     }
-    for (const list of map.values()) {
-      list.sort((a, b) => (b.paid_at ?? "").localeCompare(a.paid_at ?? ""));
+    for (const orders of map.values()) {
+      orders.sort((a, b) => (b[0].paid_at ?? "").localeCompare(a[0].paid_at ?? ""));
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [filteredReceipts]);
@@ -218,74 +226,93 @@ export default function AdminReceiptsPage() {
       {groupedByCity.length === 0 ? (
         <p className="mt-8 text-sm text-slate-500">No receipts match.</p>
       ) : (
-        groupedByCity.map(([city, cityReceipts]) => (
+        groupedByCity.map(([city, cityOrders]) => (
           <div key={city} className="mt-8 break-inside-avoid">
             <h2 className="text-lg font-bold text-slate-900">
-              {city} <span className="text-sm font-normal text-slate-500">({cityReceipts.length})</span>
+              {city} <span className="text-sm font-normal text-slate-500">({cityOrders.reduce((n, o) => n + o.length, 0)})</span>
             </h2>
             <div className="mt-2 space-y-2">
-              {cityReceipts.map((r) => (
-                <div key={r.id} className="rounded-xl border border-slate-200 bg-white">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                    className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left"
-                  >
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">
-                        {r.vendors?.business_name ?? r.business_name ?? "—"}{" "}
-                        <span className="font-normal text-slate-500">— {r.pricing_tiers?.name ?? "Purchase"}</span>
+              {cityOrders.map((order) => {
+                const first = order[0];
+                const orderTotal = order.reduce((sum, r) => sum + r.amount_cents, 0);
+                const orderKey = first.stripe_checkout_session_id ?? first.id;
+                return (
+                  <div key={orderKey} className="rounded-xl border border-slate-200 bg-white">
+                    {order.length > 1 && (
+                      <p className="border-b border-slate-100 bg-slate-50 px-4 py-1.5 text-xs font-semibold text-slate-500">
+                        🛒 {order.length}-item order
                       </p>
-                      <p className="text-xs text-slate-500">{r.paid_at ? new Date(r.paid_at).toLocaleString("en-US") : "—"}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-900">{formatPrice(r.amount_cents, r.currency)}</span>
-                      <span className="text-xs text-slate-400 print:hidden">{expandedId === r.id ? "▲" : "▼"}</span>
-                    </div>
-                  </button>
-                  {expandedId === r.id && (
-                    <div className="border-t border-slate-100 px-4 py-3 text-sm">
-                      <div className="grid gap-1 sm:grid-cols-2">
-                        <p>
-                          <span className="text-slate-500">Gross amount:</span>{" "}
-                          <span className="font-medium text-slate-900">{formatPrice(r.amount_cents, r.currency)}</span>
-                        </p>
-                        <p>
-                          <span className="text-slate-500">Platform Processing Fee:</span>{" "}
-                          <span className="font-medium text-slate-900">
-                            {r.platform_fee_cents !== null ? formatPrice(r.platform_fee_cents, r.currency) : "—"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-slate-500">Est. Stripe fee:</span>{" "}
-                          <span className="font-medium text-slate-900">
-                            {r.stripe_fee_cents !== null ? formatPrice(r.stripe_fee_cents, r.currency) : "—"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-slate-500">Net payout:</span>{" "}
-                          <span className="font-medium text-slate-900">
-                            {r.net_payout_cents !== null ? formatPrice(r.net_payout_cents, r.currency) : "—"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-slate-500">Contact:</span>{" "}
-                          <span className="font-medium text-slate-900">{r.contact_email}</span>
-                        </p>
+                    )}
+                    {order.map((r) => (
+                      <div key={r.id}>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                          className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left"
+                        >
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">
+                              {r.vendors?.business_name ?? r.business_name ?? "—"}{" "}
+                              <span className="font-normal text-slate-500">— {r.pricing_tiers?.name ?? "Purchase"}</span>
+                            </p>
+                            <p className="text-xs text-slate-500">{r.paid_at ? new Date(r.paid_at).toLocaleString("en-US") : "—"}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-slate-900">{formatPrice(r.amount_cents, r.currency)}</span>
+                            <span className="text-xs text-slate-400 print:hidden">{expandedId === r.id ? "▲" : "▼"}</span>
+                          </div>
+                        </button>
+                        {expandedId === r.id && (
+                          <div className="border-t border-slate-100 px-4 py-3 text-sm">
+                            <div className="grid gap-1 sm:grid-cols-2">
+                              <p>
+                                <span className="text-slate-500">Gross amount:</span>{" "}
+                                <span className="font-medium text-slate-900">{formatPrice(r.amount_cents, r.currency)}</span>
+                              </p>
+                              <p>
+                                <span className="text-slate-500">Platform Processing Fee:</span>{" "}
+                                <span className="font-medium text-slate-900">
+                                  {r.platform_fee_cents !== null ? formatPrice(r.platform_fee_cents, r.currency) : "—"}
+                                </span>
+                              </p>
+                              <p>
+                                <span className="text-slate-500">Est. Stripe fee (this item&apos;s share):</span>{" "}
+                                <span className="font-medium text-slate-900">
+                                  {r.stripe_fee_cents !== null ? formatPrice(r.stripe_fee_cents, r.currency) : "—"}
+                                </span>
+                              </p>
+                              <p>
+                                <span className="text-slate-500">Net payout:</span>{" "}
+                                <span className="font-medium text-slate-900">
+                                  {r.net_payout_cents !== null ? formatPrice(r.net_payout_cents, r.currency) : "—"}
+                                </span>
+                              </p>
+                              <p>
+                                <span className="text-slate-500">Contact:</span>{" "}
+                                <span className="font-medium text-slate-900">{r.contact_email}</span>
+                              </p>
+                            </div>
+                            {r.stripe_payment_intent_id && (
+                              <p className="mt-2 font-mono text-xs text-slate-400">Stripe: {r.stripe_payment_intent_id}</p>
+                            )}
+                            <Link
+                              href={`/admin/history?type=vendor&id=${r.claimed_by_vendor_id ?? ""}`}
+                              className="mt-2 inline-block text-xs font-semibold text-slate-500 underline print:hidden"
+                            >
+                              🗂️ View account history
+                            </Link>
+                          </div>
+                        )}
                       </div>
-                      {r.stripe_payment_intent_id && (
-                        <p className="mt-2 font-mono text-xs text-slate-400">Stripe: {r.stripe_payment_intent_id}</p>
-                      )}
-                      <Link
-                        href={`/admin/history?type=vendor&id=${r.claimed_by_vendor_id ?? ""}`}
-                        className="mt-2 inline-block text-xs font-semibold text-slate-500 underline print:hidden"
-                      >
-                        🗂️ View account history
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    ))}
+                    {order.length > 1 && (
+                      <p className="border-t border-slate-100 px-4 py-2 text-right text-sm font-bold text-slate-900">
+                        Order total: {formatPrice(orderTotal, first.currency)}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))
