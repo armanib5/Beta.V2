@@ -18,7 +18,9 @@ import {
 import { VendorPhotoManager } from "@/components/vendor-photo-manager";
 import { MenuHubManager } from "@/components/menu-hub-manager";
 import { MyListingManager } from "@/components/my-listing-manager";
-import { CheckoutTermsCheckbox, CheckoutTermsNotice, EventLiabilityCheckbox } from "@/components/checkout-terms";
+import { MyReceipts } from "@/components/my-receipts";
+import { CheckoutTermsCheckbox, CheckoutTermsNotice, EventLiabilityCheckbox, PlatformFeeNotice } from "@/components/checkout-terms";
+import { PLATFORM_FEE_CENTS } from "@/lib/fees";
 import type { VendorStatus } from "@/lib/types";
 
 const STATUS_DISPLAY: Record<VendorStatus, { label: string; style: string }> = {
@@ -38,7 +40,6 @@ function formatCountdown(ms: number): string {
 const SLOT_MS = 10 * 60 * 1000;
 const MAX_PER_SLOT = 5;
 const AVAILABILITY_WINDOW_HOURS = 4;
-const PLATFORM_FEE_CENTS = 100;
 
 function nextBucketStart(fromMs: number): number {
   return Math.ceil(fromMs / SLOT_MS) * SLOT_MS;
@@ -317,7 +318,7 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
             )}
             {selectedTier.slug === "top10-30min" && <p className="mt-1 text-xs text-slate-500">Starts immediately on payment.</p>}
             <div className="mt-2 flex justify-between border-t border-slate-100 pt-2">
-              <span>CityPinned service fee</span>
+              <span>Platform Processing Fee</span>
               <span>{formatPrice(PLATFORM_FEE_CENTS)}</span>
             </div>
             <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 font-bold">
@@ -326,6 +327,7 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
             </div>
           </div>
           <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <PlatformFeeNotice />
             <CheckoutTermsNotice />
             <CheckoutTermsCheckbox id="boost-terms" checked={termsAccepted} onChange={setTermsAccepted} />
             <EventLiabilityCheckbox id="boost-liability-terms" checked={liabilityAccepted} onChange={setLiabilityAccepted} />
@@ -433,6 +435,7 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
       )}
       {tiers.length > 0 && (
         <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <PlatformFeeNotice />
           <CheckoutTermsNotice />
           <CheckoutTermsCheckbox id="upgrade-terms" checked={termsAccepted} onChange={setTermsAccepted} />
           <EventLiabilityCheckbox id="upgrade-liability-terms" checked={liabilityAccepted} onChange={setLiabilityAccepted} />
@@ -442,7 +445,10 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
         {tiers.map((tier) => (
           <div key={tier.id} className="rounded-xl border border-slate-200 p-4">
             <p className="font-bold text-slate-900">{tier.name}</p>
-            <p className="text-sm text-slate-600">{formatPrice(tier.price_cents)}</p>
+            <p className="text-sm text-slate-600">
+              {formatPrice(tier.price_cents)} + {formatPrice(PLATFORM_FEE_CENTS)} fee ={" "}
+              <span className="font-semibold text-slate-900">{formatPrice(tier.price_cents + PLATFORM_FEE_CENTS)}</span>
+            </p>
             <button
               type="button"
               onClick={() => payWithStripe(tier)}
@@ -752,6 +758,8 @@ export function VendorDashboard({
       <QuickBoost vendor={vendor} tiers={tiers} />
 
       <BoostRequest vendor={vendor} tiers={tiers} />
+
+      <MyReceipts vendorId={vendor.id} />
 
       <form onSubmit={handleSave} className="mt-8 space-y-6 rounded-2xl border border-slate-200 bg-white p-6">
         <h2 className="text-lg font-bold text-slate-900">Profile Details</h2>

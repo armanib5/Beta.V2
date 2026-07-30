@@ -155,6 +155,16 @@ export default function AdminHubPage() {
           </p>
         </Link>
         <Link
+          href="/admin/receipts"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">🧾 All Receipts</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Every paid checkout across every account, itemized with the $1.00 platform fee — filter by month and
+            city, drill into one receipt, export CSV or print.
+          </p>
+        </Link>
+        <Link
           href="/admin/history"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >

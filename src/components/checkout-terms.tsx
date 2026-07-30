@@ -18,6 +18,17 @@ export function CheckoutTermsNotice() {
   );
 }
 
+/** Required directly above every checkout button so the fee is disclosed
+ * before payment, not buried in a line-item the vendor only sees after
+ * clicking through to Stripe. */
+export function PlatformFeeNotice() {
+  return (
+    <p className="text-xs font-medium text-slate-600">
+      A flat $1.00 platform processing fee applies to each checkout session.
+    </p>
+  );
+}
+
 export function CheckoutTermsCheckbox({
   checked,
   onChange,

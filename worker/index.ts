@@ -54,6 +54,21 @@ function missingEnvVars(env: Env, required: (keyof Env)[] = ["STRIPE_SECRET_KEY"
 // so old rows stay an accurate record of what was actually agreed to.
 const TERMS_VERSION = "v2_event_disclaimer_2026";
 
+// Flat $1.00 platform processing fee, itemized as its own Stripe line item
+// on every checkout on this project (not just Quick Boost/Top 10
+// Placement, which is all it used to cover). Mirrored in src/lib/fees.ts
+// - that file lives in the Next.js bundle, this one's a separate esbuild
+// bundle, so the value has to be kept in sync by hand in both places.
+const PLATFORM_FEE_CENTS = 100;
+
+// Stripe's standard published card rate (2.9% + $0.30) - an estimate
+// stored for reporting/reconciliation, not pulled from Stripe's real
+// Balance Transaction API (which can vary slightly by card type/region),
+// same simplification the requesting spec asked for.
+function estimateStripeFeeCents(grossCents: number): number {
+  return Math.round(grossCents * 0.029) + 30;
+}
+
 /** Fire-and-forget by design (same pattern as the existing activity_log
  * writes in this file) - a logging failure should never block a real
  * signup or checkout. CF-Connecting-IP is set by Cloudflare on every
@@ -191,12 +206,9 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
   if (!vendor) return json({ error: "Vendor not found." }, 404);
   if (!tier) return json({ error: "Pricing tier not found or inactive." }, 404);
 
-  // Quick Vendor Boost ($15/20-min) and Top 10 Placement ($30/30-min) both
-  // show CityPinned's cut as its own itemized line at checkout rather than
-  // folding it into the price.
   const isBoost = tier.slug === "vendor-boost";
   const isPlacement = tier.slug === "top10-30min";
-  const platformFeeCents = isBoost || isPlacement ? 100 : 0;
+  const platformFeeCents = PLATFORM_FEE_CENTS;
 
   // Quick Boost: the vendor picks exactly 2 of the 10-minute slots shown
   // available in the dashboard. Top 10 Placement: always 3 consecutive
@@ -256,7 +268,7 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
       price_data: {
         currency: tier.currency ?? "usd",
         unit_amount: platformFeeCents,
-        product_data: { name: "CityPinned Platform Fee" },
+        product_data: { name: "Platform Processing Fee" },
       },
     });
   }
@@ -393,8 +405,8 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
 
   try {
     // Idempotency - Stripe redelivers events, sometimes more than once.
-    const existingRes = await sb(env, `/registrations?stripe_checkout_session_id=eq.${session.id}&select=id,status`);
-    const [existing] = (await existingRes.json()) as Array<{ id: string; status: string }>;
+    const existingRes = await sb(env, `/registrations?stripe_checkout_session_id=eq.${session.id}&select=id,status,amount_cents`);
+    const [existing] = (await existingRes.json()) as Array<{ id: string; status: string; amount_cents: number }>;
     if (existing?.status === "paid") return json({ received: true, alreadyProcessed: true });
 
     const [tierRes, vendorRes] = await Promise.all([
@@ -404,6 +416,7 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
     const [tier] = (await tierRes.json()) as Array<{
       slug: string;
       name: string;
+      price_cents: number;
       is_top10: boolean;
       is_founding: boolean;
       max_slots: number | null;
@@ -461,11 +474,16 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
     }
 
     const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null);
+    const grossCents = existing?.amount_cents ?? tier.price_cents + PLATFORM_FEE_CENTS;
+    const stripeFeeCents = estimateStripeFeeCents(grossCents);
     const regPatchBody = {
       status: "paid",
       paid_at: new Date().toISOString(),
       stripe_payment_intent_id: paymentIntentId,
       awarded_top10: !usesSlots && tier.is_top10,
+      stripe_fee_cents: stripeFeeCents,
+      platform_fee_cents: PLATFORM_FEE_CENTS,
+      net_payout_cents: grossCents - stripeFeeCents - PLATFORM_FEE_CENTS,
     };
     const regPatchRes = existing
       ? await sb(env, `/registrations?id=eq.${existing.id}`, { method: "PATCH", body: JSON.stringify(regPatchBody) })

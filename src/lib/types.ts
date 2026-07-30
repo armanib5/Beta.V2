@@ -251,6 +251,9 @@ export interface Registration {
   awarded_top10: boolean;
   paid_at: string | null;
   created_at: string;
+  stripe_fee_cents: number | null;
+  platform_fee_cents: number | null;
+  net_payout_cents: number | null;
 }
 
 export interface VendorStatusLog {

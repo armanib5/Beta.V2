@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
 import type { VendorHubType } from "@/lib/types";
-import { CheckoutTermsCheckbox, CheckoutTermsNotice, EventLiabilityCheckbox } from "@/components/checkout-terms";
+import { CheckoutTermsCheckbox, CheckoutTermsNotice, EventLiabilityCheckbox, PlatformFeeNotice } from "@/components/checkout-terms";
 
 const SLUG_RETRY_ATTEMPTS = 5;
 
@@ -199,6 +199,7 @@ export function VendorSignupForm({
         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
       />
       <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        {tierId && <PlatformFeeNotice />}
         {tierId && <CheckoutTermsNotice />}
         {tierId && <CheckoutTermsCheckbox id="signup-terms" checked={termsAccepted} onChange={setTermsAccepted} />}
         <EventLiabilityCheckbox id="signup-liability-terms" checked={liabilityAccepted} onChange={setLiabilityAccepted} />

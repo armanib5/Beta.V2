@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice, type PricingTier } from "@/lib/types";
 import { VendorSignupForm } from "@/components/vendor-signup-form";
+import { PLATFORM_FEE_CENTS } from "@/lib/fees";
 
 export default function VendorSignupPage() {
   return (
@@ -51,8 +52,10 @@ function VendorSignupContent() {
         <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
           {tier ? (
             <>
-              You&apos;re signing up for <strong>{tier.name}</strong> ({formatPrice(tier.price_cents, tier.currency)}
-              ). Create your account below, then you&apos;ll go straight to secure Stripe checkout.
+              You&apos;re signing up for <strong>{tier.name}</strong> (
+              {formatPrice(tier.price_cents, tier.currency)} + {formatPrice(PLATFORM_FEE_CENTS, tier.currency)}{" "}
+              platform processing fee = {formatPrice(tier.price_cents + PLATFORM_FEE_CENTS, tier.currency)}). Create
+              your account below, then you&apos;ll go straight to secure Stripe checkout.
             </>
           ) : (
             "Loading your selected plan…"
