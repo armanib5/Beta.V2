@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
   formatPrice,
+  type AccountLegalAgreement,
   type Category,
   type LovEntry,
   type MenuItem,
@@ -17,7 +18,7 @@ import {
 import { VendorPhotoManager } from "@/components/vendor-photo-manager";
 import { MenuHubManager } from "@/components/menu-hub-manager";
 import { MyListingManager } from "@/components/my-listing-manager";
-import { CheckoutTermsCheckbox, CheckoutTermsNotice } from "@/components/checkout-terms";
+import { CheckoutTermsCheckbox, CheckoutTermsNotice, EventLiabilityCheckbox } from "@/components/checkout-terms";
 import type { VendorStatus } from "@/lib/types";
 
 const STATUS_DISPLAY: Record<VendorStatus, { label: string; style: string }> = {
@@ -74,6 +75,7 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [liabilityAccepted, setLiabilityAccepted] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -142,7 +144,7 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
 
   async function confirmAndPay() {
     if (!selectedTier) return;
-    if (!termsAccepted) {
+    if (!termsAccepted || !liabilityAccepted) {
       setError("Please accept the Terms of Service to continue.");
       return;
     }
@@ -156,7 +158,7 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
           vendor_id: vendor.id,
           tier_id: selectedTier.id,
           slots: selectedTier.slug === "vendor-boost" ? selectedSlots.map((ms) => new Date(ms).toISOString()) : undefined,
-          terms_accepted: termsAccepted,
+          terms_accepted: termsAccepted && liabilityAccepted,
         }),
       });
       const data: { url?: string; error?: string } = await res.json();
@@ -326,11 +328,12 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
           <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <CheckoutTermsNotice />
             <CheckoutTermsCheckbox id="boost-terms" checked={termsAccepted} onChange={setTermsAccepted} />
+            <EventLiabilityCheckbox id="boost-liability-terms" checked={liabilityAccepted} onChange={setLiabilityAccepted} />
           </div>
           <button
             type="button"
             onClick={confirmAndPay}
-            disabled={checkingOut || !termsAccepted}
+            disabled={checkingOut || !termsAccepted || !liabilityAccepted}
             className="mt-3 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
           >
             {checkingOut ? "Starting checkout…" : "Secure Checkout"}
@@ -352,9 +355,10 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
   const [checkoutTierId, setCheckoutTierId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [liabilityAccepted, setLiabilityAccepted] = useState(false);
 
   async function payWithStripe(tier: PricingTier) {
-    if (!termsAccepted) {
+    if (!termsAccepted || !liabilityAccepted) {
       setCheckoutError("Please accept the Terms of Service to continue.");
       return;
     }
@@ -364,7 +368,7 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ vendor_id: vendor.id, tier_id: tier.id, terms_accepted: termsAccepted }),
+        body: JSON.stringify({ vendor_id: vendor.id, tier_id: tier.id, terms_accepted: termsAccepted && liabilityAccepted }),
       });
       const data: { url?: string; error?: string } = await res.json();
       if (res.ok && data.url) {
@@ -431,6 +435,7 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
         <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <CheckoutTermsNotice />
           <CheckoutTermsCheckbox id="upgrade-terms" checked={termsAccepted} onChange={setTermsAccepted} />
+          <EventLiabilityCheckbox id="upgrade-liability-terms" checked={liabilityAccepted} onChange={setLiabilityAccepted} />
         </div>
       )}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -441,7 +446,7 @@ function BoostRequest({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] 
             <button
               type="button"
               onClick={() => payWithStripe(tier)}
-              disabled={checkoutTierId === tier.id || !termsAccepted}
+              disabled={checkoutTierId === tier.id || !termsAccepted || !liabilityAccepted}
               className="mt-2 inline-block rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
             >
               {checkoutTierId === tier.id ? "Starting checkout…" : "Secure Checkout"}
@@ -890,11 +895,20 @@ function AccountLoginSettings({ vendor }: { vendor: Vendor }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [latestAgreement, setLatestAgreement] = useState<AccountLegalAgreement | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => setSessionEmail(data.user?.email ?? null));
-  }, []);
+    supabase
+      .from("account_legal_agreements")
+      .select("*")
+      .eq("user_id", vendor.id)
+      .order("agreed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<AccountLegalAgreement>()
+      .then(({ data }) => setLatestAgreement(data));
+  }, [vendor.id]);
 
   const isPinLogin = (sessionEmail ?? vendor.contact_email).endsWith("@vendor.citypinned.app");
 
@@ -955,6 +969,13 @@ function AccountLoginSettings({ vendor }: { vendor: Vendor }) {
         Your Account ID never changes no matter how you log in, so it stays the same if this account is ever
         moved to a future version of CityPinned.
       </p>
+
+      {latestAgreement && (
+        <p className="mt-3 inline-block rounded-full border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-800">
+          ✅ Terms &amp; Event Liability Agreement accepted on{" "}
+          {new Date(latestAgreement.agreed_at).toLocaleString("en-US")} (Version: {latestAgreement.terms_version})
+        </p>
+      )}
 
       <p className="mt-4 text-sm text-slate-600">
         Set your own email and/or password below whenever you&rsquo;re ready — you don&rsquo;t have to keep

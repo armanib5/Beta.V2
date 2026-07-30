@@ -6,7 +6,7 @@
  * Session creation needs a real secret key, and the webhook needs to run
  * server-side too, so both live here instead: a small Worker that serves
  * the static site (via the ASSETS binding, unchanged from before) and adds
- * exactly two JSON API routes on top of it. No Stripe SDK dependency -
+ * a small number of JSON API routes on top of it. No Stripe SDK dependency -
  * Checkout Sessions are created with a plain fetch to Stripe's REST API,
  * and webhook signatures are verified by hand with Web Crypto (HMAC-SHA256)
  * - both are simple enough to not need the SDK, and it sidesteps any
@@ -41,11 +41,33 @@ function json(data: unknown, status = 200): Response {
 // either endpoint can do anything real. Without this check, a request
 // hitting an unset SUPABASE_URL turns into fetch("undefined/rest/v1/...")
 // - an unhandled exception that Cloudflare shows as an opaque "error code
-// 1101" page instead of a message anyone could act on.
-function missingEnvVars(env: Env): string[] {
-  return (["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const).filter(
-    (key) => !env[key],
-  );
+// 1101" page instead of a message anyone could act on. Takes an explicit
+// key list so a Supabase-only route (like logging a terms agreement)
+// doesn't get blocked on Stripe secrets it never touches.
+function missingEnvVars(env: Env, required: (keyof Env)[] = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]): string[] {
+  return required.filter((key) => !env[key]);
+}
+
+// The version string logged to account_legal_agreements every time someone
+// checks the event non-host / assumption-of-risk box (signup or checkout) -
+// bump this if the disclaimer text in src/app/terms/page.tsx ever changes,
+// so old rows stay an accurate record of what was actually agreed to.
+const TERMS_VERSION = "v2_event_disclaimer_2026";
+
+/** Fire-and-forget by design (same pattern as the existing activity_log
+ * writes in this file) - a logging failure should never block a real
+ * signup or checkout. CF-Connecting-IP is set by Cloudflare on every
+ * request reaching a Worker, so this is a real observed IP, not a
+ * client-reported (and therefore spoofable) one. */
+function logTermsAgreement(env: Env, request: Request, userId: string): Promise<Response> {
+  return sb(env, "/account_legal_agreements", {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+      terms_version: TERMS_VERSION,
+      user_ip: request.headers.get("CF-Connecting-IP"),
+    }),
+  });
 }
 
 function sb(env: Env, path: string, init: RequestInit = {}): Promise<Response> {
@@ -279,7 +301,31 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
     }),
   }).catch(() => {});
 
+  // Event non-host / assumption-of-risk disclaimer acceptance - a separate
+  // audit trail from the activity_log entry above (that one's about the
+  // sale being final; this one's specifically the event-liability
+  // acknowledgment required at every checkout, same as at signup).
+  await logTermsAgreement(env, request, vendorId).catch(() => {});
+
   return json({ url: session.url });
+}
+
+/** Called once right after a new vendor account is created, since that
+ * signup happens via supabase.auth.signUp() straight from the browser
+ * (no server involved) and so has no other point where a real
+ * server-observed IP could be captured for the audit row. */
+async function handleLogTermsAgreement(request: Request, env: Env): Promise<Response> {
+  let body: { vendor_id?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body." }, 400);
+  }
+  if (!body.vendor_id) return json({ error: "vendor_id is required." }, 400);
+
+  const res = await logTermsAgreement(env, request, body.vendor_id);
+  if (!res.ok) return json({ error: `Could not log agreement: ${await res.text()}` }, 500);
+  return json({ ok: true });
 }
 
 function parseSignatureHeader(header: string): { timestamp: string; signatures: string[] } {
@@ -455,16 +501,22 @@ async function handleStripeWebhook(request: Request, env: Env): Promise<Response
 const worker = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const isApiRoute = url.pathname === "/api/create-checkout-session" || url.pathname === "/api/stripe-webhook";
-    if (!isApiRoute || request.method !== "POST") return env.ASSETS.fetch(request);
+    const apiRoutes = ["/api/create-checkout-session", "/api/stripe-webhook", "/api/log-terms-agreement"];
+    if (!apiRoutes.includes(url.pathname) || request.method !== "POST") return env.ASSETS.fetch(request);
 
-    const missing = missingEnvVars(env);
+    // /api/log-terms-agreement only touches Supabase, never Stripe - don't
+    // block it on Stripe secrets it has no use for.
+    const missing =
+      url.pathname === "/api/log-terms-agreement"
+        ? missingEnvVars(env, ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"])
+        : missingEnvVars(env);
     if (missing.length > 0) {
-      return json({ error: `Payment isn't configured yet - missing: ${missing.join(", ")}.` }, 503);
+      return json({ error: `Not configured yet - missing: ${missing.join(", ")}.` }, 503);
     }
 
     try {
       if (url.pathname === "/api/create-checkout-session") return await handleCreateCheckoutSession(request, env);
+      if (url.pathname === "/api/log-terms-agreement") return await handleLogTermsAgreement(request, env);
       return await handleStripeWebhook(request, env);
     } catch (err) {
       // Whatever the reason, never let an exception escape to Cloudflare's

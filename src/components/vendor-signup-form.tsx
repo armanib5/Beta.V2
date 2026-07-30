@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
 import type { VendorHubType } from "@/lib/types";
-import { CheckoutTermsCheckbox, CheckoutTermsNotice } from "@/components/checkout-terms";
+import { CheckoutTermsCheckbox, CheckoutTermsNotice, EventLiabilityCheckbox } from "@/components/checkout-terms";
 
 const SLUG_RETRY_ATTEMPTS = 5;
 
@@ -26,6 +26,7 @@ export function VendorSignupForm({
   const [error, setError] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [liabilityAccepted, setLiabilityAccepted] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -43,10 +44,15 @@ export function VendorSignupForm({
       setError("Passwords do not match.");
       return;
     }
-    // Only a paid signup (a tier was picked) needs terms acceptance — a
-    // free account isn't a sale. Re-checked here even though the button
-    // is already disabled until this is true, so the guard can't be
+    // Every account (free or paid) needs the event non-host/liability
+    // acknowledgment; only a paid signup (a tier was picked) also needs
+    // the sales-final one. Re-checked here even though the button is
+    // already disabled until both are true, so the guard can't be
     // bypassed by submitting the form directly.
+    if (!liabilityAccepted) {
+      setError("Please accept the Terms of Service to continue.");
+      return;
+    }
     if (tierId && !termsAccepted) {
       setError("Please accept the Terms of Service to continue.");
       return;
@@ -98,6 +104,15 @@ export function VendorSignupForm({
         setError(lastError ?? "Could not create your vendor profile. Please try again.");
         return;
       }
+
+      // Timestamped, server-observed-IP record of the event non-host/
+      // liability acknowledgment for this new account - failure here
+      // shouldn't block a successful signup, only best-effort logged.
+      fetch("/api/log-terms-agreement", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ vendor_id: user.id }),
+      }).catch(() => {});
 
       if (tierId) {
         try {
@@ -183,16 +198,15 @@ export function VendorSignupForm({
         onChange={(e) => setConfirmPassword(e.target.value)}
         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
       />
-      {tierId && (
-        <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <CheckoutTermsNotice />
-          <CheckoutTermsCheckbox id="signup-terms" checked={termsAccepted} onChange={setTermsAccepted} />
-        </div>
-      )}
+      <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        {tierId && <CheckoutTermsNotice />}
+        {tierId && <CheckoutTermsCheckbox id="signup-terms" checked={termsAccepted} onChange={setTermsAccepted} />}
+        <EventLiabilityCheckbox id="signup-liability-terms" checked={liabilityAccepted} onChange={setLiabilityAccepted} />
+      </div>
       {error && <p className="text-sm font-medium text-red-600">{error}</p>}
       <button
         type="submit"
-        disabled={loading || (Boolean(tierId) && !termsAccepted)}
+        disabled={loading || (Boolean(tierId) && !termsAccepted) || !liabilityAccepted}
         className="w-full rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
       >
         {loading ? "Creating account…" : tierId ? "Secure Checkout" : "Create Vendor Login"}

@@ -261,6 +261,14 @@ export interface VendorStatusLog {
   changed_at: string;
 }
 
+export interface AccountLegalAgreement {
+  id: string;
+  user_id: string;
+  terms_version: string;
+  agreed_at: string;
+  user_ip: string | null;
+}
+
 export type ActivityEntityType = "vendor" | "event" | "booth";
 
 export interface ActivityLog {
