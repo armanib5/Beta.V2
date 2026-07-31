@@ -51,7 +51,17 @@ function formatCountdown(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function cityInfo(lat: number | null, lng: number | null): { city: string; section: string | null } {
+// The Board and Map both check section_zone (an admin-settable manual
+// city/section override) before falling back to raw lat/lng - this used
+// to always skip straight to nearestCityCenter(lat, lng), so a row an
+// admin corrected via section_zone (e.g. a boundary-adjacent address)
+// could show under the right city on Board/Map but the wrong one here,
+// for the exact same row. Mirrors that same precedence now.
+function cityInfo(lat: number | null, lng: number | null, sectionZone?: string | null): { city: string; section: string | null } {
+  if (sectionZone) {
+    const bySection = CITY_CENTERS.find((c) => c.section === sectionZone);
+    if (bySection) return { city: bySection.city, section: bySection.section };
+  }
   if (lat == null || lng == null) return { city: "Unknown", section: null };
   const nearest = nearestCityCenter(lat, lng);
   return { city: nearest.city, section: nearest.section };
@@ -101,7 +111,7 @@ function fromGuestListing(entry: LovEntry, categorySlugById: Map<string, string>
     lng: entry.lng,
     eventDate: null,
     href: null,
-    ...cityInfo(entry.lat, entry.lng),
+    ...cityInfo(entry.lat, entry.lng, entry.section_zone),
   };
 }
 
@@ -120,7 +130,7 @@ function fromEvent(entry: LovEntry, categoryById: Map<string, Category>): Direct
     lng: entry.lng,
     eventDate: entry.event_date,
     href: null,
-    ...cityInfo(entry.lat, entry.lng),
+    ...cityInfo(entry.lat, entry.lng, entry.section_zone),
   };
 }
 

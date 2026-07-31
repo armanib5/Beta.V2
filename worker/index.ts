@@ -483,6 +483,141 @@ async function handleLogTermsAgreement(request: Request, env: Env): Promise<Resp
   return json({ ok: true });
 }
 
+function slugify(input: string): string {
+  return (
+    input
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "vendor"
+  );
+}
+
+/** Admin-only: provisions a Business ID + PIN credential from scratch.
+ * Nothing in this codebase could do this before - confirmed by a full
+ * repo search - the 20 existing Host Hub vendor rows (migration 0036)
+ * only work because their auth.users rows were created by hand, out of
+ * band, undocumented. vendors.id is a hard FK to auth.users.id (migration
+ * 0001), so the auth user has to be created first via the Supabase Admin
+ * Auth API (only the service-role key can do this - never exposed to the
+ * browser), then the vendors row with that same id, same shape as the
+ * browser's own self-signup insert in vendor-signup-form.tsx. None of the
+ * other /api/* routes authenticate their caller at all (see file header);
+ * this is the first one that has to, since it's a genuinely privileged
+ * action - so unlike them, it requires a bearer token identifying an
+ * admin, checked against the same `admins` table every RLS policy and
+ * checkIsAdmin() already trust. */
+async function handleAdminCreateBusiness(request: Request, env: Env): Promise<Response> {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader) return json({ error: "Missing Authorization header." }, 401);
+
+  const callerRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: authHeader },
+  });
+  if (!callerRes.ok) return json({ error: "Invalid session." }, 401);
+  const caller = (await callerRes.json()) as { id?: string };
+  if (!caller.id) return json({ error: "Invalid session." }, 401);
+
+  const adminRes = await sb(env, `/admins?id=eq.${caller.id}&select=id`);
+  const admins = (await adminRes.json()) as Array<{ id: string }>;
+  if (admins.length === 0) return json({ error: "Admin access required." }, 403);
+
+  let body: {
+    business_name?: string;
+    pin?: string;
+    category_id?: string;
+    lat?: number;
+    lng?: number;
+  };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body." }, 400);
+  }
+
+  const businessName = body.business_name?.trim();
+  if (!businessName) return json({ error: "business_name is required." }, 400);
+
+  const pin = (body.pin?.trim() || String(Math.floor(100000 + Math.random() * 900000))).slice(0, 20);
+  if (pin.length < 4) return json({ error: "PIN must be at least 4 characters." }, 400);
+
+  // Business ID (the slug) has to be unique the same way vendor-signup-
+  // form.tsx retries on a slug collision - reused here rather than a new
+  // scheme, since this is the same vendors.slug column.
+  const baseSlug = slugify(businessName);
+  let slug = baseSlug;
+  let email = `${slug}@vendor.citypinned.app`;
+  let newUserId: string | null = null;
+  for (let attempt = 0; attempt < 5 && !newUserId; attempt++) {
+    if (attempt > 0) {
+      slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+      email = `${slug}@vendor.citypinned.app`;
+    }
+    const createUserRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users`, {
+      method: "POST",
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ email, password: pin, email_confirm: true }),
+    });
+    if (createUserRes.ok) {
+      const newUser = (await createUserRes.json()) as { id: string };
+      newUserId = newUser.id;
+      break;
+    }
+    const errText = await createUserRes.text();
+    if (!errText.toLowerCase().includes("already been registered") && !errText.toLowerCase().includes("already exists")) {
+      return json({ error: `Could not create login: ${errText}` }, 502);
+    }
+    // email collision - loop and retry with a suffixed slug
+  }
+  if (!newUserId) return json({ error: "Could not find an available Business ID after several attempts." }, 500);
+
+  const vendorRes = await sb(env, "/vendors", {
+    method: "POST",
+    headers: { prefer: "return=representation" },
+    body: JSON.stringify({
+      id: newUserId,
+      slug,
+      business_name: businessName,
+      contact_email: email,
+      status: "pending",
+      entity_type: "vendor",
+      hub_type: "vendor",
+      lat: body.lat ?? null,
+      lng: body.lng ?? null,
+    }),
+  });
+  if (!vendorRes.ok) {
+    const errText = await vendorRes.text();
+    return json({ error: `Login created, but the business listing failed: ${errText}` }, 500);
+  }
+  const [vendor] = (await vendorRes.json()) as Array<{ id: string; slug: string }>;
+
+  if (body.category_id) {
+    await sb(env, "/vendor_categories", {
+      method: "POST",
+      body: JSON.stringify({ vendor_id: vendor.id, category_id: body.category_id }),
+    }).catch(() => {});
+  }
+
+  await sb(env, "/activity_log", {
+    method: "POST",
+    body: JSON.stringify({
+      entity_type: "vendor",
+      entity_id: vendor.id,
+      entity_name: businessName,
+      action: "Admin created Business ID + PIN",
+      detail: `Business ID: ${vendor.slug}`,
+    }),
+  }).catch(() => {});
+
+  return json({ business_id: vendor.slug, pin, vendor_id: vendor.id });
+}
+
 function parseSignatureHeader(header: string): { timestamp: string; signatures: string[] } {
   let timestamp = "";
   const signatures: string[] = [];
@@ -799,15 +934,17 @@ const worker = {
       "/api/create-cart-checkout-session",
       "/api/stripe-webhook",
       "/api/log-terms-agreement",
+      "/api/admin-create-business",
     ];
     if (!apiRoutes.includes(url.pathname) || request.method !== "POST") return env.ASSETS.fetch(request);
 
-    // /api/log-terms-agreement only touches Supabase, never Stripe - don't
-    // block it on Stripe secrets it has no use for.
-    const missing =
-      url.pathname === "/api/log-terms-agreement"
-        ? missingEnvVars(env, ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"])
-        : missingEnvVars(env);
+    // /api/log-terms-agreement and /api/admin-create-business only touch
+    // Supabase, never Stripe - don't block them on Stripe secrets they
+    // have no use for.
+    const supabaseOnlyRoutes = ["/api/log-terms-agreement", "/api/admin-create-business"];
+    const missing = supabaseOnlyRoutes.includes(url.pathname)
+      ? missingEnvVars(env, ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"])
+      : missingEnvVars(env);
     if (missing.length > 0) {
       return json({ error: `Not configured yet - missing: ${missing.join(", ")}.` }, 503);
     }
@@ -816,6 +953,7 @@ const worker = {
       if (url.pathname === "/api/create-checkout-session") return await handleCreateCheckoutSession(request, env);
       if (url.pathname === "/api/create-cart-checkout-session") return await handleCreateCartCheckoutSession(request, env);
       if (url.pathname === "/api/log-terms-agreement") return await handleLogTermsAgreement(request, env);
+      if (url.pathname === "/api/admin-create-business") return await handleAdminCreateBusiness(request, env);
       return await handleStripeWebhook(request, env);
     } catch (err) {
       // Whatever the reason, never let an exception escape to Cloudflare's

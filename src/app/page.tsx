@@ -39,11 +39,17 @@ export default function HomePage() {
             Local vendors, home cooks &amp; artisans — find your spot.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base text-slate-300 sm:text-lg">
-            Lock in a permanent CityPinned vendor profile as a Founding Vendor. Early-bird
-            pricing, a badge that carries into Version 3, and a dashboard you control from your
-            phone.
+            Claim your free CityPinned listing and post a flyer — or lock in a permanent
+            Founding Vendor profile with early-bird pricing, a badge that carries into Version
+            3, and a dashboard you control from your phone.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/vendor/signup"
+              className="w-full rounded-full bg-white px-6 py-3 text-sm font-bold text-slate-900 hover:bg-slate-100 sm:w-auto"
+            >
+              Create Free Listing
+            </Link>
             <a
               href="#pricing"
               className="w-full rounded-full bg-amber-400 px-6 py-3 text-sm font-bold text-slate-900 hover:bg-amber-300 sm:w-auto"
@@ -107,11 +113,16 @@ export default function HomePage() {
       <section id="pricing" className="mx-auto max-w-6xl px-4 py-14">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-            Secure your permanent vendor account
+            Optional paid upgrades
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600 sm:text-base">
-            One-time payment via Stripe. Pay online, or hand your phone/iPad to a vendor at your
-            next event and let them scan a QR code to pay in person.
+            Your CityPinned listing and flyer are free —{" "}
+            <Link href="/vendor/signup" className="font-semibold text-slate-900 underline">
+              create your free listing here
+            </Link>
+            . The tiers below are optional: one-time payment via Stripe for extra visibility
+            (a Founding Vendor badge, Top 10 placement). Pay online, or hand your phone/iPad to
+            a vendor at your next event and let them scan a QR code to pay in person.
           </p>
         </div>
 

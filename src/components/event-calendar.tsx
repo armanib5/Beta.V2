@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Category, LovEntry } from "@/lib/types";
 import { FlyerPlaceholder } from "@/components/flyer-placeholder";
 import { BASE_PATH } from "@/lib/site";
+import { expandRecurringEventForMonth } from "@/lib/recurrence";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -50,23 +51,38 @@ export function EventCalendar({ events, categories = [] }: { events: LovEntry[];
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Memoized (not just a plain const) so it's a stable dependency for the
+  // eventsByDate useMemo below - a plain `new Date()`-derived value has a
+  // new identity every render, which the React Compiler can't prove is
+  // safe to depend on.
+  const todayKey = useMemo(() => toDateKey(today.getFullYear(), today.getMonth(), today.getDate()), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, LovEntry[]>();
     for (const event of events) {
-      if (!event.event_date) continue;
-      for (const key of expandDateRange(event.event_date.slice(0, 10), event.end_date?.slice(0, 10) ?? null)) {
-        const list = map.get(key) ?? [];
-        list.push(event);
-        map.set(key, list);
+      if (event.event_date) {
+        for (const key of expandDateRange(event.event_date.slice(0, 10), event.end_date?.slice(0, 10) ?? null)) {
+          const list = map.get(key) ?? [];
+          list.push(event);
+          map.set(key, list);
+        }
+      } else if (event.recurrence) {
+        // Purely recurring rows (no event_date) used to never populate any
+        // day cell at all - only the flat "Recurring Markets & Events"
+        // list below. This expands them onto every matching weekday in
+        // the currently-displayed month, at render time only - no new
+        // rows are ever written, so there's nothing to duplicate.
+        for (const key of expandRecurringEventForMonth(event.recurrence, cursor.year, cursor.month, todayKey)) {
+          const list = map.get(key) ?? [];
+          list.push(event);
+          map.set(key, list);
+        }
       }
     }
     return map;
-  }, [events]);
+  }, [events, cursor.year, cursor.month, todayKey]);
 
   const recurringEvents = useMemo(() => events.filter((event) => !event.event_date), [events]);
-
-  const todayKey = toDateKey(today.getFullYear(), today.getMonth(), today.getDate());
   const firstOfMonth = new Date(cursor.year, cursor.month, 1);
   const daysInMonth = new Date(cursor.year, cursor.month + 1, 0).getDate();
   const leadingBlanks = firstOfMonth.getDay();

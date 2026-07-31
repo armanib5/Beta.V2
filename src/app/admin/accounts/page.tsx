@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { CITY_CENTERS, nearestCityCenter } from "@/lib/geo";
-import type { LovEntry, Vendor } from "@/lib/types";
+import type { Category, LovEntry, Vendor } from "@/lib/types";
 
 interface Row {
   id: string;
@@ -74,6 +74,13 @@ export default function AccountsDirectoryPage() {
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
+  async function refreshVendors() {
+    const supabase = createClient();
+    const { data } = await supabase.from("vendors").select("*").order("onboarded_at", { ascending: false }).returns<Vendor[]>();
+    setVendors(data ?? []);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -184,14 +191,31 @@ export default function AccountsDirectoryPage() {
     <div className="mx-auto max-w-5xl px-4 py-10 print:max-w-full">
       <div className="flex items-center justify-between print:hidden">
         <h1 className="text-2xl font-bold text-slate-900">Accounts Directory</h1>
-        <Link href="/admin" className="text-sm font-semibold text-slate-700 underline">
-          ← Admin Home
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowCreateForm((s) => !s)}
+            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          >
+            {showCreateForm ? "✕ Close" : "+ Create Business"}
+          </button>
+          <Link href="/admin" className="text-sm font-semibold text-slate-700 underline">
+            ← Admin Home
+          </Link>
+        </div>
       </div>
       <p className="mt-1 text-sm text-slate-600 print:hidden">
         Every vendor account — business ID (slug), email, kind, and status. PIN/password values are never shown here
         (they&rsquo;re hashed, not stored retrievably) — the Business ID is the only account identifier visible.
       </p>
+
+      {showCreateForm && (
+        <CreateBusinessForm
+          onCreated={() => {
+            refreshVendors();
+          }}
+        />
+      )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3 print:hidden">
         <input
@@ -379,5 +403,169 @@ export default function AccountsDirectoryPage() {
         ))
       )}
     </div>
+  );
+}
+
+/** Creates a Business ID + PIN from scratch via the new admin-only Worker
+ * route - the piece that never existed anywhere in this codebase before
+ * (the 20 existing Host Hub vendor rows only work because someone
+ * created their auth users by hand, out of band). Once created, the
+ * owner can log in immediately with Business ID + PIN
+ * (vendor-login-form.tsx) and later set their own real email/password
+ * from the dashboard (AccountLoginSettings, already built) - no new code
+ * needed for either of those, this is the one missing piece. */
+function CreateBusinessForm({ onCreated }: { onCreated: () => void }) {
+  const [businessName, setBusinessName] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [locationId, setLocationId] = useState("");
+  const [pin, setPin] = useState("");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ business_id: string; pin: string } | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("categories")
+      .select("*")
+      .order("sort_order")
+      .returns<Category[]>()
+      .then(({ data }) => setCategories(data ?? []));
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!businessName.trim()) {
+      setError("Business name is required.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setError("Your session expired — please log in again.");
+        return;
+      }
+      const location = CITY_CENTERS.find((c) => c.id === locationId);
+      const res = await fetch("/api/admin-create-business", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          business_name: businessName.trim(),
+          pin: pin.trim() || undefined,
+          category_id: categoryId || undefined,
+          lat: location?.lat,
+          lng: location?.lng,
+        }),
+      });
+      const data: { business_id?: string; pin?: string; error?: string } = await res.json();
+      if (!res.ok || !data.business_id || !data.pin) {
+        setError(data.error ?? "Could not create the business.");
+        return;
+      }
+      setResult({ business_id: data.business_id, pin: data.pin });
+      setBusinessName("");
+      setCategoryId("");
+      setLocationId("");
+      setPin("");
+      onCreated();
+    } catch {
+      setError("Could not reach the server. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (result) {
+    return (
+      <div className="mt-4 rounded-xl border border-green-300 bg-green-50 p-4 print:hidden">
+        <p className="text-sm font-bold text-green-900">✅ Business created — hand these to the owner now</p>
+        <p className="mt-2 text-sm text-green-800">
+          These won&rsquo;t be shown again (the PIN isn&rsquo;t stored anywhere retrievable, same as any password).
+        </p>
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <div className="rounded-lg border border-green-300 bg-white p-3">
+            <p className="text-xs font-semibold uppercase text-green-700">Business ID</p>
+            <p className="font-mono text-base font-bold text-slate-900">{result.business_id}</p>
+          </div>
+          <div className="rounded-lg border border-green-300 bg-white p-3">
+            <p className="text-xs font-semibold uppercase text-green-700">PIN</p>
+            <p className="font-mono text-base font-bold text-slate-900">{result.pin}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setResult(null)}
+          className="mt-3 rounded-full border border-green-400 px-4 py-2 text-xs font-semibold text-green-800 hover:bg-green-100"
+        >
+          + Create Another
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-4 rounded-xl border border-slate-200 bg-white p-4 print:hidden">
+      <p className="text-sm font-bold text-slate-900">Create a business listing + Business ID/PIN</p>
+      <p className="mt-1 text-xs text-slate-500">
+        Gives the owner a Business ID + PIN to log in with — they can set up their own free email/password from the
+        dashboard whenever they&rsquo;re ready.
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <input
+          type="text"
+          required
+          placeholder="Business name (e.g. San Jose Candy Shop)"
+          value={businessName}
+          onChange={(e) => setBusinessName(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
+        />
+        <select
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="">Category (optional)</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={locationId}
+          onChange={(e) => setLocationId(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="">Location / area (optional)</option>
+          {CITY_CENTERS.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="PIN (leave blank to auto-generate)"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
+        />
+      </div>
+      {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+      <button
+        type="submit"
+        disabled={saving}
+        className="mt-3 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+      >
+        {saving ? "Creating…" : "Create Business"}
+      </button>
+    </form>
   );
 }

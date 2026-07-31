@@ -53,6 +53,11 @@ export function VendorLoginForm() {
     setLoading(true);
     try {
       const supabase = createClient();
+      // signInWithPassword leaves any pre-existing session untouched on
+      // failure - without this, a stale session from a previous login
+      // (shared/kiosk device) can make a failed attempt here look like
+      // "already logged in" as whoever was signed in before.
+      await supabase.auth.signOut();
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
         setError(signInError.message);
@@ -75,6 +80,7 @@ export function VendorLoginForm() {
       const resolvedEmail = businessId.trim()
         ? `${businessId.trim().toLowerCase()}@vendor.citypinned.app`
         : ADMIN_EMAIL;
+      await supabase.auth.signOut();
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: resolvedEmail,
         password: pin,

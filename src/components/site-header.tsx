@@ -55,7 +55,16 @@ export function SiteHeader() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [profile, setProfile] = useState<Profile>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
+  // Tracked separately (not just a summed pendingCount) so the badge can
+  // route to whichever admin page actually has something to resolve -
+  // pending flyers are only reviewable on /admin/flyers, not
+  // /admin/vendors, and sending the badge to the wrong page for that case
+  // means the count never drops and the badge just reappears every poll.
+  const [pendingVendorCount, setPendingVendorCount] = useState(0);
+  const [pendingFlyerCount, setPendingFlyerCount] = useState(0);
+  const [pendingBoostCount, setPendingBoostCount] = useState(0);
+  const pendingCount = pendingVendorCount + pendingFlyerCount + pendingBoostCount;
+  const pendingHref = pendingVendorCount > 0 || pendingBoostCount > 0 ? "/admin/vendors" : "/admin/flyers";
 
   useEffect(() => {
     const supabase = createClient();
@@ -110,7 +119,9 @@ export function SiteHeader() {
         supabase.from("vendors").select("id", { count: "exact", head: true }).not("boost_requested_at", "is", null).eq("is_top10", false),
       ]);
       if (cancelled) return;
-      setPendingCount((pendingVendors ?? 0) + (pendingFlyers ?? 0) + (boostRequests ?? 0));
+      setPendingVendorCount(pendingVendors ?? 0);
+      setPendingFlyerCount(pendingFlyers ?? 0);
+      setPendingBoostCount(boostRequests ?? 0);
     }
     loadPending();
     const interval = setInterval(loadPending, 45000);
@@ -124,7 +135,7 @@ export function SiteHeader() {
     <>
     {isAdmin && pendingCount > 0 && (
       <Link
-        href="/admin/vendors"
+        href={pendingHref}
         title={`${pendingCount} waiting on approval — click to review`}
         className="approval-blink fixed bottom-4 right-4 z-[999] flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-lg font-bold text-white shadow-lg ring-4 ring-white print:hidden"
       >
@@ -140,7 +151,7 @@ export function SiteHeader() {
           </Link>
           {isAdmin && pendingCount > 0 && (
             <Link
-              href="/admin/vendors"
+              href={pendingHref}
               title={`${pendingCount} waiting on approval`}
               className="approval-blink flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-bold text-white"
             >
@@ -149,7 +160,12 @@ export function SiteHeader() {
           )}
         </div>
 
-        <span className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 sm:block">
+        {/* Centered-absolute + sm:block (640px+) used to overlap the
+            md:flex desktop nav (768px+) across the whole iPad portrait/
+            landscape range (768-1024px), sitting on top of Directory and
+            other nav items. xl:block keeps it off every tablet width and
+            only shows it on genuinely wide desktop viewports. */}
+        <span className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 xl:block">
           Beta V2
         </span>
 

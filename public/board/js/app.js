@@ -436,12 +436,18 @@ function recurrenceToDayCode(recurrence){
    to a board category key - "everything non-recurring is seasonal" was
    too crude and put comedy/music shows in the wrong board entirely
    instead of Theaters. Falls back to seasonal for anything unmapped. */
+/* "community-event" used to map to "seasonal", leaving the "Centers" board
+   section (a full nav button/category, see C/ORD above) permanently
+   empty - no category anywhere pointed to it. Community Event content
+   (rec centers, libraries, community centers) fits "Centers" far better
+   than the generic Seasonal bucket it was lumped into, and this reuses
+   the existing category instead of inventing a new one. */
 var LOV_CAT_SLUG_TO_BOARD={
   "farmers-market":"market","farmers-market-vendor":"market","fair":"market",
   "maker-market":"market","night-market":"market","art-walk":"seasonal",
   "music-festival":"venue","comedy-show":"venue","live-show":"venue",
   "cultural-festival":"venue","gaming-festival":"venue","outdoor-movie":"venue",
-  "community-event":"seasonal","restaurant":"bars","bar":"bars",
+  "community-event":"centers","restaurant":"bars","bar":"bars",
   "workshop-class":"workshop","park-event":"parks","city-art":"cityart"
 };
 /* Resolves a real city+hood from the row's own lat/lng (every seeded row
@@ -532,7 +538,15 @@ function loadFlyerRotation(){
    ?openVendor=<name> from the Vendor Directory instead. */
 function loadLovVendors(){
   if(typeof V2_SUPABASE_URL==="undefined")return;
-  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*&type=eq.vendor&or=(publish_at.is.null,publish_at.lte."+encodeURIComponent(new Date().toISOString())+")",{
+  // Joins categories(slug) directly (same join loadLovEvents() already
+  // uses) instead of relying on the separately-loaded realCategories
+  // cache, since load order between loadLovVendors() and
+  // loadRealCategories() at init() isn't guaranteed. Used to hardcode
+  // cat:"market" for every guest listing regardless of its real
+  // category_id (e.g. a Baker/Jewelry guest listing always showed under
+  // Farmers Market) - "market" is now only the fallback for a listing
+  // with no category set at all, same as before for that case.
+  fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*,categories(slug)&type=eq.vendor&or=(publish_at.is.null,publish_at.lte."+encodeURIComponent(new Date().toISOString())+")",{
     headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
   }).then(function(res){return res.json();}).then(function(rows){
     if(!Array.isArray(rows)||typeof vendors==="undefined")return;
@@ -542,8 +556,10 @@ function loadLovVendors(){
       var id="lov-"+r.id;
       if(existingIds.indexOf(id)>=0)return;
       var loc=cityHoodFromRow(r);
+      var slug=r.categories?r.categories.slug:null;
+      var cat=(slug&&LOV_CAT_SLUG_TO_BOARD[slug])||"market";
       vendors.push({
-        id:id,name:r.name,cat:"market",
+        id:id,name:r.name,cat:cat,
         desc:r.location||"",menu:"",address:r.location||"",
         contact:{phone:"",email:""},website:r.website_url||"",
         social:{instagram:r.instagram_handle||""},
@@ -558,7 +574,11 @@ function loadLovVendors(){
   }).catch(function(){});
 }
 
-var BOARD_CAT_SLUGS={restaurant:"bars",bar:"bars","home-cook":"homecook",other:"other","live-show":"venue"};
+// "food-truck" used to fall through to the generic "shop" default below -
+// the only thing that ever populated "Food Hall" was one hardcoded static
+// seed flyer, so any real DB-driven food-hall listing had nowhere to
+// land. Food Truck vendors fit "Food Hall" well and give it real content.
+var BOARD_CAT_SLUGS={restaurant:"bars",bar:"bars","home-cook":"homecook",other:"other","live-show":"venue","food-truck":"foodhall"};
 /* Real paid/comped vendor accounts (V2's `vendors` table) - same merge as
    loadLovVendors, sourced from the actual vendor accounts instead of the
    LOV guest listings, so a vendor who's actually signed up (or been
@@ -1519,35 +1539,81 @@ function subSug(lid){
    submission lands with an actual category_id an admin can trust, not a
    lossy guess. Fetched once at init() and cached - see loadRealCategories(). */
 var realCategories=[];
-function loadRealCategories(){
+function loadRealCategories(retried){
   if(typeof V2_SUPABASE_URL==="undefined")return;
   fetch(V2_SUPABASE_URL+"/rest/v1/categories?select=*&order=sort_order",{
     headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
   }).then(function(res){return res.json();}).then(function(rows){
     if(Array.isArray(rows))realCategories=rows;
-  }).catch(function(){});
+    refreshFormCategoriesIfOpen();
+  }).catch(function(){
+    // One retry (slow connection, not a real failure) before giving up -
+    // either way, refreshFormCategoriesIfOpen() unblocks the form so a
+    // genuinely open "Post a Flyer" panel doesn't stay disabled forever.
+    if(!retried){setTimeout(function(){loadRealCategories(true);},2000);}
+    else{refreshFormCategoriesIfOpen();}
+  });
 }
 
-function openForm(defCat){
-  var fp=document.getElementById("frmPanel");
-  var catOpts=realCategories.length
+/* Builds the #fcat <select>'s options from whichever category list is
+   currently available, and stamps data-real on the element itself so
+   submitFlyerToSupabase() can tell - from the live DOM, not a possibly
+   stale/since-changed realCategories check - whether the selected value
+   is a real category UUID or just a coarse board-key fallback. */
+function renderCategoryOptions(defCat){
+  var fcatEl=document.getElementById("fcat");
+  if(!fcatEl)return;
+  var usingReal=realCategories.length>0;
+  fcatEl.dataset.real=usingReal?"1":"0";
+  fcatEl.innerHTML=usingReal
     ? realCategories.map(function(c){return "<option value='"+c.id+"'>"+c.name+"</option>";}).join("")
     : Object.entries(C).map(function(e){return "<option value='"+e[0]+"'>"+e[1].l+"</option>";}).join("");
-  var hoodField="";
-  if(curCity==="sj"){
-    var hoodOpts=HOODS_SJ.map(function(h){return "<option value='"+h.id+"'"+(h.id===curHood?" selected":"")+">"+h.l+"</option>";}).join("");
-    hoodField="<label>Neighborhood</label><select id='fhood'>"+hoodOpts+"</select>";
-  }
-  fp.innerHTML="<div class='fi'><h2>Post a Flyer</h2><p class='fnote'>Submitted flyers are reviewed by an admin before they go live on the board.</p><label>Title *</label><input id='ft' type='text' placeholder='e.g. Japantown Night Market'><label>Category</label><select id='fcat'>"+catOpts+"</select>"+hoodField+"<label>When</label><input id='fw' type='text' placeholder='e.g. Saturdays 10am-2pm'><label>Date or recurrence</label><select id='fdate'><option value=''>None</option><option value='today'>Today</option><option value='daily'>Every Day</option><option value='mon'>Mondays</option><option value='tue'>Tuesdays</option><option value='wed'>Wednesdays</option><option value='thu'>Thursdays</option><option value='fri'>Fridays</option><option value='sat'>Saturdays</option><option value='sun'>Sundays</option><option value='monthly'>First Friday Monthly</option></select><label>Address *</label><input id='fa' type='text' placeholder='e.g. 87 N San Pedro St San Jose CA'><label>Phone</label><input id='fph' type='text' placeholder='(408) 555-0100'><label>Website</label><input id='fws' type='text' placeholder='https://'><label>Description</label><textarea id='fd' placeholder='Tell people what this is...'></textarea><label>Parking</label><input id='fpk' type='text' placeholder='e.g. ParkSJ garage 90 min free'><label>Transit</label><input id='ftr' type='text' placeholder='e.g. VTA Route 68, 5 min walk'><div class='facts'><button class='bcan' id='frmCan'>Cancel</button><button class='bsub' id='frmSub'>Submit for Review</button></div></div>";
   if(defCat){
-    var fcatEl=document.getElementById("fcat");
-    if(realCategories.length){
+    if(usingReal){
       var match=realCategories.find(function(c){return LOV_CAT_SLUG_TO_BOARD[c.slug]===defCat;});
       if(match)fcatEl.value=match.id;
     }else{
       fcatEl.value=defCat;
     }
   }
+  var submitBtn=document.getElementById("frmSub");
+  var noteEl=document.getElementById("fcatNote");
+  if(submitBtn){
+    submitBtn.disabled=!usingReal;
+    submitBtn.textContent=usingReal?"Submit for Review":"Loading categories…";
+  }
+  if(noteEl)noteEl.style.display=usingReal?"none":"";
+}
+
+/* Called once loadRealCategories() resolves (success or final failure) -
+   refreshes the open form's category list in place so a panel opened
+   before the fetch finished doesn't stay stuck on the fallback list (or
+   permanently disabled, if the fetch ultimately failed both tries). */
+function refreshFormCategoriesIfOpen(){
+  var ov=document.getElementById("frmOv");
+  if(!ov||!ov.classList.contains("on"))return;
+  var fcatEl=document.getElementById("fcat");
+  if(!fcatEl||fcatEl.dataset.real==="1")return; // already showing real categories
+  renderCategoryOptions(fcatEl.dataset.defCat||"");
+  if(!realCategories.length){
+    // Retry already happened and still failed - stop blocking the form
+    // forever; allow submission with category_id left null rather than
+    // trapping the user, and say so.
+    var submitBtn=document.getElementById("frmSub");
+    if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="Submit for Review";}
+  }
+}
+
+function openForm(defCat){
+  var fp=document.getElementById("frmPanel");
+  var hoodField="";
+  if(curCity==="sj"){
+    var hoodOpts=HOODS_SJ.map(function(h){return "<option value='"+h.id+"'"+(h.id===curHood?" selected":"")+">"+h.l+"</option>";}).join("");
+    hoodField="<label>Neighborhood</label><select id='fhood'>"+hoodOpts+"</select>";
+  }
+  fp.innerHTML="<div class='fi'><h2>Post a Flyer</h2><p class='fnote'>Submitted flyers are reviewed by an admin before they go live on the board.</p><label>Title *</label><input id='ft' type='text' placeholder='e.g. Japantown Night Market'><label>Category</label><select id='fcat'></select><p class='fnote' id='fcatNote'>Loading the full category list…</p>"+hoodField+"<label>When</label><input id='fw' type='text' placeholder='e.g. Saturdays 10am-2pm'><label>Date or recurrence</label><select id='fdate'><option value=''>None</option><option value='today'>Today</option><option value='daily'>Every Day</option><option value='mon'>Mondays</option><option value='tue'>Tuesdays</option><option value='wed'>Wednesdays</option><option value='thu'>Thursdays</option><option value='fri'>Fridays</option><option value='sat'>Saturdays</option><option value='sun'>Sundays</option><option value='monthly'>First Friday Monthly</option></select><label>Address *</label><input id='fa' type='text' placeholder='e.g. 87 N San Pedro St San Jose CA'><label>Phone</label><input id='fph' type='text' placeholder='(408) 555-0100'><label>Website</label><input id='fws' type='text' placeholder='https://'><label>Description</label><textarea id='fd' placeholder='Tell people what this is...'></textarea><label>Parking</label><input id='fpk' type='text' placeholder='e.g. ParkSJ garage 90 min free'><label>Transit</label><input id='ftr' type='text' placeholder='e.g. VTA Route 68, 5 min walk'><div class='facts'><button class='bcan' id='frmCan'>Cancel</button><button class='bsub' id='frmSub'>Submit for Review</button></div></div>";
+  document.getElementById("fcat").dataset.defCat=defCat||"";
+  renderCategoryOptions(defCat);
   document.getElementById("frmCan").onclick=cls;
   document.getElementById("frmSub").onclick=subForm;
   document.getElementById("frmOv").classList.add("on");
@@ -1594,7 +1660,9 @@ function submitFlyerToSupabase(t,a){
   var loc=(typeof hoodCoords==="function")?hoodCoords(curCity,hood):null;
   var dateVal=document.getElementById("fdate").value||"";
   var isSpecificDate=dateVal.length===10;
-  var categoryId=document.getElementById("fcat").value;
+  var fcatEl=document.getElementById("fcat");
+  var categoryId=fcatEl.value;
+  var categoryIsReal=fcatEl.dataset.real==="1";
   var phone=document.getElementById("fph").value.trim();
   var website=document.getElementById("fws").value.trim();
   var when=document.getElementById("fw").value.trim();
@@ -1610,7 +1678,7 @@ function submitFlyerToSupabase(t,a){
 
   var payload={
     type:"event",name:t,location:a,
-    category_id:realCategories.length?(categoryId||null):null,
+    category_id:categoryIsReal?(categoryId||null):null,
     recurrence:isSpecificDate?null:(dateVal||null),
     event_date:isSpecificDate?dateVal:null,
     website_url:normalizeUrl(website)||null,

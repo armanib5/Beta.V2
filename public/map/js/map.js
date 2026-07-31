@@ -318,12 +318,16 @@ function loadApprovedPins() {
 /* Real category (Farmers Market, Comedy Show, ...) maps to a Map
    category key - "everything non-recurring is seasonal" put shows/fairs
    in the wrong bucket instead of Theaters/Farmers Market. */
+// Mirrors the Board's LOV_CAT_SLUG_TO_BOARD fix - "community-event" now
+// maps to "centers" instead of "seasonal", matching the real civic-center
+// content ("Centers" already has static City Hall/Community Center pins
+// seeded in places.js) instead of the generic Seasonal bucket.
 var LOV_CAT_SLUG_TO_MAP = {
   "farmers-market": "market", "farmers-market-vendor": "market", "fair": "market",
   "maker-market": "market", "night-market": "market", "art-walk": "seasonal",
   "music-festival": "venue", "comedy-show": "venue", "live-show": "venue",
   "cultural-festival": "venue", "gaming-festival": "venue", "outdoor-movie": "venue",
-  "community-event": "seasonal", "restaurant": "restaurants", "bar": "bars",
+  "community-event": "centers", "restaurant": "restaurants", "bar": "bars",
   "workshop-class": "workshop", "park-event": "parks", "city-art": "cityart"
 };
 
@@ -361,12 +365,54 @@ function loadLovEvents() {
   }).catch(function () {});
 }
 
+/* Guest vendor listings (V2's lov_entries, type='vendor' - farmers-market
+   booths etc.) never appeared on the Map at all - only loadLovEvents()
+   (type='event') existed here, even though the Board has had its own
+   loadLovVendors() for these since early on. Mirrors loadLovEvents()'s
+   hood/section_zone resolution and loadVendorPins()'s marker-push
+   pattern below, same table and query shape the Board already uses. */
+function loadLovVendors() {
+  if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
+  return fetch(V2_SUPABASE_URL + "/rest/v1/lov_entries?select=*,categories(slug)&type=eq.vendor&or=(publish_at.is.null,publish_at.lte." + encodeURIComponent(new Date().toISOString()) + ")", {
+    headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY }
+  }).then(function (res) { return res.json(); }).then(function (rows) {
+    if (!Array.isArray(rows)) return;
+    rows.forEach(function (r) {
+      if (r.status && r.status !== "active") return;
+      var id = "lov-vendor-" + r.id;
+      if (PLACES.some(function (p) { return p.id === id; })) return;
+      var lat = r.lat, lng = r.lng, hood;
+      if (r.section_zone) {
+        var bySection = CITY_CENTERS.find(function (c) { return c.section === r.section_zone; });
+        hood = bySection ? nearestHood(bySection.lat, bySection.lng).hood : "downtown";
+        if (lat == null || lng == null) { lat = bySection ? bySection.lat : HOODS[0].lat; lng = bySection ? bySection.lng : HOODS[0].lng; }
+      } else if (lat != null && lng != null) {
+        hood = nearestHood(lat, lng).hood;
+      } else {
+        lat = HOODS[0].lat; lng = HOODS[0].lng; hood = HOODS[0].id;
+      }
+      var slug = r.categories ? r.categories.slug : null;
+      var cat = (slug && LOV_CAT_SLUG_TO_MAP[slug]) || "market";
+      var place = {
+        id: id, cat: cat, hood: hood,
+        t: r.name, a: r.location || "", ds: r.details || "",
+        lat: lat, lng: lng, wb: r.website_url || undefined,
+        flyer: r.flyer_image_url || null
+      };
+      PLACES.push(place);
+      addPlaceMarker(place);
+    });
+    updateLegendCounts();
+    applyFilters();
+  }).catch(function () {});
+}
+
 /* Real paid/comped vendor accounts (V2's `vendors` table, not the LOV
-   guest listings loadLovEvents pulls in) with a real lat/lng set - same
+   guest listings loadLovVendors pulls in) with a real lat/lng set - same
    merge pattern, live from the same project. Category comes from the
    vendor's first tagged category (vendor_categories join); anything not
    already a Map category key falls back to "shop" rather than vanishing. */
-var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars", "home-cook": "homecook", other: "other", "live-show": "venue" };
+var MAP_CAT_SLUGS = { restaurant: "restaurants", bar: "bars", "home-cook": "homecook", other: "other", "live-show": "venue", "food-truck": "foodhall" };
 
 /* Site-wide "needs approval" badge next to the brand name, mirroring the
    Board's copy of the same thing - see app.js's checkAdminPendingBadge()
@@ -806,6 +852,7 @@ function initMap() {
   initSearch();
   loadApprovedPins().then(handleSearchQuery);
   loadLovEvents();
+  loadLovVendors();
   loadVendorPins();
   checkAdminPendingBadge();
   setInterval(checkAdminPendingBadge, 45000);
