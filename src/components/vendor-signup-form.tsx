@@ -89,6 +89,18 @@ export function VendorSignupForm({
         },
       });
       if (signUpError) {
+        // TEMPORARY - remove once the current signup rate-limit issue is
+        // resolved. friendlyErrorMessage() only shows a mapped, generic
+        // message to the user; this exposes the raw code/status/message
+        // Supabase Auth actually returned, in the dev console only, so a
+        // real 429 can't be confused with anything else client-side.
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[vendor-signup-form] signUp() failed at Supabase Auth (client -> /auth/v1/signup directly, no worker/API involved):", {
+            code: signUpError.code,
+            status: signUpError.status,
+            message: signUpError.message,
+          });
+        }
         setError(friendlyErrorMessage(signUpError));
         return;
       }
