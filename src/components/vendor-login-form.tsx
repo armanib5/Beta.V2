@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyErrorMessage } from "@/lib/auth-errors";
 
 const ADMIN_EMAIL = "citypinned@gmail.com";
 const REMEMBER_KEY = "citypinned_login_remember";
@@ -60,7 +61,7 @@ export function VendorLoginForm() {
       await supabase.auth.signOut();
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
-        setError(signInError.message);
+        setError(friendlyErrorMessage(signInError));
         return;
       }
       remember({ mode: "password", email });
@@ -86,7 +87,7 @@ export function VendorLoginForm() {
         password: pin,
       });
       if (signInError) {
-        setError(signInError.message);
+        setError(friendlyErrorMessage(signInError));
         return;
       }
       remember({ mode: "pin", businessId });

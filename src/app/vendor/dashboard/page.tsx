@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
-import type { Category, LovEntry, MenuItem, PricingTier, Vendor, VendorPhoto } from "@/lib/types";
+import { friendlyErrorMessage } from "@/lib/auth-errors";
+import type { Category, LovEntry, MenuItem, PricingTier, Vendor, VendorHubType, VendorPhoto } from "@/lib/types";
 import { VendorDashboard } from "@/components/vendor-dashboard";
 
 const SLUG_RETRY_ATTEMPTS = 5;
@@ -25,7 +26,7 @@ export default function VendorDashboardPage() {
   // /vendor/signup for either — that page calls auth.signUp() again, which
   // just fails with "already registered" since the account already exists.
   // This finishes the same insert using the session that already exists.
-  const [needsProfile, setNeedsProfile] = useState<{ userId: string; email: string } | null>(null);
+  const [needsProfile, setNeedsProfile] = useState<{ userId: string; email: string; hubType: VendorHubType | null } | null>(null);
   const [businessName, setBusinessName] = useState("");
   const [profileError, setProfileError] = useState<string | null>(null);
   const [creatingProfile, setCreatingProfile] = useState(false);
@@ -67,7 +68,8 @@ export default function VendorDashboardPage() {
       if (cancelled) return;
 
       if (!vendor) {
-        setNeedsProfile({ userId: user.id, email: user.email ?? "" });
+        const hubType = (user.user_metadata?.hub_type as VendorHubType | undefined) ?? null;
+        setNeedsProfile({ userId: user.id, email: user.email ?? "", hubType });
         return;
       }
 
@@ -105,6 +107,7 @@ export default function VendorDashboardPage() {
           business_name: businessName,
           contact_email: needsProfile.email,
           status: "pending",
+          ...(needsProfile.hubType ? { hub_type: needsProfile.hubType } : {}),
         });
 
         if (!insertError) {
@@ -116,7 +119,7 @@ export default function VendorDashboardPage() {
           lastError = insertError.message; // slug collision — retry with a suffix
           continue;
         }
-        setProfileError(insertError.message);
+        setProfileError(friendlyErrorMessage(insertError));
         return;
       }
       setProfileError(lastError ?? "Could not create your vendor profile. Please try again.");

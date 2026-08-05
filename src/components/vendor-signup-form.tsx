@@ -5,6 +5,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { slugify } from "@/lib/slug";
+import { friendlyErrorMessage } from "@/lib/auth-errors";
+import { BASE_PATH } from "@/lib/site";
 import type { VendorHubType } from "@/lib/types";
 import { CheckoutTermsCheckbox, CheckoutTermsNotice, EventLiabilityCheckbox, PlatformFeeNotice } from "@/components/checkout-terms";
 
@@ -24,6 +26,11 @@ export function VendorSignupForm({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Distinct from `error` (red/alarming) - this is the expected, successful
+  // outcome of every signup while email confirmation is required, and used
+  // to be shown via setError(), making a working signup look identical to
+  // a failed one.
+  const [notice, setNotice] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [liabilityAccepted, setLiabilityAccepted] = useState(false);
@@ -31,6 +38,7 @@ export function VendorSignupForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
 
     if (!businessName.trim()) {
       setError("Business name is required.");
@@ -61,17 +69,38 @@ export function VendorSignupForm({
     setLoading(true);
     try {
       const supabase = createClient();
-      const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        // Confirmation email links back here specifically (not whatever
+        // the project's default Site URL happens to be) - this page
+        // already has the "finish your profile" completion flow for a
+        // just-confirmed account with no vendor row yet. Same pattern
+        // vendor-forgot-password/page.tsx already uses for its own
+        // reset-password redirect.
+        options: {
+          emailRedirectTo: `${window.location.origin}${BASE_PATH}/vendor/dashboard`,
+          // Carries hub_type across the confirmation-email gap - without
+          // this, a Venue/Host Hub signup that hits the "no session yet"
+          // path below would silently become a plain vendor account once
+          // /vendor/dashboard finishes creating its row after confirmation,
+          // since nothing else remembers which kind of signup this was.
+          data: defaultHubType ? { hub_type: defaultHubType } : undefined,
+        },
+      });
       if (signUpError) {
-        setError(signUpError.message);
+        setError(friendlyErrorMessage(signUpError));
         return;
       }
 
       const user = data.user;
       if (!user || !data.session) {
-        setError(
-          "Account created — check your email to confirm it, then log in to finish setting up your profile.",
-        );
+        // The expected outcome with email confirmation required -
+        // signUp() creates the auth user but issues no session until the
+        // link is clicked, so there's nothing to authenticate the
+        // vendors-row insert below as yet (RLS requires auth.uid() = id).
+        // /vendor/dashboard finishes it once a real session exists.
+        setNotice("Account created! Check your email to confirm it, then log in to finish setting up your profile.");
         return;
       }
 
@@ -95,7 +124,7 @@ export function VendorSignupForm({
         } else if (insertError.code === "23505") {
           lastError = insertError.message; // slug collision — retry with a suffix
         } else {
-          setError(insertError.message);
+          setError(friendlyErrorMessage(insertError));
           return;
         }
       }
@@ -146,6 +175,22 @@ export function VendorSignupForm({
     } finally {
       setLoading(false);
     }
+  }
+
+  if (notice) {
+    return (
+      <div className="mt-6 space-y-3">
+        <p className="rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800">
+          ✅ {notice}
+        </p>
+        <Link
+          href="/vendor/login"
+          className="block w-full rounded-full bg-slate-900 px-6 py-3 text-center text-sm font-semibold text-white hover:bg-slate-700"
+        >
+          Go to Log In
+        </Link>
+      </div>
+    );
   }
 
   if (checkoutError) {
