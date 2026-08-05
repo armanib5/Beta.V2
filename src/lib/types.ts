@@ -236,6 +236,22 @@ export interface PromoCode {
   created_at: string;
 }
 
+export interface PromoCodeGrant {
+  id: string;
+  promo_code_id: string;
+  vendor_id: string;
+  created_at: string;
+}
+
+export interface PromoRedemption {
+  id: string;
+  promo_code_id: string;
+  vendor_id: string;
+  tier_id: string;
+  registration_id: string | null;
+  redeemed_at: string;
+}
+
 export interface CartItem {
   id: string;
   vendor_id: string;
