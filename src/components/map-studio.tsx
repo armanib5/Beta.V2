@@ -60,6 +60,18 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
   const [pins, setPins] = useState(initialPins);
+  // Marker click handlers are bound once, when a marker is first created
+  // (see the pins-sync effect below) - they close over whatever
+  // `selectPin` looked like at that moment, which itself closed over
+  // that render's `pins`. Without this ref, clicking an existing pin
+  // after any OTHER pin had been edited would show stale data, since the
+  // handler's captured `pins` snapshot never gets updated. Read through
+  // this ref instead of the `pins` state variable anywhere a marker
+  // callback (created once) needs the current list (updated every time).
+  const pinsRef = useRef(pins);
+  useEffect(() => {
+    pinsRef.current = pins;
+  }, [pins]);
   const [mapReady, setMapReady] = useState(false);
   const [addMode, setAddMode] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -150,7 +162,7 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
   }, [pins, mapReady]);
 
   function selectPin(id: string) {
-    const pin = pins.find((p) => p.id === id);
+    const pin = pinsRef.current.find((p) => p.id === id);
     if (!pin) return;
     setSelectedId(id);
     setForm({ title: pin.title ?? "", description: pin.description ?? "", category: pin.category ?? "business" });
@@ -173,11 +185,18 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
     }
     setPins((prev) => [...prev, data]);
     setAddMode(false);
-    selectPin(data.id);
+    // Set the edit panel directly from the freshly-inserted row instead of
+    // routing through selectPin(data.id) - selectPin looks the pin up by id
+    // in the pins list, and immediately after this setPins call that lookup
+    // would still miss the new pin (state updates aren't synchronous), so
+    // the panel would silently never open.
+    setSelectedId(data.id);
+    setForm({ title: data.title ?? "", description: data.description ?? "", category: data.category ?? "business" });
+    setError(null);
     flash("✓ Pin added — edit its details below");
   }
 
-  async function savePin(id: string, patch: Partial<PinRow>) {
+  async function savePin(id: string, patch: Partial<PinRow>): Promise<boolean> {
     setSaving(true);
     setError(null);
     const supabase = createClient();
@@ -185,9 +204,10 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
     setSaving(false);
     if (updateError || !data) {
       setError(updateError?.message ?? "Could not save changes.");
-      return;
+      return false;
     }
     setPins((prev) => prev.map((p) => (p.id === id ? data : p)));
+    return true;
   }
 
   async function saveForm() {
@@ -196,12 +216,12 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
       setError("Title can't be empty.");
       return;
     }
-    await savePin(selected.id, {
+    const ok = await savePin(selected.id, {
       title: form.title.trim(),
       description: form.description.trim() || null,
       category: form.category,
     });
-    flash(`✓ Saved — ${form.title.trim()}`);
+    if (ok) flash(`✓ Saved — ${form.title.trim()}`);
   }
 
   // pins.status only allows "pending" or "approved" (confirmed live against
