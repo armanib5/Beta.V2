@@ -106,7 +106,7 @@ export function LogoCropEditor({
           />
         </div>
 
-        {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-xs font-medium text-red-600">{error}</p>}
 
         <div className="mt-4 flex justify-end gap-2">
           <button

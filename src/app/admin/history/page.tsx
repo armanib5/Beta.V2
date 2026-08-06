@@ -165,7 +165,7 @@ function AdminHistoryContent() {
   const selectedName = selectedVendor?.business_name ?? selectedEvent?.name ?? null;
 
   if (status === "loading") {
-    return <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
+    return <div role="status" aria-live="polite" className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
   }
   if (status === "denied") {
     return (
@@ -559,7 +559,7 @@ function EntityDetail({
             {savingNote ? "Saving…" : "Add Note"}
           </button>
         </div>
-        {error && <p className="mt-2 text-sm font-medium text-red-600">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm font-medium text-red-600">{error}</p>}
 
         <div className="mt-4 space-y-3">
           {notes.length === 0 && <p className="text-sm text-slate-500">No notes yet.</p>}

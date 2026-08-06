@@ -170,7 +170,7 @@ export default function AccountsDirectoryPage() {
   }
 
   if (status === "loading") {
-    return <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
+    return <div role="status" aria-live="polite" className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
   }
 
   if (status === "denied") {
@@ -558,7 +558,7 @@ function CreateBusinessForm({ onCreated }: { onCreated: () => void }) {
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
         />
       </div>
-      {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
       <button
         type="submit"
         disabled={saving}

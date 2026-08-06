@@ -15,7 +15,15 @@
    matching how the rest of this file already reads V2 data. */
 var REPORT_TAKEDOWN_DISCLAIMER = "Citypinned and Baypinned operate solely as user-driven directories. We do not host, authorize, or endorse listed events. Report flags trigger immediate review and temporary listing suspension pending investigation.";
 
+// Cheap, no-dependency deterrent against scripted spam (the DB-side
+// cooldown in migration 0052 is the real backstop against a determined
+// human attacker) - a bot filling every field in a form dump will fill
+// this honeypot too, and a script submitting instantly will trip the
+// minimum-dwell-time check below.
+var reportFormOpenedAt = 0;
+
 function openReportForm(targetType, targetId, targetName) {
+  reportFormOpenedAt = Date.now();
   var fp = document.getElementById("reportPanel");
   fp.innerHTML = "<div class='fi'><h2>Report " + escHtml(targetName) + "</h2>" +
     "<label>Reason *</label><select id='rpReason'>" +
@@ -30,6 +38,7 @@ function openReportForm(targetType, targetId, targetName) {
     "<option value='Other'>Other</option>" +
     "</select>" +
     "<label>Details (optional)</label><textarea id='rpDetails' placeholder='Describe the issue...'></textarea>" +
+    "<input type='text' id='rpHoneypot' name='website' autocomplete='off' tabindex='-1' aria-hidden='true' style='position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;'>" +
     "<div id='rpErr' style='color:#c0392b;font-size:12px;margin-top:6px;display:none;'></div>" +
     "<p style='font-size:11px;line-height:1.5;color:rgba(90,65,30,.75);margin-top:14px;'>" + REPORT_TAKEDOWN_DISCLAIMER + "</p>" +
     "<div class='facts'><button class='bcan' id='rpCancel'>Cancel</button><button class='bsub' id='rpSubmit'>Submit Report</button></div>" +
@@ -50,6 +59,19 @@ function submitReport(targetType, targetId, targetName) {
   var err = document.getElementById("rpErr");
   if (!reason) {
     err.textContent = "Please pick a reason."; err.style.display = "block"; return;
+  }
+  var honeypot = document.getElementById("rpHoneypot");
+  if (honeypot && honeypot.value) {
+    // A field a real person never sees or fills got filled - silently
+    // accept without actually submitting, same as a real success, so an
+    // automated script gets no signal that it was caught.
+    var doneFp = document.getElementById("reportPanel");
+    doneFp.innerHTML = "<div class='fi'><h2>Report Submitted</h2><p style='font-size:13px;'>Thanks - our moderation team will review this.</p><div class='facts'><button class='bsub' id='rpDone'>Done</button></div></div>";
+    document.getElementById("rpDone").onclick = closeReportForm;
+    return;
+  }
+  if (Date.now() - reportFormOpenedAt < 2000) {
+    err.textContent = "Please take a moment to review before submitting."; err.style.display = "block"; return;
   }
   if (typeof V2_SUPABASE_URL === "undefined") {
     err.textContent = "Couldn't reach the reporting service right now - check your connection and try again."; err.style.display = "block"; return;

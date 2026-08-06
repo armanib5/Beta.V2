@@ -35,19 +35,34 @@ body {
   animation: live-pulse-border 2.4s ease-in-out infinite;
 }
 
-/* The admin "needs approval" badge — a real on/off blink (not the
-   subtler opacity fade of Tailwind's animate-pulse), so it actually
-   catches your eye from across the page instead of just sitting there
-   dimmed. */
+/* The admin "needs approval" badge — noticeably more attention-grabbing
+   than the slow live-pulse-border above, but eased rather than a hard
+   on/off cut (the previous step-start version was a real strobe flash -
+   a genuine vestibular/photosensitivity concern with zero benefit over a
+   fast, smooth pulse that's just as noticeable). */
 @keyframes approval-blink {
-  0%, 49% {
+  0%, 100% {
     opacity: 1;
   }
-  50%, 100% {
-    opacity: 0.25;
+  50% {
+    opacity: 0.4;
   }
 }
 
 .approval-blink {
-  animation: approval-blink 1s step-start infinite;
+  animation: approval-blink 1.2s ease-in-out infinite;
+}
+
+/* Anyone who's asked their OS/browser to reduce motion gets both
+   animations replaced with a static (but still visually distinct)
+   state instead of disabling the visual cue entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .live-pulse {
+    animation: none;
+    border-color: #16a34a;
+  }
+  .approval-blink {
+    animation: none;
+    opacity: 1;
+  }
 }

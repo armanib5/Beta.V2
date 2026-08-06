@@ -207,18 +207,20 @@ export function Top10Directory() {
     return map;
   }, [boostBookings, now]);
 
+  // Deliberately NOT dependent on activeBoostEndByVendor/now - that used
+  // to bake live boost status into every item here, which meant this
+  // (and everything derived from it: filtered, featured, the whole main
+  // grid) recomputed from scratch every second for every visitor, even
+  // though boost status only actually matters for the small "Rotating
+  // Boost" strip below (boostedNow), which reads activeBoostEndByVendor
+  // directly instead now.
   const allItems = useMemo(() => {
-    const items = [
+    return [
       ...vendors.map(fromVendor),
       ...guestListings.map((e) => fromGuestListing(e, categorySlugById)),
       ...events.map((e) => fromEvent(e, categoryById)),
     ];
-    return items.map((item) => {
-      if (!item.id.startsWith("vendor:")) return item;
-      const activeEnd = activeBoostEndByVendor.get(item.id.slice("vendor:".length));
-      return activeEnd ? { ...item, boostActiveUntil: activeEnd } : item;
-    });
-  }, [vendors, guestListings, events, categorySlugById, categoryById, activeBoostEndByVendor]);
+  }, [vendors, guestListings, events, categorySlugById, categoryById]);
 
   const [anchor, setAnchorState] = useState<Anchor | null>(null);
   const [locating, setLocating] = useState(false);
@@ -281,24 +283,35 @@ export function Top10Directory() {
   // either cap is ever bypassed (e.g. an admin manually flipping is_top10).
   const featured = useMemo(() => filtered.filter((item) => item.isTop10).slice(0, 5), [filtered]);
 
-  const boostedNow = useMemo(
-    () =>
-      filtered
-        .filter((item) => item.boostActiveUntil && new Date(item.boostActiveUntil).getTime() > now)
-        .sort((a, b) => new Date(a.boostActiveUntil!).getTime() - new Date(b.boostActiveUntil!).getTime())
-        .slice(0, 5),
-    [filtered, now],
-  );
+  const boostedNow = useMemo(() => {
+    const boosted: DirectoryItem[] = [];
+    for (const item of filtered) {
+      if (!item.id.startsWith("vendor:")) continue;
+      const end = activeBoostEndByVendor.get(item.id.slice("vendor:".length));
+      if (end) boosted.push({ ...item, boostActiveUntil: end });
+    }
+    return boosted.sort((a, b) => new Date(a.boostActiveUntil!).getTime() - new Date(b.boostActiveUntil!).getTime()).slice(0, 5);
+  }, [filtered, activeBoostEndByVendor]);
+
+  // A stable string, not the boostedNow array itself, as nearMe's
+  // dependency - activeBoostEndByVendor (and so boostedNow) gets a new
+  // object identity every second from the live countdown tick, even
+  // when the actual SET of currently-boosted vendors hasn't changed.
+  // Depending on boostedNow directly used to recompute (and re-render)
+  // the entire main grid every second along with it; this key only
+  // actually changes value when boosted membership itself changes.
+  const boostedVendorIdsKey = [...activeBoostEndByVendor.keys()].sort().join(",");
 
   const nearMe = useMemo(() => {
-    const rest = filtered.filter((item) => !item.isTop10 && !boostedNow.includes(item));
+    const boostedIds = new Set(boostedVendorIdsKey ? boostedVendorIdsKey.split(",") : []);
+    const rest = filtered.filter((item) => !item.isTop10 && !(item.id.startsWith("vendor:") && boostedIds.has(item.id.slice("vendor:".length))));
     if (!anchor) {
       return rest
         .map((item) => ({ ...item, distance: null as number | null }))
         .sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured) || a.name.localeCompare(b.name));
     }
     return calculateProximity(rest, anchor);
-  }, [filtered, anchor, boostedNow]);
+  }, [filtered, anchor, boostedVendorIdsKey]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -316,7 +329,7 @@ export function Top10Directory() {
           {locating ? "Locating…" : anchor ? `📍 Sorted Near ${anchor.label}` : "📍 Near Me"}
         </button>
       </div>
-      {locationError && <p className="mt-2 text-sm font-medium text-red-600">{locationError}</p>}
+      {locationError && <p role="alert" className="mt-2 text-sm font-medium text-red-600">{locationError}</p>}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {PILLS.map((p) => (

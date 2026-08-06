@@ -65,9 +65,16 @@ export function MyCart({ vendorId, refreshKey }: { vendorId: string; refreshKey:
     setError(null);
     setCheckingOut(true);
     try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const res = await fetch("/api/create-cart-checkout-session", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(session ? { authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ vendor_id: vendorId, terms_accepted: termsAccepted && liabilityAccepted }),
       });
       const data: { url?: string; error?: string } = await res.json();
@@ -134,7 +141,7 @@ export function MyCart({ vendorId, refreshKey }: { vendorId: string; refreshKey:
         <EventLiabilityCheckbox id="cart-liability-terms" checked={liabilityAccepted} onChange={setLiabilityAccepted} />
       </div>
 
-      {error && <p className="mt-2 text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm font-medium text-red-600">{error}</p>}
 
       <button
         type="button"

@@ -155,7 +155,7 @@ export default function AdminPlacementsPage() {
   }
 
   if (status === "loading") {
-    return <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
+    return <div role="status" aria-live="polite" className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
   }
 
   if (status === "denied") {
@@ -224,7 +224,7 @@ export default function AdminPlacementsPage() {
             {granting ? "Granting…" : "Grant Now"}
           </button>
         </div>
-        {error && <p className="mt-2 text-sm font-medium text-red-600">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm font-medium text-red-600">{error}</p>}
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[700px] border-collapse text-left text-sm">

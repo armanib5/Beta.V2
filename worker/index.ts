@@ -93,6 +93,24 @@ function sb(env: Env, path: string, init: RequestInit = {}): Promise<Response> {
   return fetch(`${env.SUPABASE_URL}/rest/v1${path}`, { ...init, headers });
 }
 
+// Resolves the caller's Supabase Auth id from the request's own bearer
+// token - same check handleAdminCreateBusiness already used, pulled out
+// so handleCreateCheckoutSession/handleCreateCartCheckoutSession/
+// handleLogTermsAgreement can each verify the caller genuinely IS the
+// vendor_id in their own request body, instead of trusting it unchecked
+// (launch-hardening audit finding: any of those three routes previously
+// accepted any vendor_id with zero caller verification).
+async function resolveAuthenticatedCallerId(request: Request, env: Env): Promise<string | null> {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader) return null;
+  const callerRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: authHeader },
+  });
+  if (!callerRes.ok) return null;
+  const caller = (await callerRes.json()) as { id?: string };
+  return caller.id ?? null;
+}
+
 // Flattens a nested object into Stripe's bracket-notation form fields,
 // e.g. { line_items: [{ quantity: 1 }] } -> "line_items[0][quantity]=1".
 // The Stripe REST API (outside the SDK) only accepts form-encoded bodies.
@@ -177,6 +195,13 @@ async function handleCreateCheckoutSession(request: Request, env: Env): Promise<
   const vendorId = body.vendor_id;
   const tierId = body.tier_id;
   if (!vendorId || !tierId) return json({ error: "vendor_id and tier_id are required." }, 400);
+
+  // The caller has to genuinely BE this vendor - previously any vendor_id
+  // was accepted unchecked (launch-hardening audit finding).
+  const callerId = await resolveAuthenticatedCallerId(request, env);
+  if (!callerId) return json({ error: "Not signed in." }, 401);
+  if (callerId !== vendorId) return json({ error: "You can only start checkout for your own account." }, 403);
+
   // Server-side backstop behind the disabled-until-checked button in every
   // checkout UI (signup, Quick Boost/Top 10 Placement, Founding/Featured
   // upgrade) - all three funnel through this one endpoint, so enforcing it
@@ -341,6 +366,11 @@ async function handleCreateCartCheckoutSession(request: Request, env: Env): Prom
   }
   const vendorId = body.vendor_id;
   if (!vendorId) return json({ error: "vendor_id is required." }, 400);
+
+  const callerId = await resolveAuthenticatedCallerId(request, env);
+  if (!callerId) return json({ error: "Not signed in." }, 401);
+  if (callerId !== vendorId) return json({ error: "You can only start checkout for your own account." }, 403);
+
   if (body.terms_accepted !== true) return json({ error: "You must accept the Terms of Service to check out." }, 400);
 
   const [vendorRes, cartRes] = await Promise.all([
@@ -478,6 +508,10 @@ async function handleLogTermsAgreement(request: Request, env: Env): Promise<Resp
   }
   if (!body.vendor_id) return json({ error: "vendor_id is required." }, 400);
 
+  const callerId = await resolveAuthenticatedCallerId(request, env);
+  if (!callerId) return json({ error: "Not signed in." }, 401);
+  if (callerId !== body.vendor_id) return json({ error: "You can only log agreement for your own account." }, 403);
+
   const res = await logTermsAgreement(env, request, body.vendor_id);
   if (!res.ok) return json({ error: `Could not log agreement: ${await res.text()}` }, 500);
   return json({ ok: true });
@@ -509,17 +543,10 @@ function slugify(input: string): string {
  * admin, checked against the same `admins` table every RLS policy and
  * checkIsAdmin() already trust. */
 async function handleAdminCreateBusiness(request: Request, env: Env): Promise<Response> {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader) return json({ error: "Missing Authorization header." }, 401);
+  const callerId = await resolveAuthenticatedCallerId(request, env);
+  if (!callerId) return json({ error: "Invalid session." }, 401);
 
-  const callerRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: authHeader },
-  });
-  if (!callerRes.ok) return json({ error: "Invalid session." }, 401);
-  const caller = (await callerRes.json()) as { id?: string };
-  if (!caller.id) return json({ error: "Invalid session." }, 401);
-
-  const adminRes = await sb(env, `/admins?id=eq.${caller.id}&select=id`);
+  const adminRes = await sb(env, `/admins?id=eq.${callerId}&select=id`);
   const admins = (await adminRes.json()) as Array<{ id: string }>;
   if (admins.length === 0) return json({ error: "Admin access required." }, 403);
 

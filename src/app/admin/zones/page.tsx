@@ -387,7 +387,7 @@ export default function AdminZonesPage() {
   }
 
   if (status === "loading") {
-    return <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
+    return <div role="status" aria-live="polite" className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
   }
 
   if (status === "denied") {
@@ -494,7 +494,7 @@ export default function AdminZonesPage() {
         </div>
       )}
 
-      {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
 
       <div className="mt-6">
         {loadingZone && <p className="text-sm text-slate-500">Loading zone map…</p>}

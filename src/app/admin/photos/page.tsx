@@ -183,7 +183,7 @@ export default function AdminPhotosPage() {
   }
 
   if (status === "loading") {
-    return <div className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
+    return <div role="status" aria-live="polite" className="mx-auto max-w-md px-4 py-16 text-center text-sm text-slate-500">Loading…</div>;
   }
   if (status === "denied") {
     return (
@@ -217,7 +217,7 @@ export default function AdminPhotosPage() {
         className="mt-4 w-full max-w-sm rounded-full border border-slate-300 px-4 py-2 text-sm"
       />
 
-      {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
 
       <h2 className="mt-8 text-lg font-bold text-slate-900">Vendors ({filteredVendors.length})</h2>
       <div className="mt-3 space-y-3">

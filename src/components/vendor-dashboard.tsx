@@ -153,9 +153,16 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
     setError(null);
     setCheckingOut(true);
     try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(session ? { authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           vendor_id: vendor.id,
           tier_id: selectedTier.id,
@@ -344,7 +351,7 @@ function QuickBoost({ vendor, tiers }: { vendor: Vendor; tiers: PricingTier[] })
         </div>
       )}
 
-      {error && <p className="mt-2 text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm font-medium text-red-600">{error}</p>}
     </div>
   );
 }
@@ -393,9 +400,16 @@ function BoostRequest({
     setCheckoutError(null);
     setCheckoutTierId(tier.id);
     try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(session ? { authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ vendor_id: vendor.id, tier_id: tier.id, terms_accepted: termsAccepted && liabilityAccepted }),
       });
       const data: { url?: string; error?: string } = await res.json();
@@ -498,7 +512,7 @@ function BoostRequest({
           </div>
         ))}
       </div>
-      {checkoutError && <p className="mt-3 text-sm font-medium text-red-600">{checkoutError}</p>}
+      {checkoutError && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{checkoutError}</p>}
       <p className="mt-4 text-xs text-slate-500">
         Paying with Stripe above activates your badge automatically, usually within seconds. Paid
         another way (cash, check, in person)?
@@ -536,7 +550,7 @@ function BoostRequest({
         >
           {redeeming ? "Redeeming…" : "Redeem"}
         </button>
-        {redeemError && <p className="w-full text-xs font-medium text-red-600">{redeemError}</p>}
+        {redeemError && <p role="alert" className="w-full text-xs font-medium text-red-600">{redeemError}</p>}
       </form>
     </div>
   );
@@ -917,7 +931,7 @@ export function VendorDashboard({
           </div>
         </div>
 
-        {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
         {savedMessage && <p className="text-sm font-medium text-green-600">{savedMessage}</p>}
 
         <button
@@ -1046,7 +1060,7 @@ function AccountLoginSettings({ vendor }: { vendor: Vendor }) {
           onChange={(e) => setNewPassword(e.target.value)}
           className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
         />
-        {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+        {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
         {message && <p className="text-sm font-medium text-green-600">{message}</p>}
         <button
           type="submit"

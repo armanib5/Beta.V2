@@ -151,7 +151,7 @@ export function MenuHubManager({
         </button>
       </div>
 
-      {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
 
       <MenuKindSection title="🥟 Bites" items={bites} onUpload={uploadItemPhoto} onToggleTopPick={toggleTopPick} onDelete={deleteItem} />
       <MenuKindSection title="🥤 Sips" items={sips} onUpload={uploadItemPhoto} onToggleTopPick={toggleTopPick} onDelete={deleteItem} />

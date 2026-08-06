@@ -94,7 +94,7 @@ export default function ResetPasswordPage() {
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
           />
-          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+          {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
           <button
             type="submit"
             disabled={loading}

@@ -160,7 +160,7 @@ export function VendorDirectory() {
           {locating ? "Locating…" : anchor ? `📍 Sorted Near ${anchor.label}` : "📍 Sort Near Me"}
         </button>
       </div>
-      {locationError && <p className="mt-2 text-sm font-medium text-red-600">{locationError}</p>}
+      {locationError && <p role="alert" className="mt-2 text-sm font-medium text-red-600">{locationError}</p>}
 
       {!sortedItems.length ? (
         <p className="mt-10 text-sm text-slate-500">

@@ -144,7 +144,7 @@ export default function VendorDashboardPage() {
             onChange={(e) => setBusinessName(e.target.value)}
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
           />
-          {profileError && <p className="text-sm font-medium text-red-600">{profileError}</p>}
+          {profileError && <p role="alert" className="text-sm font-medium text-red-600">{profileError}</p>}
           <button
             type="submit"
             disabled={creatingProfile}
@@ -158,7 +158,7 @@ export default function VendorDashboardPage() {
   }
 
   if (!state) {
-    return <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500">Loading…</div>;
+    return <div role="status" aria-live="polite" className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500">Loading…</div>;
   }
 
   return (

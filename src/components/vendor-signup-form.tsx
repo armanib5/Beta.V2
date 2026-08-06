@@ -106,7 +106,8 @@ export function VendorSignupForm({
       }
 
       const user = data.user;
-      if (!user || !data.session) {
+      const session = data.session;
+      if (!user || !session) {
         // The expected outcome with email confirmation required -
         // signUp() creates the auth user but issues no session until the
         // link is clicked, so there's nothing to authenticate the
@@ -149,9 +150,13 @@ export function VendorSignupForm({
       // Timestamped, server-observed-IP record of the event non-host/
       // liability acknowledgment for this new account - failure here
       // shouldn't block a successful signup, only best-effort logged.
+      // session is guaranteed non-null here (the "no session yet" branch
+      // above already returned otherwise), so its access_token is this
+      // brand-new account's own - exactly who the worker route now
+      // requires the caller to be.
       fetch("/api/log-terms-agreement", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ vendor_id: user.id }),
       }).catch(() => {});
 
@@ -159,7 +164,7 @@ export function VendorSignupForm({
         try {
           const res = await fetch("/api/create-checkout-session", {
             method: "POST",
-            headers: { "content-type": "application/json" },
+            headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
             body: JSON.stringify({ vendor_id: user.id, tier_id: tierId, terms_accepted: termsAccepted }),
           });
           const data: { url?: string; error?: string } = await res.json();
@@ -261,7 +266,7 @@ export function VendorSignupForm({
         {tierId && <CheckoutTermsCheckbox id="signup-terms" checked={termsAccepted} onChange={setTermsAccepted} />}
         <EventLiabilityCheckbox id="signup-liability-terms" checked={liabilityAccepted} onChange={setLiabilityAccepted} />
       </div>
-      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
       <button
         type="submit"
         disabled={loading || (Boolean(tierId) && !termsAccepted) || !liabilityAccepted}

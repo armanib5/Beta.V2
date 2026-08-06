@@ -267,7 +267,7 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
           {confirmation}
         </div>
       )}
-      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
 
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         {FILTERS.map((f) => (

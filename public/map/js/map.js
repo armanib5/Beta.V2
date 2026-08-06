@@ -102,6 +102,10 @@ function flyerHtml(p) {
   html += '<span class="bp-cat" style="background:' + info.c + '">' + info.l + '</span>';
   if (isLive(p)) html += ' <span class="bp-livebadge">LIVE NOW</span>';
   html += '<h3>' + p.t + '</h3>';
+  // p.flyer (flyer_image_url) was already being fetched from every guest
+  // vendor/event row and just never rendered anywhere - a real vendor
+  // upload with zero payoff on the single most visual surface of the app.
+  if (p.flyer) html += '<img class="bp-img" src="' + p.flyer + '" alt="" loading="lazy">';
   if (p.ds) html += '<div class="bp-desc">' + p.ds + '</div>';
   html += '<div class="bp-meta">';
   if (p.a) html += '<div><b>Address:</b> ' + p.a + '</div>';
@@ -144,6 +148,7 @@ function showFullDetail(id) {
   if (isLive(p)) html += ' <span class="bp-livebadge">LIVE NOW</span>';
   html += '<h2>' + p.t + '</h2>';
   if (p.w) html += '<div class="dwhen">' + p.w + '</div>';
+  if (p.flyer) html += '<img class="d-img" src="' + p.flyer + '" alt="" loading="lazy">';
   if (p.ds) html += '<p class="ddesc">' + p.ds + '</p>';
   html += '<div class="digrid">';
   html += box("Address", p.a);
@@ -955,6 +960,8 @@ function setupFullScreenToggle() {
   });
 }
 
+var LEGEND_SEEN_KEY = "citypinned_map_legend_seen";
+
 function setupKeyToggle() {
   var toggle = document.getElementById("mkeyToggle"), legend = document.getElementById("mapLegend"),
     closeBtn = document.getElementById("mlgClose");
@@ -966,6 +973,15 @@ function setupKeyToggle() {
   }
   toggle.onclick = function () { setOpen(true); };
   if (closeBtn) closeBtn.onclick = function () { setOpen(false); };
+  // First-time visitors had no way to learn what the pin colors/icons
+  // mean short of noticing this small toggle button unaided - opens once
+  // automatically, never again once they've seen it (or closed it).
+  try {
+    if (!window.localStorage.getItem(LEGEND_SEEN_KEY)) {
+      setOpen(true);
+      window.localStorage.setItem(LEGEND_SEEN_KEY, "1");
+    }
+  } catch (e) { /* localStorage unavailable (private mode edge cases) - just skip auto-open */ }
 }
 
 document.addEventListener("DOMContentLoaded", initMap);

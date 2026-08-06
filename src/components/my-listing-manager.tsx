@@ -127,7 +127,7 @@ function ListingRow({
           </button>
         </div>
       </div>
-      {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-xs font-medium text-red-600">{error}</p>}
       {message && <p className="mt-2 text-xs font-medium text-green-600">{message}</p>}
 
       <div className="mt-4 border-t border-slate-100 pt-3">

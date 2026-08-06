@@ -239,7 +239,7 @@ export function VendorPhotoManager({
         </div>
       </div>
 
-      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
 
       {zoomUrl && (
         <div
