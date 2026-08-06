@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Booth, LovEntry, Vendor, ZoneBoundary } from "@/lib/types";
 import { ZoneMap } from "@/components/zone-map";
+import { BackButton } from "@/components/back-button";
 
 export default function VendorZonesPage() {
   const router = useRouter();
@@ -113,6 +114,7 @@ export default function VendorZonesPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
+      <BackButton className="mb-3" />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Claim a Booth</h1>
         <Link href="/vendor/dashboard" className="text-sm font-semibold text-slate-700 underline">

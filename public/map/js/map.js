@@ -298,12 +298,19 @@ function nearestHood(lat, lng) {
   return best || { city: "sj", hood: "downtown" };
 }
 
-/* Approved pins (added via /admin/'s Pins tab or the public /pins/ page)
-   live in Supabase, but this map only ever read the static PLACES array -
-   approving a pin never made it appear here. Fetched once after the
-   static map is already up and merged in as new markers, so approving in
-   /admin/ actually shows up on the live map instead of only updating a
-   database row nobody sees. */
+/* pins.category has its own check constraint - only "business", "food",
+   "event" are allowed (confirmed live, not guessed) - a completely
+   different, much narrower vocabulary than CATS' visual icon categories
+   below. Without this mapping, every approved pin's `cat` value matched
+   no CATS key at all and silently fell back to a plain pushpin. */
+var PINS_CATEGORY_TO_MAP_CAT = { business: "shop", food: "foodhall", event: "seasonal" };
+
+/* Approved pins (added via /admin/'s Pins tab, the Map Studio, or the
+   public /pins/ page) live in Supabase, but this map only ever read the
+   static PLACES array - approving a pin never made it appear here.
+   Fetched once after the static map is already up and merged in as new
+   markers, so approving actually shows up on the live map instead of
+   only updating a database row nobody sees. */
 function loadApprovedPins() {
   if (typeof isSupabaseConfigured !== "function" || !isSupabaseConfigured()) return Promise.resolve();
   var sb = getSupabase();
@@ -312,7 +319,7 @@ function loadApprovedPins() {
     res.data.forEach(function (p) {
       var loc = nearestHood(p.lat, p.lng);
       var place = {
-        id: "sb-" + p.id, cat: p.cat_id || "shop", hood: loc.hood,
+        id: "sb-" + p.id, cat: PINS_CATEGORY_TO_MAP_CAT[p.category] || "shop", hood: loc.hood,
         t: p.title || p.owner_name || "Vendor Pin",
         a: p.owner_name || "", ds: p.description || "",
         lat: p.lat, lng: p.lng

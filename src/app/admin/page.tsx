@@ -70,6 +70,15 @@ export default function AdminHubPage() {
           </p>
         </Link>
         <Link
+          href="/admin/map-studio"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">Map Studio</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Add, edit, drag, and remove pins on the real map — with a live link to see exactly what the public sees.
+          </p>
+        </Link>
+        <Link
           href="/admin/flyers"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >
