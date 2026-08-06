@@ -6,8 +6,21 @@ var ICONS = {
   art: "\u{1F5BC}", mask: "\u{1F3AD}", star: "⭐", bag: "\u{1F6CD}",
   P: "P", restroom: "\u{1F6BB}", train: "\u{1F686}",
   school: "\u{1F3EB}", hospital: "\u{1F3E5}", church: "⛪", plate: "\u{1F37D}\u{FE0F}", hotel: "\u{1F3E8}",
-  grad: "\u{1F393}", pot: "\u{1F372}", sparkle: "\u{2728}"
+  grad: "\u{1F393}", pot: "\u{1F372}", sparkle: "\u{2728}", building: "\u{1F3DB}\u{FE0F}"
 };
+
+/* Vendor-controlled strings (name/description/address) get concatenated
+   straight into innerHTML all over this file - escape them once here
+   rather than trusting every call site to remember to. */
+function escapeHtml(s) {
+  if (s == null) return s;
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 var map, clusterGroup, userMarker, activeCity = "sj", activeHood = "downtown", activeCat = "all";
 var markerById = {};
@@ -101,14 +114,14 @@ function flyerHtml(p) {
   var html = '<div class="bp-card">';
   html += '<span class="bp-cat" style="background:' + info.c + '">' + info.l + '</span>';
   if (isLive(p)) html += ' <span class="bp-livebadge">LIVE NOW</span>';
-  html += '<h3>' + p.t + '</h3>';
+  html += '<h3>' + escapeHtml(p.t) + '</h3>';
   // p.flyer (flyer_image_url) was already being fetched from every guest
   // vendor/event row and just never rendered anywhere - a real vendor
   // upload with zero payoff on the single most visual surface of the app.
   if (p.flyer) html += '<img class="bp-img" src="' + p.flyer + '" alt="" loading="lazy">';
-  if (p.ds) html += '<div class="bp-desc">' + p.ds + '</div>';
+  if (p.ds) html += '<div class="bp-desc">' + escapeHtml(p.ds) + '</div>';
   html += '<div class="bp-meta">';
-  if (p.a) html += '<div><b>Address:</b> ' + p.a + '</div>';
+  if (p.a) html += '<div><b>Address:</b> ' + escapeHtml(p.a) + '</div>';
   html += distLine;
   if (p.pk) html += '<div><b>Parking:</b> ' + p.pk + '</div>';
   if (p.tr) html += '<div><b>Transit:</b> ' + p.tr + '</div>';
@@ -142,14 +155,14 @@ function showFullDetail(id) {
   if (!p) return;
   var info = CATS[p.cat] || { l: p.cat, c: "#666" };
   var mu = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(p.a || p.t);
-  function box(label, val) { return val ? '<div class="dibox"><h4>' + label + '</h4><p>' + val + '</p></div>' : ""; }
+  function box(label, val) { return val ? '<div class="dibox"><h4>' + label + '</h4><p>' + escapeHtml(val) + '</p></div>' : ""; }
   var html = '<button class="xbtn" id="detailClose">&times;</button>';
   html += '<span class="dcat" style="background:' + info.c + '">' + info.l + '</span>';
   if (isLive(p)) html += ' <span class="bp-livebadge">LIVE NOW</span>';
-  html += '<h2>' + p.t + '</h2>';
-  if (p.w) html += '<div class="dwhen">' + p.w + '</div>';
+  html += '<h2>' + escapeHtml(p.t) + '</h2>';
+  if (p.w) html += '<div class="dwhen">' + escapeHtml(p.w) + '</div>';
   if (p.flyer) html += '<img class="d-img" src="' + p.flyer + '" alt="" loading="lazy">';
-  if (p.ds) html += '<p class="ddesc">' + p.ds + '</p>';
+  if (p.ds) html += '<p class="ddesc">' + escapeHtml(p.ds) + '</p>';
   html += '<div class="digrid">';
   html += box("Address", p.a);
   html += box("Parking", p.pk);
@@ -333,7 +346,8 @@ var LOV_CAT_SLUG_TO_MAP = {
   "music-festival": "venue", "comedy-show": "venue", "live-show": "venue",
   "cultural-festival": "venue", "gaming-festival": "venue", "outdoor-movie": "venue",
   "community-event": "centers", "restaurant": "restaurants", "bar": "bars",
-  "workshop-class": "workshop", "park-event": "parks", "city-art": "cityart"
+  "workshop-class": "workshop", "park-event": "parks", "city-art": "cityart",
+  "museum": "centers"
 };
 
 function loadLovEvents() {
@@ -733,7 +747,7 @@ function initSearch() {
         var info = CATS[p.cat] || { c: "#666", l: p.cat };
         var row = document.createElement("div");
         row.className = "msrow";
-        row.innerHTML = '<span class="msdot" style="background:' + info.c + '"></span><span class="msname">' + p.t + '</span><span class="mstype">' + info.l + '</span>';
+        row.innerHTML = '<span class="msdot" style="background:' + info.c + '"></span><span class="msname">' + escapeHtml(p.t) + '</span><span class="mstype">' + info.l + '</span>';
         row.onclick = function () { selectPlace(p); results.classList.remove("show"); input.value = p.t; };
         results.appendChild(row);
       });

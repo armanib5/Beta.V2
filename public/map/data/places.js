@@ -32,7 +32,7 @@ var CATS = {
 };
 
 /* Order controls the category filter row. */
-var CAT_ORDER = ["market","foodhall","restaurants","bars","cityart","venue","seasonal","workshop","centers","shop","homecook","other","parking","restrooms","transit","schools","hospitals","churches","hotels"];
+var CAT_ORDER = ["market","foodhall","restaurants","bars","cityart","venue","seasonal","workshop","centers","parks","shop","homecook","other","parking","restrooms","transit","schools","hospitals","churches","hotels"];
 
 var HOODS = [
   { "id": "downtown", "l": "Downtown San Jose", "lat": 37.3382, "lng": -121.8863, "zoom": 15 },

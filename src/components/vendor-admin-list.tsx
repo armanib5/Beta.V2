@@ -3,8 +3,25 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import type { Vendor, VendorStatus, VendorStatusLog } from "@/lib/types";
+import type { Category, Vendor, VendorPhoto, VendorStatus, VendorStatusLog } from "@/lib/types";
 import { logActivity } from "@/lib/activity";
+import { VendorPhotoManager } from "@/components/vendor-photo-manager";
+
+type EditForm = {
+  business_name: string;
+  short_description: string;
+  instagram_handle: string;
+  website_url: string;
+};
+
+function toEditForm(vendor: Vendor): EditForm {
+  return {
+    business_name: vendor.business_name,
+    short_description: vendor.short_description ?? "",
+    instagram_handle: vendor.instagram_handle ?? "",
+    website_url: vendor.website_url ?? "",
+  };
+}
 
 function describePatch(patch: Partial<Vendor>): string {
   const parts: string[] = [];
@@ -47,7 +64,15 @@ function boostCountdown(expiresAt: string): { label: string; expired: boolean } 
   return { label: `${days} day${days === 1 ? "" : "s"} left`, expired: false };
 }
 
-export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendors: Vendor[]; statusLog: VendorStatusLog[] }) {
+export function VendorAdminList({
+  vendors: initialVendors,
+  statusLog,
+  categories,
+}: {
+  vendors: Vendor[];
+  statusLog: VendorStatusLog[];
+  categories: Category[];
+}) {
   const [vendors, setVendors] = useState(initialVendors);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -61,6 +86,17 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
   // then appears is what actually calls the API. Any other action on the
   // page (or picking a different vendor to delete) disarms it.
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  // Full profile edit (name/description/social links/category/photos) -
+  // admin previously had zero way to correct these on a vendor's behalf,
+  // only the status/founding/top10 toggles. Category checkboxes are
+  // lazy-loaded per vendor on open, not fetched for the whole list
+  // upfront, so this doesn't add a query to every page load.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [editCategoryIds, setEditCategoryIds] = useState<Set<string> | null>(null);
+  const [editPhotos, setEditPhotos] = useState<VendorPhoto[] | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const reapprovedIds = useMemo(() => {
     const counts = new Map<string, number>();
@@ -172,6 +208,101 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
       setBusyId(null);
       setPendingDeleteId(null);
     }
+  }
+
+  async function openEdit(vendor: Vendor) {
+    setEditError(null);
+    setEditingId(vendor.id);
+    setEditForm(toEditForm(vendor));
+    setEditCategoryIds(null); // shows a brief loading state while this fetches
+    setEditPhotos(null);
+    const supabase = createClient();
+    const [{ data }, { data: photoRows }] = await Promise.all([
+      supabase.from("vendor_categories").select("category_id").eq("vendor_id", vendor.id),
+      supabase.from("vendor_photos").select("*").eq("vendor_id", vendor.id).order("sort_order").returns<VendorPhoto[]>(),
+    ]);
+    setEditCategoryIds(new Set((data ?? []).map((row) => row.category_id as string)));
+    setEditPhotos(photoRows ?? []);
+  }
+
+  function closeEdit() {
+    setEditingId(null);
+    setEditForm(null);
+    setEditCategoryIds(null);
+    setEditPhotos(null);
+    setEditError(null);
+  }
+
+  function toggleEditCategory(categoryId: string) {
+    setEditCategoryIds((prev) => {
+      const next = new Set(prev ?? []);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      return next;
+    });
+  }
+
+  async function saveEdit(vendor: Vendor) {
+    if (!editForm || !editCategoryIds) return;
+    if (!editForm.business_name.trim()) {
+      setEditError("Business name can't be empty.");
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
+    const supabase = createClient();
+
+    const patch: Partial<Vendor> = {
+      business_name: editForm.business_name.trim(),
+      short_description: editForm.short_description.trim() || null,
+      instagram_handle: editForm.instagram_handle.trim() || null,
+      website_url: editForm.website_url.trim() || null,
+    };
+    const { data: updated, error: updateError } = await supabase
+      .from("vendors")
+      .update(patch)
+      .eq("id", vendor.id)
+      .select("*")
+      .single<Vendor>();
+    if (updateError || !updated) {
+      setEditError(updateError?.message ?? "Could not save changes.");
+      setEditSaving(false);
+      return;
+    }
+
+    const { data: currentLinks } = await supabase.from("vendor_categories").select("category_id").eq("vendor_id", vendor.id);
+    const currentIds = new Set((currentLinks ?? []).map((row) => row.category_id as string));
+    const toAdd = [...editCategoryIds].filter((id) => !currentIds.has(id));
+    const toRemove = [...currentIds].filter((id) => !editCategoryIds.has(id));
+    if (toAdd.length > 0) {
+      const { error: addError } = await supabase
+        .from("vendor_categories")
+        .insert(toAdd.map((category_id) => ({ vendor_id: vendor.id, category_id })));
+      if (addError) {
+        setEditError(`Details saved, but categories didn't: ${addError.message}`);
+        setEditSaving(false);
+        return;
+      }
+    }
+    if (toRemove.length > 0) {
+      const { error: removeError } = await supabase
+        .from("vendor_categories")
+        .delete()
+        .eq("vendor_id", vendor.id)
+        .in("category_id", toRemove);
+      if (removeError) {
+        setEditError(`Details saved, but categories didn't: ${removeError.message}`);
+        setEditSaving(false);
+        return;
+      }
+    }
+
+    logActivity(supabase, "vendor", vendor.id, updated.business_name, "Edited profile", "Admin updated business details/category");
+    setVendors((prev) => prev.map((v) => (v.id === vendor.id ? updated : v)));
+    setEditSaving(false);
+    closeEdit();
+    setConfirmation(`✓ Saved — ${updated.business_name}`);
+    window.setTimeout(() => setConfirmation((c) => (c?.startsWith("✓") ? null : c)), 4000);
   }
 
   function toggleSelected(id: string) {
@@ -560,6 +691,18 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
               >
                 ⭐ Top 10
               </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => (editingId === vendor.id ? closeEdit() : openEdit(vendor))}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                  editingId === vendor.id
+                    ? "bg-slate-700 text-white hover:bg-slate-800"
+                    : "border border-slate-400 text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                ✏️ {editingId === vendor.id ? "Close Edit" : "Edit Details"}
+              </button>
               {pendingDeleteId === vendor.id ? (
                 <>
                   <span className="text-xs font-semibold text-red-700">Permanently delete this account?</span>
@@ -592,6 +735,109 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
                 </button>
               )}
             </div>
+            {editingId === vendor.id && editForm && (
+              <div className="mt-3 space-y-3 rounded-xl border border-slate-300 bg-slate-50 p-4 print:hidden">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Business name</label>
+                  <input
+                    type="text"
+                    value={editForm.business_name}
+                    onChange={(e) => setEditForm((f) => (f ? { ...f, business_name: e.target.value } : f))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Description</label>
+                  <textarea
+                    value={editForm.short_description}
+                    onChange={(e) => setEditForm((f) => (f ? { ...f, short_description: e.target.value } : f))}
+                    rows={2}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600">Instagram handle</label>
+                    <input
+                      type="text"
+                      value={editForm.instagram_handle}
+                      onChange={(e) => setEditForm((f) => (f ? { ...f, instagram_handle: e.target.value } : f))}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600">Website URL</label>
+                    <input
+                      type="text"
+                      value={editForm.website_url}
+                      onChange={(e) => setEditForm((f) => (f ? { ...f, website_url: e.target.value } : f))}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Categories</label>
+                  {editCategoryIds === null ? (
+                    <p className="mt-1 text-xs text-slate-500">Loading…</p>
+                  ) : (
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {categories.map((category) => {
+                        const active = editCategoryIds.has(category.id);
+                        return (
+                          <button
+                            key={category.id}
+                            type="button"
+                            onClick={() => toggleEditCategory(category.id)}
+                            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                              active
+                                ? "border-slate-900 bg-slate-900 text-white"
+                                : "border-slate-300 text-slate-600 hover:bg-slate-100"
+                            }`}
+                          >
+                            {category.icon} {category.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Logo / photos</label>
+                  <div className="mt-1">
+                    {editPhotos === null ? (
+                      <p className="text-xs text-slate-500">Loading…</p>
+                    ) : (
+                      <VendorPhotoManager
+                        vendorId={vendor.id}
+                        logoUrl={vendor.logo_url}
+                        logoFocalX={vendor.logo_focal_x}
+                        logoFocalY={vendor.logo_focal_y}
+                        initialPhotos={editPhotos}
+                      />
+                    )}
+                  </div>
+                </div>
+                {editError && <p role="alert" className="text-sm font-medium text-red-600">{editError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={editSaving || editCategoryIds === null}
+                    onClick={() => saveEdit(vendor)}
+                    className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    {editSaving ? "Saving…" : "Save Changes"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={editSaving}
+                    onClick={closeEdit}
+                    className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         );
       })}

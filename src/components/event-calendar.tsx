@@ -56,6 +56,7 @@ export function EventCalendar({ events, categories = [] }: { events: LovEntry[];
   // new identity every render, which the React Compiler can't prove is
   // safe to depend on.
   const todayKey = useMemo(() => toDateKey(today.getFullYear(), today.getMonth(), today.getDate()), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const onCurrentMonth = cursor.year === today.getFullYear() && cursor.month === today.getMonth();
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, LovEntry[]>();
@@ -72,7 +73,7 @@ export function EventCalendar({ events, categories = [] }: { events: LovEntry[];
         // list below. This expands them onto every matching weekday in
         // the currently-displayed month, at render time only - no new
         // rows are ever written, so there's nothing to duplicate.
-        for (const key of expandRecurringEventForMonth(event.recurrence, cursor.year, cursor.month, todayKey)) {
+        for (const key of expandRecurringEventForMonth(event.recurrence, cursor.year, cursor.month, todayKey, onCurrentMonth)) {
           const list = map.get(key) ?? [];
           list.push(event);
           map.set(key, list);
@@ -80,7 +81,7 @@ export function EventCalendar({ events, categories = [] }: { events: LovEntry[];
       }
     }
     return map;
-  }, [events, cursor.year, cursor.month, todayKey]);
+  }, [events, cursor.year, cursor.month, todayKey, onCurrentMonth]);
 
   const recurringEvents = useMemo(() => events.filter((event) => !event.event_date), [events]);
   const firstOfMonth = new Date(cursor.year, cursor.month, 1);
@@ -106,8 +107,6 @@ export function EventCalendar({ events, categories = [] }: { events: LovEntry[];
     setCursor({ year: today.getFullYear(), month: today.getMonth() });
     setSelectedDate(todayKey);
   }
-
-  const onCurrentMonth = cursor.year === today.getFullYear() && cursor.month === today.getMonth();
 
   return (
     <div className="mt-6">

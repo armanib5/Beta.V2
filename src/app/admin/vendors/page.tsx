@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
-import type { Vendor, VendorStatusLog } from "@/lib/types";
+import type { Category, Vendor, VendorStatusLog } from "@/lib/types";
 import { VendorAdminList } from "@/components/vendor-admin-list";
 
 export default function AdminVendorsPage() {
   const [status, setStatus] = useState<"loading" | "denied" | "ready">("loading");
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [statusLog, setStatusLog] = useState<VendorStatusLog[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -22,13 +23,15 @@ export default function AdminVendorsPage() {
         setStatus("denied");
         return;
       }
-      const [{ data }, { data: logRows }] = await Promise.all([
+      const [{ data }, { data: logRows }, { data: categoryRows }] = await Promise.all([
         supabase.from("vendors").select("*").order("created_at", { ascending: false }).returns<Vendor[]>(),
         supabase.from("vendor_status_log").select("*").returns<VendorStatusLog[]>(),
+        supabase.from("categories").select("*").order("sort_order").returns<Category[]>(),
       ]);
       if (cancelled) return;
       setVendors(data ?? []);
       setStatusLog(logRows ?? []);
+      setCategories(categoryRows ?? []);
       setStatus("ready");
     });
 
@@ -70,7 +73,7 @@ export default function AdminVendorsPage() {
         Approve a vendor once their payment is confirmed in Stripe, or award Founding Vendor / Top 10 as a
         boost. Private — every write is re-checked by the database, not just this page.
       </p>
-      <VendorAdminList vendors={vendors} statusLog={statusLog} />
+      <VendorAdminList vendors={vendors} statusLog={statusLog} categories={categories} />
     </div>
   );
 }

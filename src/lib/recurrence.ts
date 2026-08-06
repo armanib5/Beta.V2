@@ -60,8 +60,12 @@ function monthInRange(month: number, range: [number, number] | null): boolean {
 
 /** Every date-key ("YYYY-MM-DD") in the given calendar month that a weekly
  * recurring event lands on, respecting its month-range if it has one, and
- * never before today (no expired-looking past occurrences within the
- * current month). Only weekly (single weekday) recurrences expand onto
+ * never before today WITHIN THE CURRENT MONTH (no expired-looking past
+ * occurrences earlier this month). `isCurrentMonth` gates that filter -
+ * without it, navigating to a genuinely past month would make every one
+ * of its days "before today" and silently erase all recurring events
+ * from that month, even though dated (non-recurring) events still show
+ * correctly there. Only weekly (single weekday) recurrences expand onto
  * the grid — a recurrence with no detectable weekday (e.g. "Monthly,
  * 1st Saturday") still only appears in the existing flat recurring list,
  * same as before this change. */
@@ -70,6 +74,7 @@ export function expandRecurringEventForMonth(
   year: number,
   month: number,
   todayKey: string,
+  isCurrentMonth: boolean,
 ): string[] {
   const { dayOfWeek, monthRange } = parseRecurrence(recurrence);
   if (dayOfWeek === null) return [];
@@ -81,7 +86,7 @@ export function expandRecurringEventForMonth(
     const date = new Date(year, month, day);
     if (date.getDay() !== dayOfWeek) continue;
     const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    if (key < todayKey) continue; // no expired occurrences
+    if (isCurrentMonth && key < todayKey) continue; // no expired occurrences earlier this month
     keys.push(key);
   }
   return keys;

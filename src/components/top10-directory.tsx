@@ -165,6 +165,7 @@ export function Top10Directory() {
       .from("lov_entries")
       .select("*")
       .eq("type", "vendor")
+      .eq("status", "active")
       .or(`publish_at.is.null,publish_at.lte.${nowIso}`)
       .returns<LovEntry[]>()
       .then(({ data }) => setGuestListings(data ?? []));
@@ -172,6 +173,7 @@ export function Top10Directory() {
       .from("lov_entries")
       .select("*")
       .eq("type", "event")
+      .eq("status", "active")
       .or(`publish_at.is.null,publish_at.lte.${nowIso}`)
       .returns<LovEntry[]>()
       .then(({ data }) => setEvents(data ?? []));
@@ -215,9 +217,13 @@ export function Top10Directory() {
   // Boost" strip below (boostedNow), which reads activeBoostEndByVendor
   // directly instead now.
   const allItems = useMemo(() => {
+    // A guest listing linked to a real vendor account (lov_entries.vendor_id)
+    // would otherwise render twice - once from `vendors`, once from here.
+    const linkedVendorIds = new Set(vendors.map((v) => v.id));
+    const unlinkedGuestListings = guestListings.filter((e) => !e.vendor_id || !linkedVendorIds.has(e.vendor_id));
     return [
       ...vendors.map(fromVendor),
-      ...guestListings.map((e) => fromGuestListing(e, categorySlugById)),
+      ...unlinkedGuestListings.map((e) => fromGuestListing(e, categorySlugById)),
       ...events.map((e) => fromEvent(e, categoryById)),
     ];
   }, [vendors, guestListings, events, categorySlugById, categoryById]);
@@ -444,13 +450,14 @@ function DirectoryCard({
   now?: number;
 }) {
   const boostRemainingMs = item.boostActiveUntil && now ? new Date(item.boostActiveUntil).getTime() - now : 0;
+  const [logoFailed, setLogoFailed] = useState(false);
   const cardBody = (
     <>
       <div className="flex items-center gap-3">
         <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-slate-200">
-          {item.logoUrl ? (
+          {item.logoUrl && !logoFailed ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.logoUrl} alt="" className="h-full w-full object-cover" />
+            <img src={item.logoUrl} alt="" className="h-full w-full object-cover" onError={() => setLogoFailed(true)} />
           ) : (
             <FlyerPlaceholder seed={item.name} icon={item.categoryIcon ?? "🏪"} className="h-full w-full" />
           )}
