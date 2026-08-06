@@ -131,9 +131,9 @@ export default function VendorDashboardPage() {
   if (needsProfile) {
     return (
       <div className="mx-auto max-w-md px-4 py-16">
-        <h1 className="text-center text-2xl font-bold text-slate-900">Finish setting up your profile</h1>
+        <h1 className="text-center text-2xl font-bold text-slate-900">Welcome! Your email has been confirmed.</h1>
         <p className="mt-2 text-center text-sm text-slate-600">
-          Your account is confirmed — just need a business name to finish creating your profile.
+          Next, complete your business profile by adding your business name below.
         </p>
         <form onSubmit={finishProfile} className="mt-6 space-y-3">
           <input
