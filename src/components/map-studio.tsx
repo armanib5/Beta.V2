@@ -29,10 +29,33 @@ type PinRow = {
   event_id: string | null;
 };
 
+type VendorRow = {
+  id: string;
+  business_name: string;
+  lat: number;
+  lng: number;
+  status: string;
+  category_names: string[];
+};
+
 declare global {
   interface Window {
     L?: typeof import("leaflet");
   }
+}
+
+/** A vendor marker needs to read as visually distinct from a plain pin
+ * (which uses Leaflet's default teardrop marker image) at a glance, and
+ * the color itself needs to carry the dirty/clean state - amber for "this
+ * one has been dragged but not saved yet," indigo otherwise - since that's
+ * the only cue visible on markers that aren't the currently-selected one. */
+function vendorDivIcon(L: NonNullable<Window["L"]>, isDirty: boolean, vendorId: string) {
+  const color = isDirty ? "#d97706" : "#4338ca";
+  const html =
+    `<div data-vendor-id="${vendorId}" style="width:26px;height:26px;border-radius:50%;background:${color};` +
+    'border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;' +
+    'font-size:13px;">\u{1F3EA}</div>';
+  return L.divIcon({ html, className: "", iconSize: [26, 26], iconAnchor: [13, 13] });
 }
 
 /** Loads the same vendored Leaflet build the public map already uses
@@ -55,10 +78,17 @@ function loadLeaflet(): Promise<NonNullable<Window["L"]>> {
   });
 }
 
-export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
+export function MapStudio({
+  initialPins,
+  initialVendors = [],
+}: {
+  initialPins: PinRow[];
+  initialVendors?: VendorRow[];
+}) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
+  const vendorMarkersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
   const [pins, setPins] = useState(initialPins);
   // Marker click handlers are bound once, when a marker is first created
   // (see the pins-sync effect below) - they close over whatever
@@ -80,7 +110,28 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  const [showPins, setShowPins] = useState(true);
+  const [showVendors, setShowVendors] = useState(true);
+  const [vendors, setVendors] = useState(initialVendors);
+  const vendorsRef = useRef(vendors);
+  useEffect(() => {
+    vendorsRef.current = vendors;
+  }, [vendors]);
+  // A vendor marker drag never calls the API directly (unlike a pin drag) -
+  // it only stages a candidate position here, keyed by vendor id, so a
+  // location fix is never persisted without an explicit Save click. See
+  // the requirement this was built for: "every location correction
+  // intentional and visually verified," since most vendor coordinates
+  // were never placed on a map at all (set from a phone's raw GPS at
+  // signup) and a silent auto-save here would just replace one unverified
+  // number with another.
+  const [vendorDrafts, setVendorDrafts] = useState<Record<string, { lat: number; lng: number }>>({});
+  const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
+
   const selected = pins.find((p) => p.id === selectedId) ?? null;
+  const selectedVendor = vendors.find((v) => v.id === selectedVendorId) ?? null;
+  const selectedVendorDraft = selectedVendorId ? vendorDrafts[selectedVendorId] : undefined;
+  const unsavedVendorCount = Object.keys(vendorDrafts).length;
 
   function flash(msg: string) {
     setToast(msg);
@@ -133,6 +184,11 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
     const L = window.L;
     const map = mapRef.current;
     if (!L || !map || !mapReady) return;
+    if (!showPins) {
+      for (const [, marker] of markersRef.current) marker.remove();
+      markersRef.current.clear();
+      return;
+    }
 
     const seen = new Set<string>();
     for (const pin of pins) {
@@ -159,14 +215,104 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pins, mapReady]);
+  }, [pins, mapReady, showPins]);
+
+  // Vendor markers - a separate layer from pins, toggled independently.
+  // Draft (unsaved, dragged-but-not-yet-saved) positions take priority
+  // over the stored lat/lng so a marker never snaps back mid-edit; the
+  // dirty/clean icon color is the only visual cue that a draft exists,
+  // since the edit panel is only open for whichever one is selected.
+  useEffect(() => {
+    const L = window.L;
+    const map = mapRef.current;
+    if (!L || !map || !mapReady) return;
+    if (!showVendors) {
+      for (const [, marker] of vendorMarkersRef.current) marker.remove();
+      vendorMarkersRef.current.clear();
+      return;
+    }
+
+    const seen = new Set<string>();
+    for (const vendor of vendors) {
+      seen.add(vendor.id);
+      const draft = vendorDrafts[vendor.id];
+      const lat = draft ? draft.lat : vendor.lat;
+      const lng = draft ? draft.lng : vendor.lng;
+      let marker = vendorMarkersRef.current.get(vendor.id);
+      if (!marker) {
+        marker = L.marker([lat, lng], { draggable: true, icon: vendorDivIcon(L, false, vendor.id) }).addTo(map);
+        marker.on("dragend", () => {
+          const pos = marker!.getLatLng();
+          setVendorDrafts((prev) => ({ ...prev, [vendor.id]: { lat: pos.lat, lng: pos.lng } }));
+        });
+        marker.on("click", () => selectVendor(vendor.id));
+        vendorMarkersRef.current.set(vendor.id, marker);
+      } else {
+        marker.setLatLng([lat, lng]);
+      }
+      marker.setIcon(vendorDivIcon(L, !!draft, vendor.id));
+      marker.bindTooltip(vendor.business_name + (draft ? " (unsaved)" : ""), { permanent: false });
+    }
+    for (const [id, marker] of vendorMarkersRef.current) {
+      if (!seen.has(id)) {
+        marker.remove();
+        vendorMarkersRef.current.delete(id);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendors, vendorDrafts, mapReady, showVendors]);
 
   function selectPin(id: string) {
     const pin = pinsRef.current.find((p) => p.id === id);
     if (!pin) return;
     setSelectedId(id);
     setForm({ title: pin.title ?? "", description: pin.description ?? "", category: pin.category ?? "business" });
+    setSelectedVendorId(null);
     setError(null);
+  }
+
+  function selectVendor(id: string) {
+    const vendor = vendorsRef.current.find((v) => v.id === id);
+    if (!vendor) return;
+    setSelectedVendorId(id);
+    setSelectedId(null);
+    setForm(null);
+    setError(null);
+  }
+
+  async function saveVendorLocation(id: string) {
+    const draft = vendorDrafts[id];
+    if (!draft) return;
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("vendors")
+      .update({ lat: draft.lat, lng: draft.lng })
+      .eq("id", id)
+      .select("id,business_name,lat,lng")
+      .single<{ id: string; business_name: string; lat: number; lng: number }>();
+    setSaving(false);
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not save this vendor's location.");
+      return;
+    }
+    setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, lat: data.lat, lng: data.lng } : v)));
+    setVendorDrafts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    flash(`✓ Location saved — ${data.business_name}`);
+  }
+
+  function cancelVendorEdit(id: string) {
+    setVendorDrafts((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setSelectedVendorId(null);
   }
 
   async function createPinAt(lat: number, lng: number) {
@@ -192,6 +338,7 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
     // the panel would silently never open.
     setSelectedId(data.id);
     setForm({ title: data.title ?? "", description: data.description ?? "", category: data.category ?? "business" });
+    setSelectedVendorId(null);
     setError(null);
     flash("✓ Pin added — edit its details below");
   }
@@ -272,6 +419,30 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
         >
           👁 Preview Public Map ↗
         </a>
+        <span className="mx-1 h-6 w-px bg-slate-300" />
+        <button
+          type="button"
+          onClick={() => setShowPins((v) => !v)}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${
+            showPins ? "border border-slate-400 text-slate-700 hover:bg-slate-50" : "border border-slate-200 text-slate-400"
+          }`}
+        >
+          📍 Pins {showPins ? "on" : "off"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowVendors((v) => !v)}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${
+            showVendors ? "border border-indigo-400 text-indigo-700 hover:bg-indigo-50" : "border border-slate-200 text-slate-400"
+          }`}
+        >
+          🏪 Vendors {showVendors ? "on" : "off"}
+        </button>
+        {unsavedVendorCount > 0 && (
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+            {unsavedVendorCount} vendor location{unsavedVendorCount === 1 ? "" : "s"} unsaved
+          </span>
+        )}
         {saving && <span className="text-xs text-slate-500">Saving…</span>}
         {toast && <span className="text-xs font-semibold text-green-700">{toast}</span>}
       </div>
@@ -280,10 +451,79 @@ export function MapStudio({ initialPins }: { initialPins: PinRow[] }) {
         <div ref={mapDivRef} className="h-[520px] w-full rounded-xl border border-slate-300" />
 
         <div className="rounded-xl border border-slate-300 bg-slate-50 p-4">
-          {!selected || !form ? (
+          {selectedVendor ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                    selectedVendorDraft ? "bg-amber-100 text-amber-800" : "bg-indigo-100 text-indigo-800"
+                  }`}
+                >
+                  🏪 {selectedVendorDraft ? "Unsaved location" : "Vendor"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedVendorId(null)}
+                  className="text-xs text-slate-500 hover:underline"
+                >
+                  Close
+                </button>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-600">Business Name</p>
+                <p className="text-sm text-slate-900">{selectedVendor.business_name}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-600">Category</p>
+                <p className="text-sm text-slate-900">
+                  {selectedVendor.category_names.length ? selectedVendor.category_names.join(", ") : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-600">Stored Coordinates</p>
+                <p className="text-sm text-slate-900">
+                  {selectedVendor.lat.toFixed(6)}, {selectedVendor.lng.toFixed(6)}
+                </p>
+              </div>
+              {selectedVendorDraft && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-2">
+                  <p className="text-xs font-semibold text-amber-800">Pending Coordinates (not yet saved)</p>
+                  <p className="text-sm text-amber-900">
+                    {selectedVendorDraft.lat.toFixed(6)}, {selectedVendorDraft.lng.toFixed(6)}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700">
+                    Drag the marker again to adjust, or Save to confirm this is the correct building.
+                  </p>
+                </div>
+              )}
+              <p className="text-xs text-slate-500">
+                Drag this vendor&apos;s marker on the map to its correct physical building, then Save. Most vendor
+                coordinates were set by a phone&apos;s GPS at signup and have never been checked against a real map.
+              </p>
+              {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => saveVendorLocation(selectedVendor.id)}
+                  disabled={saving || !selectedVendorDraft}
+                  className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => cancelVendorEdit(selectedVendor.id)}
+                  disabled={saving}
+                  className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : !selected || !form ? (
             <p className="text-sm text-slate-500">
-              Click a pin on the map to edit it, or click <strong>+ Add Pin</strong> then click anywhere on the map to
-              place a new one.
+              Click a pin or vendor on the map to edit it, or click <strong>+ Add Pin</strong> then click anywhere on
+              the map to place a new one.
             </p>
           ) : (
             <div className="space-y-3">

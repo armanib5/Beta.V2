@@ -18,9 +18,28 @@ type PinRow = {
   event_id: string | null;
 };
 
+type RawVendorRow = {
+  id: string;
+  business_name: string;
+  lat: number | null;
+  lng: number | null;
+  status: string;
+  vendor_categories: { categories: { name: string } | null }[] | null;
+};
+
+export type VendorPinRow = {
+  id: string;
+  business_name: string;
+  lat: number;
+  lng: number;
+  status: string;
+  category_names: string[];
+};
+
 export default function AdminMapStudioPage() {
   const [status, setStatus] = useState<"loading" | "denied" | "ready">("loading");
   const [pins, setPins] = useState<PinRow[]>([]);
+  const [vendors, setVendors] = useState<VendorPinRow[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,9 +50,29 @@ export default function AdminMapStudioPage() {
         setStatus("denied");
         return;
       }
-      const { data } = await supabase.from("pins").select("*").returns<PinRow[]>();
+      const [{ data: pinRows }, { data: vendorRows }] = await Promise.all([
+        supabase.from("pins").select("*").returns<PinRow[]>(),
+        supabase
+          .from("vendors")
+          .select("id,business_name,lat,lng,status,vendor_categories(categories(name))")
+          .not("lat", "is", null)
+          .not("lng", "is", null)
+          .returns<RawVendorRow[]>(),
+      ]);
       if (cancelled) return;
-      setPins(data ?? []);
+      setPins(pinRows ?? []);
+      setVendors(
+        (vendorRows ?? [])
+          .filter((v): v is RawVendorRow & { lat: number; lng: number } => v.lat != null && v.lng != null)
+          .map((v) => ({
+            id: v.id,
+            business_name: v.business_name,
+            lat: v.lat,
+            lng: v.lng,
+            status: v.status,
+            category_names: (v.vendor_categories ?? []).map((vc) => vc.categories?.name).filter((n): n is string => !!n),
+          })),
+      );
       setStatus("ready");
     });
     return () => {
@@ -60,11 +99,12 @@ export default function AdminMapStudioPage() {
     <div className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="text-2xl font-bold text-slate-900">Map Studio</h1>
       <p className="mt-1 text-sm text-slate-600">
-        Add, edit, move, and remove map pins. Drag a pin to move it; click one to edit its details. This is Phase 1
-        of the Map Studio — the same foundation will grow to manage event zones and booths later.
+        Add, edit, move, and remove map pins. Drag a pin to move it; click one to edit its details. Toggle the
+        Vendors layer to visually correct real business locations — most of which were set by a vendor&apos;s phone
+        GPS at signup, not verified on a map.
       </p>
       <div className="mt-6">
-        <MapStudio initialPins={pins} />
+        <MapStudio initialPins={pins} initialVendors={vendors} />
       </div>
     </div>
   );
