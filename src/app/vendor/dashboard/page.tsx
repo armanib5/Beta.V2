@@ -131,9 +131,10 @@ export default function VendorDashboardPage() {
   if (needsProfile) {
     return (
       <div className="mx-auto max-w-md px-4 py-16">
-        <h1 className="text-center text-2xl font-bold text-slate-900">Welcome! Your email has been confirmed.</h1>
+        <h1 className="text-center text-2xl font-bold text-slate-900">Welcome to CityPinned!</h1>
         <p className="mt-2 text-center text-sm text-slate-600">
-          Next, complete your business profile by adding your business name below.
+          Your email has been confirmed. The last step is completing your business profile —
+          add your business name below to finish setting it up.
         </p>
         <form onSubmit={finishProfile} className="mt-6 space-y-3">
           <input
@@ -150,7 +151,7 @@ export default function VendorDashboardPage() {
             disabled={creatingProfile}
             className="w-full rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
           >
-            {creatingProfile ? "Saving…" : "Continue"}
+            {creatingProfile ? "Saving…" : "Complete My Profile"}
           </button>
         </form>
       </div>
