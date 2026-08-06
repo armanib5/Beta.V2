@@ -24,6 +24,7 @@ type RawVendorRow = {
   lat: number | null;
   lng: number | null;
   status: string;
+  location_verified_at: string | null;
   vendor_categories: { categories: { name: string } | null }[] | null;
 };
 
@@ -34,12 +35,34 @@ export type VendorPinRow = {
   lng: number;
   status: string;
   category_names: string[];
+  location_verified_at: string | null;
+};
+
+type RawEventRow = {
+  id: string;
+  name: string;
+  lat: number | null;
+  lng: number | null;
+  location: string | null;
+  location_verified_at: string | null;
+  categories: { name: string } | null;
+};
+
+export type EventPinRow = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  location: string | null;
+  category_name: string | null;
+  location_verified_at: string | null;
 };
 
 export default function AdminMapStudioPage() {
   const [status, setStatus] = useState<"loading" | "denied" | "ready">("loading");
   const [pins, setPins] = useState<PinRow[]>([]);
   const [vendors, setVendors] = useState<VendorPinRow[]>([]);
+  const [events, setEvents] = useState<EventPinRow[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,14 +73,21 @@ export default function AdminMapStudioPage() {
         setStatus("denied");
         return;
       }
-      const [{ data: pinRows }, { data: vendorRows }] = await Promise.all([
+      const [{ data: pinRows }, { data: vendorRows }, { data: eventRows }] = await Promise.all([
         supabase.from("pins").select("*").returns<PinRow[]>(),
         supabase
           .from("vendors")
-          .select("id,business_name,lat,lng,status,vendor_categories(categories(name))")
+          .select("id,business_name,lat,lng,status,location_verified_at,vendor_categories(categories(name))")
           .not("lat", "is", null)
           .not("lng", "is", null)
           .returns<RawVendorRow[]>(),
+        supabase
+          .from("lov_entries")
+          .select("id,name,lat,lng,location,location_verified_at,categories(name)")
+          .eq("type", "event")
+          .not("lat", "is", null)
+          .not("lng", "is", null)
+          .returns<RawEventRow[]>(),
       ]);
       if (cancelled) return;
       setPins(pinRows ?? []);
@@ -71,6 +101,20 @@ export default function AdminMapStudioPage() {
             lng: v.lng,
             status: v.status,
             category_names: (v.vendor_categories ?? []).map((vc) => vc.categories?.name).filter((n): n is string => !!n),
+            location_verified_at: v.location_verified_at,
+          })),
+      );
+      setEvents(
+        (eventRows ?? [])
+          .filter((e): e is RawEventRow & { lat: number; lng: number } => e.lat != null && e.lng != null)
+          .map((e) => ({
+            id: e.id,
+            name: e.name,
+            lat: e.lat,
+            lng: e.lng,
+            location: e.location,
+            category_name: e.categories?.name ?? null,
+            location_verified_at: e.location_verified_at,
           })),
       );
       setStatus("ready");
@@ -99,12 +143,12 @@ export default function AdminMapStudioPage() {
     <div className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="text-2xl font-bold text-slate-900">Map Studio</h1>
       <p className="mt-1 text-sm text-slate-600">
-        Add, edit, move, and remove map pins. Drag a pin to move it; click one to edit its details. Toggle the
-        Vendors layer to visually correct real business locations — most of which were set by a vendor&apos;s phone
-        GPS at signup, not verified on a map.
+        The single place to maintain every real-world location in CityPinned. Toggle Pins, Vendors, and Events on or
+        off independently; drag a marker to correct it, then Save. A red ring means a location has never been
+        visually checked — Save or Mark as Verified clears it.
       </p>
       <div className="mt-6">
-        <MapStudio initialPins={pins} initialVendors={vendors} />
+        <MapStudio initialPins={pins} initialVendors={vendors} initialEvents={events} />
       </div>
     </div>
   );

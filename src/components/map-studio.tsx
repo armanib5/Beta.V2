@@ -36,7 +36,21 @@ type VendorRow = {
   lng: number;
   status: string;
   category_names: string[];
+  location_verified_at: string | null;
 };
+
+type EventRow = {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  location: string | null;
+  category_name: string | null;
+  location_verified_at: string | null;
+};
+
+type Draft = { lat: number; lng: number };
+type DraftSetter = React.Dispatch<React.SetStateAction<Record<string, Draft>>>;
 
 declare global {
   interface Window {
@@ -44,18 +58,103 @@ declare global {
   }
 }
 
-/** A vendor marker needs to read as visually distinct from a plain pin
- * (which uses Leaflet's default teardrop marker image) at a glance, and
- * the color itself needs to carry the dirty/clean state - amber for "this
- * one has been dragged but not saved yet," indigo otherwise - since that's
- * the only cue visible on markers that aren't the currently-selected one. */
-function vendorDivIcon(L: NonNullable<Window["L"]>, isDirty: boolean, vendorId: string) {
-  const color = isDirty ? "#d97706" : "#4338ca";
+const VENDOR_COLOR = "#4338ca"; // indigo
+const EVENT_COLOR = "#0f766e"; // teal
+const DIRTY_COLOR = "#d97706"; // amber - staged, unsaved drag
+const NEEDS_REVIEW_RING = "#dc2626"; // red halo - never manually verified
+
+/** Vendor/event markers need to read as visually distinct from a plain
+ * pin (which uses Leaflet's default teardrop marker image) and need to
+ * carry two independent pieces of state at a glance, since the edit
+ * panel is only open for whichever one is selected: the base color says
+ * what layer it belongs to and whether it has an unsaved drag pending
+ * (amber overrides everything else), and a red halo says its stored
+ * coordinates have never actually been checked against the map. */
+function entityDivIcon(
+  L: NonNullable<Window["L"]>,
+  opts: { id: string; emoji: string; color: string; needsReview: boolean },
+) {
+  const ring = opts.needsReview
+    ? `box-shadow:0 0 0 3px ${NEEDS_REVIEW_RING},0 1px 4px rgba(0,0,0,.45);`
+    : "box-shadow:0 1px 4px rgba(0,0,0,.45);";
   const html =
-    `<div data-vendor-id="${vendorId}" style="width:26px;height:26px;border-radius:50%;background:${color};` +
-    'border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;' +
-    'font-size:13px;">\u{1F3EA}</div>';
+    `<div data-entity-id="${opts.id}" style="width:26px;height:26px;border-radius:50%;background:${opts.color};` +
+    `border:3px solid #fff;${ring}display:flex;align-items:center;justify-content:center;font-size:13px;">` +
+    `${opts.emoji}</div>`;
   return L.divIcon({ html, className: "", iconSize: [26, 26], iconAnchor: [13, 13] });
+}
+
+function stageDraft(setDrafts: DraftSetter, id: string, lat: number, lng: number) {
+  setDrafts((prev) => ({ ...prev, [id]: { lat, lng } }));
+}
+
+function clearDraft(setDrafts: DraftSetter, id: string) {
+  setDrafts((prev) => {
+    const next = { ...prev };
+    delete next[id];
+    return next;
+  });
+}
+
+/** The one place marker sync happens, shared by every editable layer
+ * (pins, vendors, events, and whatever comes next) instead of copy-pasting
+ * the same add/update/remove loop per layer. A draft position (staged but
+ * not yet saved) always wins over the entity's own stored lat/lng so a
+ * marker never snaps back mid-edit. `onDragEnd`/`onClick` only ever
+ * receive the entity's id (never the whole object) - handlers are bound
+ * once, at marker-creation time, so anything beyond a stable id would be
+ * a stale closure the moment that entity's other fields changed. */
+function syncEditableLayer<T extends { id: string; lat: number; lng: number }>(config: {
+  L: NonNullable<Window["L"]>;
+  map: import("leaflet").Map;
+  markersRef: React.MutableRefObject<Map<string, import("leaflet").Marker>>;
+  entities: T[];
+  drafts: Record<string, Draft>;
+  show: boolean;
+  icon?: (entity: T, isDirty: boolean) => import("leaflet").DivIcon;
+  opacity?: (entity: T) => number;
+  tooltip: (entity: T, isDirty: boolean) => string;
+  onDragEnd: (id: string, lat: number, lng: number) => void;
+  onClick: (id: string) => void;
+}) {
+  const { L, map, markersRef, entities, drafts, show, icon, opacity, tooltip, onDragEnd, onClick } = config;
+  if (!show) {
+    for (const [, marker] of markersRef.current) marker.remove();
+    markersRef.current.clear();
+    return;
+  }
+
+  const seen = new Set<string>();
+  for (const entity of entities) {
+    seen.add(entity.id);
+    const draft = drafts[entity.id];
+    const lat = draft ? draft.lat : entity.lat;
+    const lng = draft ? draft.lng : entity.lng;
+    let marker = markersRef.current.get(entity.id);
+    if (!marker) {
+      const opts: import("leaflet").MarkerOptions = { draggable: true };
+      if (icon) opts.icon = icon(entity, false);
+      marker = L.marker([lat, lng], opts).addTo(map);
+      const id = entity.id;
+      marker.on("dragend", () => {
+        const pos = marker!.getLatLng();
+        onDragEnd(id, pos.lat, pos.lng);
+      });
+      marker.on("click", () => onClick(id));
+      markersRef.current.set(entity.id, marker);
+    } else {
+      marker.setLatLng([lat, lng]);
+    }
+    if (icon) marker.setIcon(icon(entity, !!draft));
+    if (opacity) marker.setOpacity(opacity(entity));
+    marker.bindTooltip(tooltip(entity, !!draft), { permanent: false });
+  }
+  for (const [id, marker] of markersRef.current) {
+    if (!seen.has(id)) {
+      marker.remove();
+      markersRef.current.delete(id);
+    }
+  }
 }
 
 /** Loads the same vendored Leaflet build the public map already uses
@@ -81,23 +180,26 @@ function loadLeaflet(): Promise<NonNullable<Window["L"]>> {
 export function MapStudio({
   initialPins,
   initialVendors = [],
+  initialEvents = [],
 }: {
   initialPins: PinRow[];
   initialVendors?: VendorRow[];
+  initialEvents?: EventRow[];
 }) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
   const vendorMarkersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
+  const eventMarkersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
   const [pins, setPins] = useState(initialPins);
-  // Marker click handlers are bound once, when a marker is first created
-  // (see the pins-sync effect below) - they close over whatever
-  // `selectPin` looked like at that moment, which itself closed over
-  // that render's `pins`. Without this ref, clicking an existing pin
-  // after any OTHER pin had been edited would show stale data, since the
-  // handler's captured `pins` snapshot never gets updated. Read through
-  // this ref instead of the `pins` state variable anywhere a marker
-  // callback (created once) needs the current list (updated every time).
+  // Marker click/dragend handlers are bound once, when a marker is first
+  // created (see the sync effects below) - by design they only ever close
+  // over a stable id, never the entity itself, but the id lookups those
+  // handlers trigger (selectPin/selectVendor/selectEvent) still need
+  // somewhere to read *current* data from. Without these refs, selecting
+  // an entity after any OTHER one in the same layer had been edited would
+  // show stale data, since a plain state variable read inside a
+  // once-bound closure never sees later renders.
   const pinsRef = useRef(pins);
   useEffect(() => {
     pinsRef.current = pins;
@@ -112,26 +214,39 @@ export function MapStudio({
 
   const [showPins, setShowPins] = useState(true);
   const [showVendors, setShowVendors] = useState(true);
+  const [showEvents, setShowEvents] = useState(true);
+
   const [vendors, setVendors] = useState(initialVendors);
   const vendorsRef = useRef(vendors);
   useEffect(() => {
     vendorsRef.current = vendors;
   }, [vendors]);
-  // A vendor marker drag never calls the API directly (unlike a pin drag) -
-  // it only stages a candidate position here, keyed by vendor id, so a
+  // A vendor/event marker drag never calls the API directly (unlike a pin
+  // drag) - it only stages a candidate position here, keyed by id, so a
   // location fix is never persisted without an explicit Save click. See
   // the requirement this was built for: "every location correction
   // intentional and visually verified," since most vendor coordinates
   // were never placed on a map at all (set from a phone's raw GPS at
   // signup) and a silent auto-save here would just replace one unverified
   // number with another.
-  const [vendorDrafts, setVendorDrafts] = useState<Record<string, { lat: number; lng: number }>>({});
+  const [vendorDrafts, setVendorDrafts] = useState<Record<string, Draft>>({});
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
+
+  const [events, setEvents] = useState(initialEvents);
+  const eventsRef = useRef(events);
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
+  const [eventDrafts, setEventDrafts] = useState<Record<string, Draft>>({});
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   const selected = pins.find((p) => p.id === selectedId) ?? null;
   const selectedVendor = vendors.find((v) => v.id === selectedVendorId) ?? null;
   const selectedVendorDraft = selectedVendorId ? vendorDrafts[selectedVendorId] : undefined;
   const unsavedVendorCount = Object.keys(vendorDrafts).length;
+  const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
+  const selectedEventDraft = selectedEventId ? eventDrafts[selectedEventId] : undefined;
+  const unsavedEventCount = Object.keys(eventDrafts).length;
 
   function flash(msg: string) {
     setToast(msg);
@@ -163,6 +278,8 @@ export function MapStudio({
 
   // Click-to-add - a separate effect (not inline in the init effect) so
   // toggling Add Pin mode doesn't have to tear down and rebuild the map.
+  // Only pins are ever created here - vendors/events already exist from
+  // signup/board submissions, so their layers are correction-only.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
@@ -177,90 +294,75 @@ export function MapStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady, addMode]);
 
-  // Keep markers in sync with `pins` - add/remove/reposition, not a full
-  // teardown-and-rebuild, so an in-progress drag never gets interrupted
-  // by the same pin's own state update.
   useEffect(() => {
     const L = window.L;
     const map = mapRef.current;
     if (!L || !map || !mapReady) return;
-    if (!showPins) {
-      for (const [, marker] of markersRef.current) marker.remove();
-      markersRef.current.clear();
-      return;
-    }
-
-    const seen = new Set<string>();
-    for (const pin of pins) {
-      seen.add(pin.id);
-      let marker = markersRef.current.get(pin.id);
-      if (!marker) {
-        marker = L.marker([pin.lat, pin.lng], { draggable: true }).addTo(map);
-        marker.on("dragend", () => {
-          const pos = marker!.getLatLng();
-          savePin(pin.id, { lat: pos.lat, lng: pos.lng });
-        });
-        marker.on("click", () => selectPin(pin.id));
-        markersRef.current.set(pin.id, marker);
-      } else {
-        marker.setLatLng([pin.lat, pin.lng]);
-      }
-      marker.setOpacity(pin.status === "approved" ? 1 : 0.4);
-      marker.bindTooltip(pin.title || "Untitled pin", { permanent: false });
-    }
-    for (const [id, marker] of markersRef.current) {
-      if (!seen.has(id)) {
-        marker.remove();
-        markersRef.current.delete(id);
-      }
-    }
+    syncEditableLayer({
+      L,
+      map,
+      markersRef,
+      entities: pins,
+      drafts: {},
+      show: showPins,
+      opacity: (pin) => (pin.status === "approved" ? 1 : 0.4),
+      tooltip: (pin) => pin.title || "Untitled pin",
+      onDragEnd: (id, lat, lng) => savePin(id, { lat, lng }),
+      onClick: (id) => selectPin(id),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pins, mapReady, showPins]);
 
-  // Vendor markers - a separate layer from pins, toggled independently.
-  // Draft (unsaved, dragged-but-not-yet-saved) positions take priority
-  // over the stored lat/lng so a marker never snaps back mid-edit; the
-  // dirty/clean icon color is the only visual cue that a draft exists,
-  // since the edit panel is only open for whichever one is selected.
   useEffect(() => {
     const L = window.L;
     const map = mapRef.current;
     if (!L || !map || !mapReady) return;
-    if (!showVendors) {
-      for (const [, marker] of vendorMarkersRef.current) marker.remove();
-      vendorMarkersRef.current.clear();
-      return;
-    }
-
-    const seen = new Set<string>();
-    for (const vendor of vendors) {
-      seen.add(vendor.id);
-      const draft = vendorDrafts[vendor.id];
-      const lat = draft ? draft.lat : vendor.lat;
-      const lng = draft ? draft.lng : vendor.lng;
-      let marker = vendorMarkersRef.current.get(vendor.id);
-      if (!marker) {
-        marker = L.marker([lat, lng], { draggable: true, icon: vendorDivIcon(L, false, vendor.id) }).addTo(map);
-        marker.on("dragend", () => {
-          const pos = marker!.getLatLng();
-          setVendorDrafts((prev) => ({ ...prev, [vendor.id]: { lat: pos.lat, lng: pos.lng } }));
-        });
-        marker.on("click", () => selectVendor(vendor.id));
-        vendorMarkersRef.current.set(vendor.id, marker);
-      } else {
-        marker.setLatLng([lat, lng]);
-      }
-      marker.setIcon(vendorDivIcon(L, !!draft, vendor.id));
-      marker.bindTooltip(vendor.business_name + (draft ? " (unsaved)" : ""), { permanent: false });
-    }
-    for (const [id, marker] of vendorMarkersRef.current) {
-      if (!seen.has(id)) {
-        marker.remove();
-        vendorMarkersRef.current.delete(id);
-      }
-    }
+    syncEditableLayer({
+      L,
+      map,
+      markersRef: vendorMarkersRef,
+      entities: vendors,
+      drafts: vendorDrafts,
+      show: showVendors,
+      icon: (v, isDirty) =>
+        entityDivIcon(L, {
+          id: v.id,
+          emoji: "\u{1F3EA}",
+          color: isDirty ? DIRTY_COLOR : VENDOR_COLOR,
+          needsReview: !isDirty && !v.location_verified_at,
+        }),
+      tooltip: (v, isDirty) =>
+        v.business_name + (isDirty ? " (unsaved)" : v.location_verified_at ? "" : " (needs review)"),
+      onDragEnd: (id, lat, lng) => stageDraft(setVendorDrafts, id, lat, lng),
+      onClick: (id) => selectVendor(id),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendors, vendorDrafts, mapReady, showVendors]);
+
+  useEffect(() => {
+    const L = window.L;
+    const map = mapRef.current;
+    if (!L || !map || !mapReady) return;
+    syncEditableLayer({
+      L,
+      map,
+      markersRef: eventMarkersRef,
+      entities: events,
+      drafts: eventDrafts,
+      show: showEvents,
+      icon: (e, isDirty) =>
+        entityDivIcon(L, {
+          id: e.id,
+          emoji: "\u{1F3AA}",
+          color: isDirty ? DIRTY_COLOR : EVENT_COLOR,
+          needsReview: !isDirty && !e.location_verified_at,
+        }),
+      tooltip: (e, isDirty) => e.name + (isDirty ? " (unsaved)" : e.location_verified_at ? "" : " (needs review)"),
+      onDragEnd: (id, lat, lng) => stageDraft(setEventDrafts, id, lat, lng),
+      onClick: (id) => selectEvent(id),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, eventDrafts, mapReady, showEvents]);
 
   function selectPin(id: string) {
     const pin = pinsRef.current.find((p) => p.id === id);
@@ -268,6 +370,7 @@ export function MapStudio({
     setSelectedId(id);
     setForm({ title: pin.title ?? "", description: pin.description ?? "", category: pin.category ?? "business" });
     setSelectedVendorId(null);
+    setSelectedEventId(null);
     setError(null);
   }
 
@@ -277,6 +380,17 @@ export function MapStudio({
     setSelectedVendorId(id);
     setSelectedId(null);
     setForm(null);
+    setSelectedEventId(null);
+    setError(null);
+  }
+
+  function selectEvent(id: string) {
+    const event = eventsRef.current.find((e) => e.id === id);
+    if (!event) return;
+    setSelectedEventId(id);
+    setSelectedId(null);
+    setForm(null);
+    setSelectedVendorId(null);
     setError(null);
   }
 
@@ -288,31 +402,96 @@ export function MapStudio({
     const supabase = createClient();
     const { data, error: updateError } = await supabase
       .from("vendors")
-      .update({ lat: draft.lat, lng: draft.lng })
+      .update({ lat: draft.lat, lng: draft.lng, location_verified_at: new Date().toISOString() })
       .eq("id", id)
-      .select("id,business_name,lat,lng")
-      .single<{ id: string; business_name: string; lat: number; lng: number }>();
+      .select("id,business_name,lat,lng,location_verified_at")
+      .single<{ id: string; business_name: string; lat: number; lng: number; location_verified_at: string | null }>();
     setSaving(false);
     if (updateError || !data) {
       setError(updateError?.message ?? "Could not save this vendor's location.");
       return;
     }
-    setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, lat: data.lat, lng: data.lng } : v)));
-    setVendorDrafts((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
+    setVendors((prev) =>
+      prev.map((v) =>
+        v.id === id ? { ...v, lat: data.lat, lng: data.lng, location_verified_at: data.location_verified_at } : v,
+      ),
+    );
+    clearDraft(setVendorDrafts, id);
     flash(`✓ Location saved — ${data.business_name}`);
   }
 
   function cancelVendorEdit(id: string) {
-    setVendorDrafts((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
+    clearDraft(setVendorDrafts, id);
     setSelectedVendorId(null);
+  }
+
+  async function markVendorVerified(id: string) {
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("vendors")
+      .update({ location_verified_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("id,business_name,location_verified_at")
+      .single<{ id: string; business_name: string; location_verified_at: string | null }>();
+    setSaving(false);
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not mark this vendor as verified.");
+      return;
+    }
+    setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, location_verified_at: data.location_verified_at } : v)));
+    flash(`✓ Marked verified — ${data.business_name}`);
+  }
+
+  async function saveEventLocation(id: string) {
+    const draft = eventDrafts[id];
+    if (!draft) return;
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("lov_entries")
+      .update({ lat: draft.lat, lng: draft.lng, location_verified_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("id,name,lat,lng,location_verified_at")
+      .single<{ id: string; name: string; lat: number; lng: number; location_verified_at: string | null }>();
+    setSaving(false);
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not save this event's location.");
+      return;
+    }
+    setEvents((prev) =>
+      prev.map((e) =>
+        e.id === id ? { ...e, lat: data.lat, lng: data.lng, location_verified_at: data.location_verified_at } : e,
+      ),
+    );
+    clearDraft(setEventDrafts, id);
+    flash(`✓ Location saved — ${data.name}`);
+  }
+
+  function cancelEventEdit(id: string) {
+    clearDraft(setEventDrafts, id);
+    setSelectedEventId(null);
+  }
+
+  async function markEventVerified(id: string) {
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("lov_entries")
+      .update({ location_verified_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("id,name,location_verified_at")
+      .single<{ id: string; name: string; location_verified_at: string | null }>();
+    setSaving(false);
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not mark this event as verified.");
+      return;
+    }
+    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, location_verified_at: data.location_verified_at } : e)));
+    flash(`✓ Marked verified — ${data.name}`);
   }
 
   async function createPinAt(lat: number, lng: number) {
@@ -339,6 +518,7 @@ export function MapStudio({
     setSelectedId(data.id);
     setForm({ title: data.title ?? "", description: data.description ?? "", category: data.category ?? "business" });
     setSelectedVendorId(null);
+    setSelectedEventId(null);
     setError(null);
     flash("✓ Pin added — edit its details below");
   }
@@ -399,6 +579,10 @@ export function MapStudio({
     flash("✓ Pin removed");
   }
 
+  function formatVerifiedAt(iso: string) {
+    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -438,9 +622,31 @@ export function MapStudio({
         >
           🏪 Vendors {showVendors ? "on" : "off"}
         </button>
+        <button
+          type="button"
+          onClick={() => setShowEvents((v) => !v)}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${
+            showEvents ? "border border-teal-400 text-teal-700 hover:bg-teal-50" : "border border-slate-200 text-slate-400"
+          }`}
+        >
+          🎪 Events {showEvents ? "on" : "off"}
+        </button>
+        <button
+          type="button"
+          disabled
+          title="Booths are managed on the Event Zone Map today - this layer is reserved for when that moves into Map Studio."
+          className="cursor-not-allowed rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-300"
+        >
+          🏗 Booths (soon)
+        </button>
         {unsavedVendorCount > 0 && (
           <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
             {unsavedVendorCount} vendor location{unsavedVendorCount === 1 ? "" : "s"} unsaved
+          </span>
+        )}
+        {unsavedEventCount > 0 && (
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+            {unsavedEventCount} event location{unsavedEventCount === 1 ? "" : "s"} unsaved
           </span>
         )}
         {saving && <span className="text-xs text-slate-500">Saving…</span>}
@@ -456,10 +662,19 @@ export function MapStudio({
               <div className="flex items-center justify-between">
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                    selectedVendorDraft ? "bg-amber-100 text-amber-800" : "bg-indigo-100 text-indigo-800"
+                    selectedVendorDraft
+                      ? "bg-amber-100 text-amber-800"
+                      : selectedVendor.location_verified_at
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
                   }`}
                 >
-                  🏪 {selectedVendorDraft ? "Unsaved location" : "Vendor"}
+                  🏪{" "}
+                  {selectedVendorDraft
+                    ? "Unsaved location"
+                    : selectedVendor.location_verified_at
+                      ? "Verified"
+                      : "⚠ Needs Location Review"}
                 </span>
                 <button
                   type="button"
@@ -485,6 +700,9 @@ export function MapStudio({
                   {selectedVendor.lat.toFixed(6)}, {selectedVendor.lng.toFixed(6)}
                 </p>
               </div>
+              {selectedVendor.location_verified_at && !selectedVendorDraft && (
+                <p className="text-xs text-slate-500">Verified {formatVerifiedAt(selectedVendor.location_verified_at)}</p>
+              )}
               {selectedVendorDraft && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-2">
                   <p className="text-xs font-semibold text-amber-800">Pending Coordinates (not yet saved)</p>
@@ -497,8 +715,8 @@ export function MapStudio({
                 </div>
               )}
               <p className="text-xs text-slate-500">
-                Drag this vendor&apos;s marker on the map to its correct physical building, then Save. Most vendor
-                coordinates were set by a phone&apos;s GPS at signup and have never been checked against a real map.
+                Drag this vendor&apos;s marker on the map to its correct physical building, then Save. No address is
+                on file for vendors yet, so the map is the only way to check this today.
               </p>
               {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
               <div className="flex flex-wrap gap-2 pt-1">
@@ -513,17 +731,118 @@ export function MapStudio({
                 <button
                   type="button"
                   onClick={() => cancelVendorEdit(selectedVendor.id)}
-                  disabled={saving}
+                  disabled={saving || !selectedVendorDraft}
                   className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                 >
                   Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => markVendorVerified(selectedVendor.id)}
+                  disabled={saving || !!selectedVendorDraft || !!selectedVendor.location_verified_at}
+                  className="rounded-full border border-green-400 px-4 py-2 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
+                >
+                  {selectedVendor.location_verified_at ? "✓ Verified" : "✓ Mark as Verified"}
+                </button>
+              </div>
+            </div>
+          ) : selectedEvent ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                    selectedEventDraft
+                      ? "bg-amber-100 text-amber-800"
+                      : selectedEvent.location_verified_at
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  🎪{" "}
+                  {selectedEventDraft
+                    ? "Unsaved location"
+                    : selectedEvent.location_verified_at
+                      ? "Verified"
+                      : "⚠ Needs Location Review"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedEventId(null)}
+                  className="text-xs text-slate-500 hover:underline"
+                >
+                  Close
+                </button>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-600">Event Name</p>
+                <p className="text-sm text-slate-900">{selectedEvent.name}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-600">Category</p>
+                <p className="text-sm text-slate-900">{selectedEvent.category_name ?? "—"}</p>
+              </div>
+              {selectedEvent.location && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-600">Address</p>
+                  <p className="text-sm text-slate-900">{selectedEvent.location}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-semibold text-slate-600">Stored Coordinates</p>
+                <p className="text-sm text-slate-900">
+                  {selectedEvent.lat.toFixed(6)}, {selectedEvent.lng.toFixed(6)}
+                </p>
+              </div>
+              {selectedEvent.location_verified_at && !selectedEventDraft && (
+                <p className="text-xs text-slate-500">Verified {formatVerifiedAt(selectedEvent.location_verified_at)}</p>
+              )}
+              {selectedEventDraft && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-2">
+                  <p className="text-xs font-semibold text-amber-800">Pending Coordinates (not yet saved)</p>
+                  <p className="text-sm text-amber-900">
+                    {selectedEventDraft.lat.toFixed(6)}, {selectedEventDraft.lng.toFixed(6)}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700">
+                    Drag the marker again to adjust, or Save to confirm this is the correct spot.
+                  </p>
+                </div>
+              )}
+              <p className="text-xs text-slate-500">
+                Drag this event&apos;s marker to its correct location, then Save. Events without their own lat/lng
+                fall back to a coarse neighborhood or city-center point until corrected here.
+              </p>
+              {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => saveEventLocation(selectedEvent.id)}
+                  disabled={saving || !selectedEventDraft}
+                  className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => cancelEventEdit(selectedEvent.id)}
+                  disabled={saving || !selectedEventDraft}
+                  className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => markEventVerified(selectedEvent.id)}
+                  disabled={saving || !!selectedEventDraft || !!selectedEvent.location_verified_at}
+                  className="rounded-full border border-green-400 px-4 py-2 text-xs font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
+                >
+                  {selectedEvent.location_verified_at ? "✓ Verified" : "✓ Mark as Verified"}
                 </button>
               </div>
             </div>
           ) : !selected || !form ? (
             <p className="text-sm text-slate-500">
-              Click a pin or vendor on the map to edit it, or click <strong>+ Add Pin</strong> then click anywhere on
-              the map to place a new one.
+              Click a pin, vendor, or event on the map to edit it, or click <strong>+ Add Pin</strong> then click
+              anywhere on the map to place a new one.
             </p>
           ) : (
             <div className="space-y-3">
