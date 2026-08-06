@@ -645,6 +645,54 @@ async function handleAdminCreateBusiness(request: Request, env: Env): Promise<Re
   return json({ business_id: vendor.slug, pin, vendor_id: vendor.id });
 }
 
+// Permanently removes a vendor - the vendors row (every FK to vendors.id
+// is already on delete cascade/set null as of migration 0001 onward, so
+// related listings/photos/menu items/bookings clean up on their own) and
+// the underlying Supabase Auth account, so the account is genuinely gone
+// rather than just hidden. A soft "Reject" (status change) already covers
+// the case where the login should keep working - this is deliberately
+// the harder, one-way action, gated the same way handleAdminCreateBusiness
+// is: caller must resolve to a real session that's also in `admins`.
+async function handleAdminDeleteVendor(request: Request, env: Env): Promise<Response> {
+  const callerId = await resolveAuthenticatedCallerId(request, env);
+  if (!callerId) return json({ error: "Invalid session." }, 401);
+
+  const adminRes = await sb(env, `/admins?id=eq.${callerId}&select=id`);
+  const admins = (await adminRes.json()) as Array<{ id: string }>;
+  if (admins.length === 0) return json({ error: "Admin access required." }, 403);
+
+  let body: { vendor_id?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body." }, 400);
+  }
+  const vendorId = body.vendor_id;
+  if (!vendorId) return json({ error: "vendor_id is required." }, 400);
+
+  const deleteVendorRes = await sb(env, `/vendors?id=eq.${vendorId}`, { method: "DELETE" });
+  if (!deleteVendorRes.ok) {
+    const errText = await deleteVendorRes.text();
+    return json({ error: `Could not delete vendor record: ${errText}` }, 502);
+  }
+
+  const deleteUserRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${vendorId}`, {
+    method: "DELETE",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+  });
+  if (!deleteUserRes.ok && deleteUserRes.status !== 404) {
+    const errText = await deleteUserRes.text();
+    // The visible/data part already succeeded at this point - say so,
+    // rather than reporting the whole operation as a failure.
+    return json({ error: `Vendor record deleted, but the login could not be removed: ${errText}` }, 502);
+  }
+
+  return json({ success: true });
+}
+
 function parseSignatureHeader(header: string): { timestamp: string; signatures: string[] } {
   let timestamp = "";
   const signatures: string[] = [];
@@ -962,13 +1010,14 @@ const worker = {
       "/api/stripe-webhook",
       "/api/log-terms-agreement",
       "/api/admin-create-business",
+      "/api/admin-delete-vendor",
     ];
     if (!apiRoutes.includes(url.pathname) || request.method !== "POST") return env.ASSETS.fetch(request);
 
-    // /api/log-terms-agreement and /api/admin-create-business only touch
-    // Supabase, never Stripe - don't block them on Stripe secrets they
-    // have no use for.
-    const supabaseOnlyRoutes = ["/api/log-terms-agreement", "/api/admin-create-business"];
+    // /api/log-terms-agreement, /api/admin-create-business, and
+    // /api/admin-delete-vendor only touch Supabase, never Stripe - don't
+    // block them on Stripe secrets they have no use for.
+    const supabaseOnlyRoutes = ["/api/log-terms-agreement", "/api/admin-create-business", "/api/admin-delete-vendor"];
     const missing = supabaseOnlyRoutes.includes(url.pathname)
       ? missingEnvVars(env, ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"])
       : missingEnvVars(env);
@@ -981,6 +1030,7 @@ const worker = {
       if (url.pathname === "/api/create-cart-checkout-session") return await handleCreateCartCheckoutSession(request, env);
       if (url.pathname === "/api/log-terms-agreement") return await handleLogTermsAgreement(request, env);
       if (url.pathname === "/api/admin-create-business") return await handleAdminCreateBusiness(request, env);
+      if (url.pathname === "/api/admin-delete-vendor") return await handleAdminDeleteVendor(request, env);
       return await handleStripeWebhook(request, env);
     } catch (err) {
       // Whatever the reason, never let an exception escape to Cloudflare's

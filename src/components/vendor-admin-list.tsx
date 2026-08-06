@@ -56,6 +56,11 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
   const [filter, setFilter] = useState<FilterKey>("all");
   const [expiryDrafts, setExpiryDrafts] = useState<Record<string, string>>({});
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  // Two-step delete: first click only arms it (no request sent yet); a
+  // second, explicit click on the "Yes, permanently delete" button that
+  // then appears is what actually calls the API. Any other action on the
+  // page (or picking a different vendor to delete) disarms it.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const reapprovedIds = useMemo(() => {
     const counts = new Map<string, number>();
@@ -131,6 +136,42 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
     setVendors((prev) => prev.map((v) => (v.id === id ? data : v)));
     setConfirmation(`✓ Saved — ${data.business_name}: ${describePatch(patch)}`);
     window.setTimeout(() => setConfirmation((c) => (c?.startsWith("✓") ? null : c)), 4000);
+  }
+
+  async function deleteVendorPermanently(vendor: Vendor) {
+    setError(null);
+    setBusyId(vendor.id);
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      setError("Not signed in.");
+      setBusyId(null);
+      setPendingDeleteId(null);
+      return;
+    }
+    try {
+      const res = await fetch("/api/admin-delete-vendor", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ vendor_id: vendor.id }),
+      });
+      const data: { error?: string } = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not delete this vendor.");
+        return;
+      }
+      logActivity(supabase, "vendor", vendor.id, vendor.business_name, "Deleted", "Permanently removed account and login");
+      setVendors((prev) => prev.filter((v) => v.id !== vendor.id));
+      setConfirmation(`✓ Permanently deleted ${vendor.business_name}`);
+      window.setTimeout(() => setConfirmation((c) => (c?.startsWith("✓") ? null : c)), 4000);
+    } catch {
+      setError("Could not reach the server to delete this vendor.");
+    } finally {
+      setBusyId(null);
+      setPendingDeleteId(null);
+    }
   }
 
   function toggleSelected(id: string) {
@@ -519,6 +560,37 @@ export function VendorAdminList({ vendors: initialVendors, statusLog }: { vendor
               >
                 ⭐ Top 10
               </button>
+              {pendingDeleteId === vendor.id ? (
+                <>
+                  <span className="text-xs font-semibold text-red-700">Permanently delete this account?</span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => deleteVendorPermanently(vendor)}
+                    className="rounded-full bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                  >
+                    {busy ? "Deleting…" : "Yes, permanently delete"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setPendingDeleteId(null)}
+                    className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setPendingDeleteId(vendor.id)}
+                  title="Permanently removes this vendor's listing and login. Use Reject instead if they should be able to sign in again later."
+                  className="rounded-full border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  🗑 Delete Account
+                </button>
+              )}
             </div>
           </div>
         );
