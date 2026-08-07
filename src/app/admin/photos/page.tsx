@@ -17,6 +17,7 @@ export default function AdminPhotosPage() {
   const [photos, setPhotos] = useState<VendorPhoto[]>([]);
   const [flyers, setFlyers] = useState<LovEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [croppingLogo, setCroppingLogo] = useState<Vendor | null>(null);
@@ -57,6 +58,11 @@ export default function AdminPhotosPage() {
   const filteredVendors = q ? vendors.filter((v) => v.business_name.toLowerCase().includes(q)) : vendors;
   const filteredFlyers = q ? flyers.filter((f) => f.name.toLowerCase().includes(q)) : flyers;
 
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
+  }
+
   async function uploadVendorLogo(vendor: Vendor, file: File) {
     setError(null);
     if (file.size > MAX_PHOTO_BYTES) {
@@ -84,6 +90,7 @@ export default function AdminPhotosPage() {
   }
 
   async function removeVendorLogo(vendor: Vendor) {
+    if (!window.confirm(`Take down ${vendor.business_name}'s logo photo?`)) return;
     setError(null);
     setBusyKey(`logo-${vendor.id}`);
     const supabase = createClient();
@@ -95,6 +102,7 @@ export default function AdminPhotosPage() {
     }
     setVendors((prev) => prev.map((v) => (v.id === vendor.id ? { ...v, logo_url: null } : v)));
     logActivity(supabase, "vendor", vendor.id, vendor.business_name, "Admin removed logo photo");
+    flash(`✓ Took down ${vendor.business_name}'s logo photo`);
   }
 
   async function addVendorGalleryPhoto(vendor: Vendor, file: File) {
@@ -128,6 +136,7 @@ export default function AdminPhotosPage() {
   }
 
   async function removeVendorGalleryPhoto(vendor: Vendor, photo: VendorPhoto) {
+    if (!window.confirm(`Take down this gallery photo for ${vendor.business_name}?`)) return;
     setError(null);
     const supabase = createClient();
     const { error: deleteError } = await supabase.from("vendor_photos").delete().eq("id", photo.id);
@@ -138,6 +147,7 @@ export default function AdminPhotosPage() {
     await supabase.storage.from("vendor-photos").remove([photo.storage_path]);
     setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
     logActivity(supabase, "vendor", vendor.id, vendor.business_name, "Admin took down gallery photo");
+    flash(`✓ Took down gallery photo for ${vendor.business_name}`);
   }
 
   async function uploadFlyerPhoto(flyer: LovEntry, file: File) {
@@ -169,6 +179,7 @@ export default function AdminPhotosPage() {
   }
 
   async function removeFlyerPhoto(flyer: LovEntry) {
+    if (!window.confirm(`Take down ${flyer.name}'s flyer photo?`)) return;
     setError(null);
     setBusyKey(`flyer-${flyer.id}`);
     const supabase = createClient();
@@ -180,6 +191,7 @@ export default function AdminPhotosPage() {
     }
     setFlyers((prev) => prev.map((f) => (f.id === flyer.id ? { ...f, flyer_image_url: null } : f)));
     logActivity(supabase, "event", flyer.id, flyer.name, "Admin took down flyer photo");
+    flash(`✓ Took down ${flyer.name}'s flyer photo`);
   }
 
   if (status === "loading") {
@@ -218,6 +230,7 @@ export default function AdminPhotosPage() {
       />
 
       {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+      {toast && <p role="status" aria-live="polite" className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">{toast}</p>}
 
       <h2 className="mt-8 text-lg font-bold text-slate-900">Vendors ({filteredVendors.length})</h2>
       <div className="mt-3 space-y-3">

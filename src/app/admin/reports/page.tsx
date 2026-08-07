@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
+import { logActivity } from "@/lib/activity";
 
 type ReportStatus = "new" | "reviewed" | "resolved";
 
@@ -29,6 +30,12 @@ export default function AdminReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [typeFilter, setTypeFilter] = useState<"all" | "app_bug" | "vendor" | "event">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | ReportStatus>("all");
+  const [toast, setToast] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +65,7 @@ export default function AdminReportsPage() {
     const { error } = await supabase.from("reports").update({ status: next }).eq("id", id);
     if (error) return;
     setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status: next } : r)));
+    flash(`✓ Marked ${next}`);
   }
 
   // A report on a vendor/event auto-suspends it the moment it's submitted
@@ -67,11 +75,15 @@ export default function AdminReportsPage() {
   async function reactivateListing(r: Report) {
     if (!r.target_id) return;
     const supabase = createClient();
+    const name = r.target_name ?? r.target_type;
     if (r.target_type === "vendor") {
       await supabase.from("vendors").update({ status: "active" }).eq("id", r.target_id);
+      logActivity(supabase, "vendor", r.target_id, name, "Admin reactivated listing after report review");
     } else if (r.target_type === "event") {
       await supabase.from("lov_entries").update({ status: "active" }).eq("id", r.target_id);
+      logActivity(supabase, "event", r.target_id, name, "Admin reactivated listing after report review");
     }
+    flash(`✓ Reactivated ${name}`);
   }
 
   if (status === "loading") {
@@ -133,6 +145,8 @@ export default function AdminReportsPage() {
         ))}
         <span className="ml-auto text-sm font-medium text-slate-500">{filtered.length} shown</span>
       </div>
+
+      {toast && <p role="status" aria-live="polite" className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">{toast}</p>}
 
       <div className="mt-6 space-y-2">
         {filtered.length === 0 && <p className="text-sm text-slate-500">Nothing matches this filter.</p>}
