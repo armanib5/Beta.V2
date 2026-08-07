@@ -252,112 +252,6 @@ function hVendorPin(id) {
   var p = document.getElementById("vpin-" + id); if (p) p.classList.add("pulse");
 }
 
-/* ── ADMIN MODERATION PLACEHOLDER (retired) ──
-   Real accounts/roles now exist (Supabase Auth + the `admins` table, see
-   /admin/*) - the nav's #nAdmin link now goes there instead, its
-   visibility driven by setupAuthNav() in app.js. This local-only ?admin=1
-   placeholder is left in place but no longer wired into the nav. */
-function maybeShowAdminNav() {}
-function showAdmin() {
-  document.getElementById("bView").style.display = "none";
-  document.getElementById("tdwrap").style.display = "none";
-  document.getElementById("mapSec").style.display = "none";
-  document.getElementById("adminSec").style.display = "block";
-  if (typeof showAdminTab === "function") showAdminTab("events");
-  else renderAdminList();
-}
-function vendorTier(v) {
-  if (typeof getBookings !== "function") return "Standard";
-  var mine = getBookings().filter(function (b) { return b.vendorId === v.id && b.status !== "cancelled"; });
-  if (!mine.length) return "Standard";
-  if (mine.some(function (b) { return b.type === "featured"; })) return "Featured";
-  if (mine.some(function (b) { return b.type === "boost"; })) return "Boost";
-  return "Standard";
-}
-
-var vendorAdminFilter = "pending";
-
-function renderAdminList() {
-  var list = document.getElementById("adminList");
-  if (!list) return;
-  list.innerHTML = "";
-
-  var bar = document.createElement("div");
-  bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;";
-  ["pending", "approved", "rejected", "denied", "all"].forEach(function (s) {
-    var b = document.createElement("button");
-    b.className = "nb" + (s === vendorAdminFilter ? " on" : "");
-    b.textContent = s.charAt(0).toUpperCase() + s.slice(1);
-    b.onclick = function () { vendorAdminFilter = s; renderAdminList(); };
-    bar.appendChild(b);
-  });
-  list.appendChild(bar);
-
-  /* Master history: every vendor that ever applied, filterable by status,
-     newest first, showing tier + submitted timestamp + current status so
-     nothing that was here before quietly disappears from view. */
-  var rows = vendorAdminFilter === "all" ? vendors.slice() : vendors.filter(function (v) { return v.status === vendorAdminFilter; });
-  if (!rows.length) {
-    var empty = document.createElement("p"); empty.className = "aempty";
-    empty.textContent = "No " + (vendorAdminFilter === "all" ? "" : vendorAdminFilter + " ") + "vendors.";
-    list.appendChild(empty); return;
-  }
-  rows.sort(function (a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); });
-
-  rows.forEach(function (v) {
-    var row = document.createElement("div");
-    row.style.cssText = "background:rgba(253,246,224,.06);border:1px solid rgba(218,184,112,.2);border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;";
-
-    var name = document.createElement("div");
-    name.style.cssText = "font-family:'Special Elite',monospace;font-size:12.5px;color:var(--cl);flex:1;min-width:160px;";
-    var when = v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "?";
-    var statusLabel = v.status + (v.status === "approved" ? (v.active === false ? " / deactivated" : " / active") : "");
-    name.innerHTML = escHtml(v.name) + "<br><span style='opacity:.65;font-size:10.5px;'>" + vendorTier(v) + " &middot; " + when + " &middot; " + statusLabel + "</span>" +
-      (v.status === "denied" && v.denialReason ? "<br><span style='opacity:.6;font-size:10px;font-style:italic;'>" + escHtml(v.denialReason) + "</span>" : "");
-    row.appendChild(name);
-
-    if (v.status !== "approved") {
-      var approveBtn = document.createElement("button"); approveBtn.className = "nb"; approveBtn.textContent = "Approve";
-      approveBtn.onclick = function () { v.status = "approved"; v.active = true; v.denialReason = ""; saveVendors(); renderAdminList(); renderVendorPins(); };
-      row.appendChild(approveBtn);
-    }
-    if (v.status === "approved" && v.active === false) {
-      var activateBtn = document.createElement("button"); activateBtn.className = "nb"; activateBtn.textContent = "Activate";
-      activateBtn.onclick = function () { v.active = true; saveVendors(); renderAdminList(); renderVendorPins(); };
-      row.appendChild(activateBtn);
-    }
-    if (v.status === "approved" && v.active !== false) {
-      var deactivateBtn = document.createElement("button"); deactivateBtn.className = "nb"; deactivateBtn.textContent = "Deactivate";
-      deactivateBtn.onclick = function () { v.active = false; saveVendors(); renderAdminList(); renderVendorPins(); };
-      row.appendChild(deactivateBtn);
-    }
-    if (v.status !== "rejected") {
-      var rejectBtn = document.createElement("button"); rejectBtn.className = "nb"; rejectBtn.textContent = "Reject";
-      rejectBtn.onclick = function () { v.status = "rejected"; saveVendors(); renderAdminList(); renderVendorPins(); };
-      row.appendChild(rejectBtn);
-    }
-    if (v.status !== "denied") {
-      var denyBtn = document.createElement("button"); denyBtn.className = "nb"; denyBtn.textContent = "Deny";
-      denyBtn.onclick = function () {
-        if (!confirm("Deny " + v.name + "'s application? They'll be told: \"Your vendor application could not be verified at this time.\"")) return;
-        v.status = "denied"; v.denialReason = "Your vendor application could not be verified at this time.";
-        saveVendors(); renderAdminList(); renderVendorPins();
-      };
-      row.appendChild(denyBtn);
-    }
-
-    var promoCount = typeof getBookings === "function"
-      ? getBookings().filter(function (b) { return b.vendorId === v.id && b.status !== "cancelled"; }).length
-      : 0;
-    var bkBtn = document.createElement("button");
-    bkBtn.className = "nb"; bkBtn.textContent = promoCount ? "Bookings (" + promoCount + ")" : "Bookings";
-    bkBtn.onclick = function () { showAdminTab("bookings"); };
-    row.appendChild(bkBtn);
-
-    list.appendChild(row);
-  });
-}
-
 /* ── ADD / EDIT FORM (a lightweight vendor dashboard placeholder — no
    real auth yet, so anyone can edit any listing, same permission model
    the existing event flyer form already uses) ── */
@@ -536,5 +430,4 @@ function subVendorForm() {
 
 document.addEventListener("DOMContentLoaded", function () {
   renderVendorPins();
-  maybeShowAdminNav();
 });

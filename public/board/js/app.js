@@ -74,7 +74,7 @@ function sortByProximity(list,getLat,getLng){
     return haversine(anchor.lat,anchor.lng,la,getLng(a))-haversine(anchor.lat,anchor.lng,lb,getLng(b));
   });
 }
-var KEY="pinnedsj-v10",evts=[],mS=1,mX=0,mY=0,pan=false,ps={x:0,y:0};
+var KEY="pinnedsj-v10",evts=[];
 /* Public flyer self-submission - one flag, easy to toggle either way. */
 var SHOW_POST_FLYER=true;
 
@@ -113,7 +113,6 @@ function init(){
   renderToday();
   renderBoards();
   renderPins();
-  setupPan();
   setupBgParallax();
   setupBackToTop();
   setupStickyOffsetWatcher();
@@ -1836,49 +1835,15 @@ function hPin(id){
   document.querySelectorAll(".mp.pulse").forEach(function(p){p.classList.remove("pulse");});
   var p=document.getElementById("pin-"+id);if(p)p.classList.add("pulse");
 }
-function zMap(f){
-  var vp=document.getElementById("mvp"),ns=Math.max(.6,Math.min(4,mS*f));
-  var cx=vp.clientWidth/2,cy=vp.clientHeight/2;
-  mX=cx-(cx-mX)*(ns/mS);mY=cy-(cy-mY)*(ns/mS);mS=ns;applyMap();
-}
-function rMap(){mS=1;centerMap();}
-function applyMap(){
-  var m=document.getElementById("mainMap");
-  if(m){m.style.transform="translate("+mX+"px,"+mY+"px) scale("+mS+")";m.style.transformOrigin="0 0";}
-}
-/* Centers the viewport on Plaza de Cesar Chavez (the SVG's main downtown
-   landmark, at 420,470) instead of defaulting to the map's top-left
-   corner - the map used to open needing a lot of manual panning just to
-   find it. */
-function centerMap(){
-  var vp=document.getElementById("mvp");
-  if(!vp||!vp.clientWidth)return;
-  mX=vp.clientWidth/2-420*mS;
-  mY=vp.clientHeight/2-470*mS;
-  applyMap();
-}
-function setupPan(){
-  var vp=document.getElementById("mvp");if(!vp)return;
-  vp.addEventListener("mousedown",function(e){pan=true;ps={x:e.clientX-mX,y:e.clientY-mY};vp.classList.add("gr");e.preventDefault();});
-  window.addEventListener("mousemove",function(e){if(!pan)return;mX=e.clientX-ps.x;mY=e.clientY-ps.y;applyMap();});
-  window.addEventListener("mouseup",function(){pan=false;var v=document.getElementById("mvp");if(v)v.classList.remove("gr");});
-  vp.addEventListener("touchstart",function(e){if(e.touches.length===1){pan=true;ps={x:e.touches[0].clientX-mX,y:e.touches[0].clientY-mY};}},{passive:true});
-  vp.addEventListener("touchmove",function(e){if(!pan||e.touches.length!==1)return;mX=e.touches[0].clientX-ps.x;mY=e.touches[0].clientY-ps.y;applyMap();},{passive:true});
-  vp.addEventListener("touchend",function(){pan=false;});
-}
 function showBoards(){
   document.getElementById("bView").style.display="block";
   document.getElementById("tdwrap").style.display="block";
-  document.getElementById("mapSec").style.display="none";
   document.getElementById("adminSec").style.display="none";
   document.getElementById("nB").classList.add("on");
   document.getElementById("nM").classList.remove("on");
 }
-/* The board used to have its own built-in placeholder map (the SVG
-   section still sitting dormant in this file/markup below - kept but
-   unreachable rather than deleted, since every "go to map" entry point
-   already funnels through this one function). Now that the real map
-   lives as its own app right next door, "Map" just takes you there. */
+/* The real map lives as its own app right next door - "Map" just takes
+   you there. */
 function showMap(){
   window.location.href="../map/index.html";
 }
