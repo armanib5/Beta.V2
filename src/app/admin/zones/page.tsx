@@ -767,28 +767,14 @@ ${
 
       {dataMode === "geo" ? (
         <>
-          <div className="mt-6">
-            {loadingZone && <p className="text-sm text-slate-500">Loading zone map…</p>}
-            {!loadingZone && eventId && (
-              <ZoneMapLeaflet
-                mode={zoneMapMode}
-                center={mapCenter}
-                boundaries={geoBoundaries}
-                booths={geoBooths}
-                features={features}
-                contextPins={contextPins}
-                onBoothClick={handleBoothClick}
-                drawnPoints={drawnGeoPoints}
-                onDrawPoint={(p) => setDrawnGeoPoints((prev) => [...prev, p])}
-                placingType={placingType}
-                onPlacePoint={handleGeoPlacePoint}
-                onPlaceRejected={handleGeoPlaceRejected}
-              />
-            )}
-          </div>
-
+          {/* Controls render above the map on purpose - on a phone-height
+             screen, the page's header/search/event-picker above already
+             fills the viewport, so a "Save"/"Finish Boundary" button placed
+             below the 520px map was effectively unreachable without a long
+             scroll and looked like it didn't exist. Keeping controls
+             immediately above the map means one scroll gets you to both. */}
           {!previewPublic && eventId && !loadingZone && (
-            <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 print:hidden">
+            <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 print:hidden">
               {zoneUiMode === "draw-boundary" ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-indigo-700">
@@ -913,6 +899,26 @@ ${
               )}
             </div>
           )}
+
+          <div className="mt-3">
+            {loadingZone && <p className="text-sm text-slate-500">Loading zone map…</p>}
+            {!loadingZone && eventId && (
+              <ZoneMapLeaflet
+                mode={zoneMapMode}
+                center={mapCenter}
+                boundaries={geoBoundaries}
+                booths={geoBooths}
+                features={features}
+                contextPins={contextPins}
+                onBoothClick={handleBoothClick}
+                drawnPoints={drawnGeoPoints}
+                onDrawPoint={(p) => setDrawnGeoPoints((prev) => [...prev, p])}
+                placingType={placingType}
+                onPlacePoint={handleGeoPlacePoint}
+                onPlaceRejected={handleGeoPlaceRejected}
+              />
+            )}
+          </div>
 
           {geoBooths.length > 0 && (
             <div className="mt-3 space-y-1">
