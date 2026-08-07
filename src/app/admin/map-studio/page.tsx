@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { MapStudio } from "@/components/map-studio";
+import type { PublicNotice } from "@/lib/types";
 
 type PinRow = {
   id: string;
@@ -63,6 +64,7 @@ export default function AdminMapStudioPage() {
   const [pins, setPins] = useState<PinRow[]>([]);
   const [vendors, setVendors] = useState<VendorPinRow[]>([]);
   const [events, setEvents] = useState<EventPinRow[]>([]);
+  const [notices, setNotices] = useState<PublicNotice[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +75,7 @@ export default function AdminMapStudioPage() {
         setStatus("denied");
         return;
       }
-      const [{ data: pinRows }, { data: vendorRows }, { data: eventRows }] = await Promise.all([
+      const [{ data: pinRows }, { data: vendorRows }, { data: eventRows }, { data: noticeRows }] = await Promise.all([
         supabase.from("pins").select("*").returns<PinRow[]>(),
         supabase
           .from("vendors")
@@ -88,9 +90,11 @@ export default function AdminMapStudioPage() {
           .not("lat", "is", null)
           .not("lng", "is", null)
           .returns<RawEventRow[]>(),
+        supabase.from("public_notices").select("*").returns<PublicNotice[]>(),
       ]);
       if (cancelled) return;
       setPins(pinRows ?? []);
+      setNotices(noticeRows ?? []);
       setVendors(
         (vendorRows ?? [])
           .filter((v): v is RawVendorRow & { lat: number; lng: number } => v.lat != null && v.lng != null)
@@ -143,12 +147,12 @@ export default function AdminMapStudioPage() {
     <div className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="text-2xl font-bold text-slate-900">Map Studio</h1>
       <p className="mt-1 text-sm text-slate-600">
-        The single place to maintain every real-world location in CityPinned. Toggle Pins, Vendors, and Events on or
-        off independently; drag a marker to correct it, then Save. A red ring means a location has never been
-        visually checked — Save or Mark as Verified clears it.
+        The single place to maintain every real-world location in CityPinned. Toggle Pins, Vendors, Events, and
+        Danger Zones on or off independently; drag a marker to correct it, then Save. A red ring means a location has
+        never been visually checked — Save or Mark as Verified clears it.
       </p>
       <div className="mt-6">
-        <MapStudio initialPins={pins} initialVendors={vendors} initialEvents={events} />
+        <MapStudio initialPins={pins} initialVendors={vendors} initialEvents={events} initialNotices={notices} />
       </div>
     </div>
   );

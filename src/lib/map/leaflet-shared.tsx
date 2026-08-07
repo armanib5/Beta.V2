@@ -90,3 +90,85 @@ export function syncEditableLayer<T extends { id: string; lat: number; lng: numb
     }
   }
 }
+
+/** Circular zone layer (e.g. a Danger Zone) - a small draggable handle
+ * marker paired with a non-interactive circle that tracks it, since
+ * Leaflet circles aren't natively draggable. Kept separate from
+ * syncEditableLayer rather than forced through it: a zone circle also
+ * carries a radius and needs its own L.Circle instance alongside the
+ * handle marker, not just a single marker. Same staged-draft-then-save
+ * contract as everywhere else in Map Studio - dragging never auto-saves. */
+export function syncCircleZoneLayer<T extends { id: string; lat: number; lng: number; radius_meters: number }>(config: {
+  L: NonNullable<Window["L"]>;
+  map: import("leaflet").Map;
+  markersRef: React.MutableRefObject<Map<string, import("leaflet").Marker>>;
+  circlesRef: React.MutableRefObject<Map<string, import("leaflet").Circle>>;
+  entities: T[];
+  drafts: Record<string, MapDraft>;
+  show: boolean;
+  style: (entity: T, isDirty: boolean) => import("leaflet").PathOptions;
+  tooltip: (entity: T, isDirty: boolean) => string;
+  onDragEnd: (id: string, lat: number, lng: number) => void;
+  onClick: (id: string) => void;
+}) {
+  const { L, map, markersRef, circlesRef, entities, drafts, show, style, tooltip, onDragEnd, onClick } = config;
+  if (!show) {
+    for (const [, marker] of markersRef.current) marker.remove();
+    markersRef.current.clear();
+    for (const [, circle] of circlesRef.current) circle.remove();
+    circlesRef.current.clear();
+    return;
+  }
+
+  const seen = new Set<string>();
+  for (const entity of entities) {
+    seen.add(entity.id);
+    const draft = drafts[entity.id];
+    const lat = draft ? draft.lat : entity.lat;
+    const lng = draft ? draft.lng : entity.lng;
+
+    let circle = circlesRef.current.get(entity.id);
+    if (!circle) {
+      circle = L.circle([lat, lng], { radius: entity.radius_meters, ...style(entity, false) }).addTo(map);
+      circle.on("click", () => onClick(entity.id));
+      circlesRef.current.set(entity.id, circle);
+    } else {
+      circle.setLatLng([lat, lng]);
+      circle.setRadius(entity.radius_meters);
+      circle.setStyle(style(entity, !!draft));
+    }
+
+    let marker = markersRef.current.get(entity.id);
+    if (!marker) {
+      const html =
+        '<div style="width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid #dc2626;' +
+        'box-shadow:0 1px 4px rgba(0,0,0,.45);"></div>';
+      marker = L.marker([lat, lng], {
+        draggable: true,
+        icon: L.divIcon({ html, className: "", iconSize: [16, 16], iconAnchor: [8, 8] }),
+      }).addTo(map);
+      const id = entity.id;
+      marker.on("dragend", () => {
+        const pos = marker!.getLatLng();
+        onDragEnd(id, pos.lat, pos.lng);
+      });
+      marker.on("click", () => onClick(id));
+      markersRef.current.set(entity.id, marker);
+    } else {
+      marker.setLatLng([lat, lng]);
+    }
+    marker.bindTooltip(tooltip(entity, !!draft), { permanent: false });
+  }
+  for (const [id, marker] of markersRef.current) {
+    if (!seen.has(id)) {
+      marker.remove();
+      markersRef.current.delete(id);
+    }
+  }
+  for (const [id, circle] of circlesRef.current) {
+    if (!seen.has(id)) {
+      circle.remove();
+      circlesRef.current.delete(id);
+    }
+  }
+}

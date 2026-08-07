@@ -346,6 +346,27 @@ export interface ActivityLog {
   created_at: string;
 }
 
+export type NoticeType = "danger_zone";
+export type NoticeStatus = "active" | "resolved";
+
+/** An admin-drawn circular map zone the public should temporarily avoid
+ * (Danger Zone today; the foundation for a future V3 verified-city/
+ * government notice system - see migration 0060). */
+export interface PublicNotice {
+  id: string;
+  notice_type: NoticeType;
+  title: string;
+  description: string | null;
+  status: NoticeStatus;
+  lat: number;
+  lng: number;
+  radius_meters: number;
+  start_date: string;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export function formatPrice(cents: number, currency = "usd") {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

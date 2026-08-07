@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { CITY_CENTERS } from "@/lib/geo";
 import { BASE_PATH } from "@/lib/site";
 import { loadLeaflet, TILE_LAYER_URL, TILE_LAYER_ATTRIBUTION, TILE_LAYER_MAX_ZOOM } from "@/lib/map/leaflet-loader";
-import { entityDivIcon, syncEditableLayer, type MapDraft } from "@/lib/map/leaflet-shared";
+import { entityDivIcon, syncEditableLayer, syncCircleZoneLayer, type MapDraft } from "@/lib/map/leaflet-shared";
+import type { PublicNotice, NoticeStatus } from "@/lib/types";
 
 /** The `pins` table's `category` column has a check constraint of its
  * own, separate from (and much narrower than) the map's visual icon
@@ -70,20 +71,34 @@ function clearDraft(setDrafts: DraftSetter, id: string) {
   });
 }
 
+const NOTICE_TODAY = () => new Date().toISOString().slice(0, 10);
+
+/** Display-only "has this zone's end date passed" check - deliberately not
+ * a DB write/cron job. A notice's stored `status` only ever changes when an
+ * admin explicitly sets it; an expired-but-still-"active" row just stops
+ * rendering as a live warning once its end_date is in the past. */
+function isNoticeExpired(notice: PublicNotice): boolean {
+  return !!notice.end_date && notice.end_date < NOTICE_TODAY();
+}
+
 export function MapStudio({
   initialPins,
   initialVendors = [],
   initialEvents = [],
+  initialNotices = [],
 }: {
   initialPins: PinRow[];
   initialVendors?: VendorRow[];
   initialEvents?: EventRow[];
+  initialNotices?: PublicNotice[];
 }) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
   const vendorMarkersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
   const eventMarkersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
+  const noticeMarkersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
+  const noticeCirclesRef = useRef<Map<string, import("leaflet").Circle>>(new Map());
   const [pins, setPins] = useState(initialPins);
   // Marker click/dragend handlers are bound once, when a marker is first
   // created (see the sync effects below) - by design they only ever close
@@ -108,6 +123,7 @@ export function MapStudio({
   const [showPins, setShowPins] = useState(true);
   const [showVendors, setShowVendors] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
+  const [showNotices, setShowNotices] = useState(true);
 
   const [vendors, setVendors] = useState(initialVendors);
   const vendorsRef = useRef(vendors);
@@ -133,7 +149,27 @@ export function MapStudio({
   const [eventDrafts, setEventDrafts] = useState<Record<string, Draft>>({});
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
+  // Danger Zones save position immediately on drag (like Pins) rather than
+  // staging a draft (like Vendors/Events) - there's no "unverified GPS from
+  // signup" to double-check here, it's a shape an admin is drawing fresh.
+  const [notices, setNotices] = useState(initialNotices);
+  const noticesRef = useRef(notices);
+  useEffect(() => {
+    noticesRef.current = notices;
+  }, [notices]);
+  const [addNoticeMode, setAddNoticeMode] = useState(false);
+  const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
+  const [noticeForm, setNoticeForm] = useState<{
+    title: string;
+    description: string;
+    status: NoticeStatus;
+    radius_meters: string;
+    start_date: string;
+    end_date: string;
+  } | null>(null);
+
   const selected = pins.find((p) => p.id === selectedId) ?? null;
+  const selectedNotice = notices.find((n) => n.id === selectedNoticeId) ?? null;
   const selectedVendor = vendors.find((v) => v.id === selectedVendorId) ?? null;
   const selectedVendorDraft = selectedVendorId ? vendorDrafts[selectedVendorId] : undefined;
   const unsavedVendorCount = Object.keys(vendorDrafts).length;
@@ -169,21 +205,22 @@ export function MapStudio({
 
   // Click-to-add - a separate effect (not inline in the init effect) so
   // toggling Add Pin mode doesn't have to tear down and rebuild the map.
-  // Only pins are ever created here - vendors/events already exist from
-  // signup/board submissions, so their layers are correction-only.
+  // Pins and Danger Zones are the only things ever created here - vendors/
+  // events already exist from signup/board submissions, so their layers
+  // are correction-only.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
     function onMapClick(e: import("leaflet").LeafletMouseEvent) {
-      if (!addMode) return;
-      createPinAt(e.latlng.lat, e.latlng.lng);
+      if (addMode) createPinAt(e.latlng.lat, e.latlng.lng);
+      else if (addNoticeMode) createNoticeAt(e.latlng.lat, e.latlng.lng);
     }
     map.on("click", onMapClick);
     return () => {
       map.off("click", onMapClick);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, addMode]);
+  }, [mapReady, addMode, addNoticeMode]);
 
   useEffect(() => {
     const L = window.L;
@@ -255,6 +292,31 @@ export function MapStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, eventDrafts, mapReady, showEvents]);
 
+  useEffect(() => {
+    const L = window.L;
+    const map = mapRef.current;
+    if (!L || !map || !mapReady) return;
+    syncCircleZoneLayer({
+      L,
+      map,
+      markersRef: noticeMarkersRef,
+      circlesRef: noticeCirclesRef,
+      entities: notices,
+      drafts: {},
+      show: showNotices,
+      style: (n) => {
+        const live = n.status === "active" && !isNoticeExpired(n);
+        return live
+          ? { color: "#dc2626", weight: 2, fillColor: "#dc2626", fillOpacity: 0.25 }
+          : { color: "#6b7280", weight: 1.5, fillColor: "#6b7280", fillOpacity: 0.12, dashArray: "4,3" };
+      },
+      tooltip: (n) => `🚫 ${n.title}${n.status === "resolved" ? " (resolved)" : isNoticeExpired(n) ? " (expired)" : ""}`,
+      onDragEnd: (id, lat, lng) => saveNoticePosition(id, lat, lng),
+      onClick: (id) => selectNotice(id),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notices, mapReady, showNotices]);
+
   function selectPin(id: string) {
     const pin = pinsRef.current.find((p) => p.id === id);
     if (!pin) return;
@@ -262,6 +324,8 @@ export function MapStudio({
     setForm({ title: pin.title ?? "", description: pin.description ?? "", category: pin.category ?? "business" });
     setSelectedVendorId(null);
     setSelectedEventId(null);
+    setSelectedNoticeId(null);
+    setNoticeForm(null);
     setError(null);
   }
 
@@ -272,6 +336,8 @@ export function MapStudio({
     setSelectedId(null);
     setForm(null);
     setSelectedEventId(null);
+    setSelectedNoticeId(null);
+    setNoticeForm(null);
     setError(null);
   }
 
@@ -282,6 +348,27 @@ export function MapStudio({
     setSelectedId(null);
     setForm(null);
     setSelectedVendorId(null);
+    setSelectedNoticeId(null);
+    setNoticeForm(null);
+    setError(null);
+  }
+
+  function selectNotice(id: string) {
+    const notice = noticesRef.current.find((n) => n.id === id);
+    if (!notice) return;
+    setSelectedNoticeId(id);
+    setNoticeForm({
+      title: notice.title,
+      description: notice.description ?? "",
+      status: notice.status,
+      radius_meters: String(notice.radius_meters),
+      start_date: notice.start_date,
+      end_date: notice.end_date ?? "",
+    });
+    setSelectedId(null);
+    setForm(null);
+    setSelectedVendorId(null);
+    setSelectedEventId(null);
     setError(null);
   }
 
@@ -410,6 +497,8 @@ export function MapStudio({
     setForm({ title: data.title ?? "", description: data.description ?? "", category: data.category ?? "business" });
     setSelectedVendorId(null);
     setSelectedEventId(null);
+    setSelectedNoticeId(null);
+    setNoticeForm(null);
     setError(null);
     flash("✓ Pin added — edit its details below");
   }
@@ -474,17 +563,144 @@ export function MapStudio({
     return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   }
 
+  async function createNoticeAt(lat: number, lng: number) {
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: insertError } = await supabase
+      .from("public_notices")
+      .insert({ title: "New Danger Zone", status: "active", radius_meters: 50, start_date: NOTICE_TODAY(), lat, lng })
+      .select("*")
+      .single<PublicNotice>();
+    setSaving(false);
+    if (insertError || !data) {
+      setError(insertError?.message ?? "Could not add zone.");
+      return;
+    }
+    setNotices((prev) => [...prev, data]);
+    setAddNoticeMode(false);
+    selectNoticeFromRow(data);
+    flash("✓ Zone added — set its details below");
+  }
+
+  // Mirrors selectNotice, but reads from a just-inserted row directly
+  // instead of looking it up in `notices` state - see createPinAt's
+  // identical comment for why (setNotices hasn't flushed yet here).
+  function selectNoticeFromRow(notice: PublicNotice) {
+    setSelectedNoticeId(notice.id);
+    setNoticeForm({
+      title: notice.title,
+      description: notice.description ?? "",
+      status: notice.status,
+      radius_meters: String(notice.radius_meters),
+      start_date: notice.start_date,
+      end_date: notice.end_date ?? "",
+    });
+    setSelectedId(null);
+    setForm(null);
+    setSelectedVendorId(null);
+    setSelectedEventId(null);
+    setError(null);
+  }
+
+  async function saveNoticePosition(id: string, lat: number, lng: number) {
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("public_notices")
+      .update({ lat, lng })
+      .eq("id", id)
+      .select("*")
+      .single<PublicNotice>();
+    setSaving(false);
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not move this zone.");
+      return;
+    }
+    setNotices((prev) => prev.map((n) => (n.id === id ? data : n)));
+  }
+
+  async function saveNoticeForm() {
+    if (!selectedNotice || !noticeForm) return;
+    if (!noticeForm.title.trim()) {
+      setError("Title can't be empty.");
+      return;
+    }
+    const radius = Number(noticeForm.radius_meters);
+    if (!Number.isFinite(radius) || radius <= 0) {
+      setError("Radius must be a positive number.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("public_notices")
+      .update({
+        title: noticeForm.title.trim(),
+        description: noticeForm.description.trim() || null,
+        status: noticeForm.status,
+        radius_meters: radius,
+        start_date: noticeForm.start_date,
+        end_date: noticeForm.end_date || null,
+      })
+      .eq("id", selectedNotice.id)
+      .select("*")
+      .single<PublicNotice>();
+    setSaving(false);
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not save this zone.");
+      return;
+    }
+    setNotices((prev) => prev.map((n) => (n.id === data.id ? data : n)));
+    flash(`✓ Saved — ${data.title}`);
+  }
+
+  async function deleteNotice() {
+    if (!selectedNotice) return;
+    if (!window.confirm(`Permanently remove "${selectedNotice.title}" from the map?`)) return;
+    setSaving(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: deleteError } = await supabase.from("public_notices").delete().eq("id", selectedNotice.id);
+    setSaving(false);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    setNotices((prev) => prev.filter((n) => n.id !== selectedNotice.id));
+    setSelectedNoticeId(null);
+    setNoticeForm(null);
+    flash("✓ Zone removed");
+  }
+
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => setAddMode((v) => !v)}
+          onClick={() => {
+            setAddNoticeMode(false);
+            setAddMode((v) => !v);
+          }}
           className={`rounded-full px-4 py-2 text-sm font-semibold ${
             addMode ? "bg-slate-900 text-white" : "border border-slate-400 text-slate-700 hover:bg-slate-50"
           }`}
         >
           {addMode ? "📍 Click the map to place a pin…" : "+ Add Pin"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setAddMode(false);
+            setAddNoticeMode((v) => !v);
+          }}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${
+            addNoticeMode ? "bg-red-600 text-white" : "border border-red-400 text-red-700 hover:bg-red-50"
+          }`}
+        >
+          {addNoticeMode ? "🚫 Click the map to place a zone…" : "+ Add Danger Zone"}
         </button>
         <a
           href={`${BASE_PATH}/map/`}
@@ -521,6 +737,15 @@ export function MapStudio({
           }`}
         >
           🎪 Events {showEvents ? "on" : "off"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowNotices((v) => !v)}
+          className={`rounded-full px-4 py-2 text-sm font-semibold ${
+            showNotices ? "border border-red-400 text-red-700 hover:bg-red-50" : "border border-slate-200 text-slate-400"
+          }`}
+        >
+          🚫 Danger Zones {showNotices ? "on" : "off"}
         </button>
         <button
           type="button"
@@ -730,10 +955,124 @@ export function MapStudio({
                 </button>
               </div>
             </div>
+          ) : selectedNotice && noticeForm ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                    noticeForm.status === "active" && !isNoticeExpired(selectedNotice)
+                      ? "bg-red-100 text-red-800"
+                      : "bg-slate-200 text-slate-600"
+                  }`}
+                >
+                  🚫{" "}
+                  {noticeForm.status === "resolved"
+                    ? "Resolved"
+                    : isNoticeExpired(selectedNotice)
+                      ? "Expired"
+                      : "Active"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedNoticeId(null);
+                    setNoticeForm(null);
+                  }}
+                  className="text-xs text-slate-500 hover:underline"
+                >
+                  Close
+                </button>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Title</label>
+                <input
+                  type="text"
+                  value={noticeForm.title}
+                  onChange={(e) => setNoticeForm((f) => (f ? { ...f, title: e.target.value } : f))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Description</label>
+                <textarea
+                  value={noticeForm.description}
+                  onChange={(e) => setNoticeForm((f) => (f ? { ...f, description: e.target.value } : f))}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Status</label>
+                  <select
+                    value={noticeForm.status}
+                    onChange={(e) => setNoticeForm((f) => (f ? { ...f, status: e.target.value as NoticeStatus } : f))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    <option value="active">Active</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Radius (meters)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={noticeForm.radius_meters}
+                    onChange={(e) => setNoticeForm((f) => (f ? { ...f, radius_meters: e.target.value } : f))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Start Date</label>
+                  <input
+                    type="date"
+                    value={noticeForm.start_date}
+                    onChange={(e) => setNoticeForm((f) => (f ? { ...f, start_date: e.target.value } : f))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">End Date (optional)</label>
+                  <input
+                    type="date"
+                    value={noticeForm.end_date}
+                    onChange={(e) => setNoticeForm((f) => (f ? { ...f, end_date: e.target.value } : f))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-slate-500">
+                Drag the small white-and-red handle at the zone&apos;s center to reposition it — it saves
+                immediately. Once End Date passes, the zone automatically stops showing as an active warning on the
+                Public Map without needing to come back and resolve it manually.
+              </p>
+              {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={saveNoticeForm}
+                  disabled={saving}
+                  className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteNotice}
+                  disabled={saving}
+                  className="rounded-full border border-red-300 px-4 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  🗑 Delete
+                </button>
+              </div>
+            </div>
           ) : !selected || !form ? (
             <p className="text-sm text-slate-500">
-              Click a pin, vendor, or event on the map to edit it, or click <strong>+ Add Pin</strong> then click
-              anywhere on the map to place a new one.
+              Click a pin, vendor, event, or danger zone on the map to edit it, or click <strong>+ Add Pin</strong> /{" "}
+              <strong>+ Add Danger Zone</strong> then click anywhere on the map to place a new one.
             </p>
           ) : (
             <div className="space-y-3">

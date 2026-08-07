@@ -187,3 +187,11 @@ footer{text-align:center;color:rgba(200,160,70,.35);font-size:12px;padding:20px 
 .rpform .rpbtnrow button{flex:1;padding:10px;border-radius:5px;border:none;font-weight:700;font-size:13px;cursor:pointer;}
 .rpform .rpcancel{background:rgba(0,0,0,.08);color:#3a2810;}
 .rpform .rpsubmit{background:var(--go);color:#1a0800;}
+
+.notice-popup{font-family:'Libre Franklin',sans-serif;color:#2a1800;max-width:250px;}
+.notice-popup h3{font-family:'Special Elite',monospace;font-size:14px;margin:0 0 6px;color:#2a1800;}
+.notice-popup p{font-size:12.5px;line-height:1.4;margin:0 0 8px;color:#3a2810;}
+.notice-popup .notice-warning{background:rgba(192,57,43,.12);border:1px solid var(--re);color:var(--re);font-size:11.5px;font-weight:700;line-height:1.3;padding:7px 9px;border-radius:5px;margin-bottom:8px;}
+.notice-popup dl{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:11.5px;margin:0;}
+.notice-popup dt{font-family:'Special Elite',monospace;text-transform:uppercase;letter-spacing:.5px;color:#8a6030;}
+.notice-popup dd{margin:0;color:#2a1800;}

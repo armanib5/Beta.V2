@@ -521,6 +521,52 @@ function loadVendorPins() {
   }).catch(function () {});
 }
 
+/* Public Notices (Danger Zone / Restricted Area today - the foundation for
+   a future V3 verified-city/government notice system, see migration 0060).
+   Always-on: unlike PLACES, these don't go through the city/category
+   filter system, since a safety warning shouldn't disappear just because
+   a visitor filtered to "Restaurants." Only status=active rows are
+   fetched, and end_date filtering happens in the query itself (same
+   or=(...) pattern loadLovEvents() already uses for publish_at) - a zone
+   whose End Date has passed simply stops being fetched, no separate
+   archive step needed. */
+function loadPublicNotices() {
+  if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
+  var today = todayLocal();
+  return fetch(
+    V2_SUPABASE_URL + "/rest/v1/public_notices?select=*&status=eq.active&or=(end_date.is.null,end_date.gte." + today + ")",
+    { headers: { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY } }
+  ).then(function (res) { return res.json(); }).then(function (rows) {
+    if (!Array.isArray(rows)) return;
+    rows.forEach(addNoticeCircle);
+  }).catch(function () {});
+}
+
+function formatNoticeDate(dateStr) {
+  if (!dateStr) return "";
+  var parts = dateStr.split("-").map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function addNoticeCircle(n) {
+  var circle = L.circle([n.lat, n.lng], {
+    radius: n.radius_meters,
+    color: "#dc2626", weight: 2, fillColor: "#dc2626", fillOpacity: 0.25
+  }).addTo(map);
+
+  var html = '<div class="notice-popup">'
+    + (n.status === "active" ? '<div class="notice-warning">⚠ Warning: Temporary restricted area. Please avoid entering this location.</div>' : "")
+    + '<h3>' + escapeHtml(n.title) + '</h3>'
+    + (n.description ? '<p>' + escapeHtml(n.description) + '</p>' : "")
+    + '<dl>'
+    + '<dt>Status</dt><dd>' + (n.status === "active" ? "Active" : "Resolved") + '</dd>'
+    + '<dt>Start Date</dt><dd>' + formatNoticeDate(n.start_date) + '</dd>'
+    + (n.end_date ? '<dt>End Date</dt><dd>' + formatNoticeDate(n.end_date) + '</dd>' : "")
+    + '<dt>Last Updated</dt><dd>' + formatNoticeDate(n.updated_at ? n.updated_at.slice(0, 10) : n.start_date) + '</dd>'
+    + '</dl></div>';
+  circle.bindPopup(html, { maxWidth: 280 });
+}
+
 /* A vendor's "Find on Our Map" button lands here with ?q=<name> instead
    of jumping straight to /pins/ to create a new pin - this runs the same
    search the search box does (now that live-approved pins are loaded)
@@ -884,6 +930,7 @@ function initMap() {
   loadLovEvents();
   loadLovVendors();
   loadVendorPins();
+  loadPublicNotices();
   checkAdminPendingBadge();
   setInterval(checkAdminPendingBadge, 45000);
 
