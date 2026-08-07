@@ -1,12 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Booth, LovEntry, Vendor, ZoneBoundary } from "@/lib/types";
+import { CITY_CENTERS } from "@/lib/geo";
+import type { Booth, LovEntry, Vendor, ZoneBoundary, ZoneFeature } from "@/lib/types";
 import { ZoneMap } from "@/components/zone-map";
+import { ZoneMapLeaflet } from "@/components/zone-map-leaflet";
 import { BackButton } from "@/components/back-button";
+
+/** Same "legacy vs geo" split admin/zones/page.tsx uses - a row is
+ * "legacy" only if it has real percentage-grid data and no traced
+ * real-world event boundary yet. Keeps this page's behavior byte-for-byte
+ * identical for the one event with existing percentage-grid booths
+ * (Downtown San Jose Farmers Market). */
+function computeDataMode(booths: Booth[], boundaries: ZoneBoundary[]): "legacy" | "geo" {
+  const hasLegacyData = booths.some((b) => b.x != null || b.y != null) || boundaries.some((b) => b.points.length > 0);
+  const hasGeoEventBoundary = boundaries.some(
+    (b) => b.boundary_type === "event_boundary" && b.points_geo && b.points_geo.length >= 3,
+  );
+  return hasLegacyData && !hasGeoEventBoundary ? "legacy" : "geo";
+}
 
 export default function VendorZonesPage() {
   const router = useRouter();
@@ -15,6 +30,7 @@ export default function VendorZonesPage() {
   const [eventId, setEventId] = useState("");
   const [booths, setBooths] = useState<Booth[]>([]);
   const [boundaries, setBoundaries] = useState<ZoneBoundary[]>([]);
+  const [features, setFeatures] = useState<ZoneFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingZone, setLoadingZone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +74,7 @@ export default function VendorZonesPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing stale data when the event picker is reset
       setBooths([]);
       setBoundaries([]);
+      setFeatures([]);
       return;
     }
     let cancelled = false;
@@ -66,17 +83,29 @@ export default function VendorZonesPage() {
     Promise.all([
       supabase.from("booths").select("*").eq("event_id", eventId).order("booth_number").returns<Booth[]>(),
       supabase.from("zone_boundaries").select("*").eq("event_id", eventId).returns<ZoneBoundary[]>(),
-    ]).then(([boothRes, boundaryRes]) => {
+      supabase.from("zone_features").select("*").eq("event_id", eventId).returns<ZoneFeature[]>(),
+    ]).then(([boothRes, boundaryRes, featureRes]) => {
       if (cancelled) return;
       if (boothRes.error) setError(boothRes.error.message);
       else setBooths(boothRes.data ?? []);
       setBoundaries(boundaryRes.data ?? []);
+      setFeatures(featureRes.data ?? []);
       setLoadingZone(false);
     });
     return () => {
       cancelled = true;
     };
   }, [eventId]);
+
+  const selectedEvent = events.find((e) => e.id === eventId) ?? null;
+  const dataMode = useMemo(() => computeDataMode(booths, boundaries), [booths, boundaries]);
+  const geoBoundaries = useMemo(() => boundaries.filter((b) => b.points_geo && b.points_geo.length > 0), [boundaries]);
+  const geoBooths = useMemo(() => booths.filter((b) => b.lat != null && b.lng != null), [booths]);
+  const mapCenter = useMemo(() => {
+    if (selectedEvent?.lat != null && selectedEvent?.lng != null) return { lat: selectedEvent.lat, lng: selectedEvent.lng };
+    const anchor = CITY_CENTERS[0];
+    return { lat: anchor.lat, lng: anchor.lng };
+  }, [selectedEvent]);
 
   async function claim(booth: Booth) {
     if (!vendor) return;
@@ -146,7 +175,18 @@ export default function VendorZonesPage() {
 
       <div className="mt-6">
         {loadingZone && <p className="text-sm text-slate-500">Loading zone map…</p>}
-        {!loadingZone && eventId && (
+        {!loadingZone && eventId && dataMode === "geo" && (
+          <ZoneMapLeaflet
+            mode="vendor-claim"
+            center={mapCenter}
+            boundaries={geoBoundaries}
+            booths={geoBooths}
+            features={features}
+            currentVendorId={vendor.id}
+            onBoothClick={claim}
+          />
+        )}
+        {!loadingZone && eventId && dataMode === "legacy" && (
           <ZoneMap
             booths={booths}
             boundaries={boundaries}

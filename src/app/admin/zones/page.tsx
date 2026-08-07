@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { logActivity } from "@/lib/activity";
 import { CITY_CENTERS, nearestCityCenter } from "@/lib/geo";
-import type { Booth, BoundaryType, LovEntry, Vendor, ZoneBoundary, ZoneBoundaryPoint } from "@/lib/types";
+import type { Booth, BoundaryType, LovEntry, Vendor, ZoneBoundary, ZoneBoundaryPoint, ZoneBoundaryGeoPoint, ZoneFeature } from "@/lib/types";
 import { ZoneMap } from "@/components/zone-map";
 import { ZoneBoundaryDrawer } from "@/components/zone-boundary-drawer";
+import { ZoneMapLeaflet, FEATURE_TYPE_LABEL, type PlacingType, type ZoneMapContextPin } from "@/components/zone-map-leaflet";
 
 function cityOfEvent(e: LovEntry): string {
   if (e.section_zone) {
@@ -52,6 +53,24 @@ const STATUS_CYCLE: Record<Booth["status"], Booth["status"]> = {
 
 const BOUNDARY_TYPES: BoundaryType[] = ["fence", "gate", "exit", "vendor_area"];
 
+const PLACEABLE_TYPES: PlacingType[] = [
+  "booth",
+  "stage",
+  "seating",
+  "food",
+  "bar",
+  "gate",
+  "entrance",
+  "exit",
+  "info",
+  "restroom",
+];
+
+/** Roughly 1.5 miles - close enough to show real spatial context (nearby
+ * businesses/other events) without pulling in half the city. Pure display
+ * reference while tracing, not a hard boundary of any kind. */
+const CONTEXT_RADIUS_DEG = 0.022;
+
 function parsePoints(raw: string): ZoneBoundaryPoint[] {
   return raw
     .split(";")
@@ -63,17 +82,32 @@ function parsePoints(raw: string): ZoneBoundaryPoint[] {
     });
 }
 
+/** A row is "legacy" if it has real percentage-grid data and no real-world
+ * event boundary has been traced yet for it - Farmers Market's condition
+ * can only ever resolve here, so its existing layout is provably unchanged
+ * by this page. Everything else (including a brand-new event with zero
+ * zone data) goes straight to the new Leaflet editor. */
+function computeDataMode(booths: Booth[], boundaries: ZoneBoundary[]): "legacy" | "geo" {
+  const hasLegacyData = booths.some((b) => b.x != null || b.y != null) || boundaries.some((b) => b.points.length > 0);
+  const hasGeoEventBoundary = boundaries.some(
+    (b) => b.boundary_type === "event_boundary" && b.points_geo && b.points_geo.length >= 3,
+  );
+  return hasLegacyData && !hasGeoEventBoundary ? "legacy" : "geo";
+}
+
 export default function AdminZonesPage() {
   const [status, setStatus] = useState<"loading" | "denied" | "ready">("loading");
   const [events, setEvents] = useState<LovEntry[]>([]);
   const [eventId, setEventId] = useState("");
   const [booths, setBooths] = useState<Booth[]>([]);
   const [boundaries, setBoundaries] = useState<ZoneBoundary[]>([]);
+  const [features, setFeatures] = useState<ZoneFeature[]>([]);
   const [loadingZone, setLoadingZone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
 
+  // Legacy (percentage-grid) form state - unchanged.
   const [newNumber, setNewNumber] = useState("");
   const [newTier, setNewTier] = useState<Booth["tier"]>("standard");
   const [newX, setNewX] = useState("");
@@ -89,6 +123,14 @@ export default function AdminZonesPage() {
   const [drawnPoints, setDrawnPoints] = useState<ZoneBoundaryPoint[]>([]);
   const [copyFromEventId, setCopyFromEventId] = useState("");
   const [copying, setCopying] = useState(false);
+
+  // Geo (real Leaflet map) state - new.
+  const [zoneUiMode, setZoneUiMode] = useState<"view" | "draw-boundary" | "place-features">("view");
+  const [drawnGeoPoints, setDrawnGeoPoints] = useState<ZoneBoundaryGeoPoint[]>([]);
+  const [placingType, setPlacingType] = useState<PlacingType | null>(null);
+  const [pendingPlacement, setPendingPlacement] = useState<{ lat: number; lng: number } | null>(null);
+  const [placingLabel, setPlacingLabel] = useState("");
+  const [previewPublic, setPreviewPublic] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,6 +166,7 @@ export default function AdminZonesPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing stale data when the event picker is reset
       setBooths([]);
       setBoundaries([]);
+      setFeatures([]);
       return;
     }
     let cancelled = false;
@@ -132,12 +175,18 @@ export default function AdminZonesPage() {
     Promise.all([
       supabase.from("booths").select("*").eq("event_id", eventId).order("booth_number").returns<Booth[]>(),
       supabase.from("zone_boundaries").select("*").eq("event_id", eventId).returns<ZoneBoundary[]>(),
-    ]).then(([boothRes, boundaryRes]) => {
+      supabase.from("zone_features").select("*").eq("event_id", eventId).returns<ZoneFeature[]>(),
+    ]).then(([boothRes, boundaryRes, featureRes]) => {
       if (cancelled) return;
       if (boothRes.error) setError(boothRes.error.message);
       else setBooths(boothRes.data ?? []);
       setBoundaries(boundaryRes.data ?? []);
+      setFeatures(featureRes.data ?? []);
       setLoadingZone(false);
+      setZoneUiMode("view");
+      setDrawnGeoPoints([]);
+      setPlacingType(null);
+      setPendingPlacement(null);
     });
     return () => {
       cancelled = true;
@@ -164,7 +213,40 @@ export default function AdminZonesPage() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [events, todayKey]);
 
+  const selectedEvent = events.find((e) => e.id === eventId) ?? null;
+  const dataMode = useMemo(() => computeDataMode(booths, boundaries), [booths, boundaries]);
+  const geoBoundaries = useMemo(() => boundaries.filter((b) => b.points_geo && b.points_geo.length > 0), [boundaries]);
+  const geoBooths = useMemo(() => booths.filter((b) => b.lat != null && b.lng != null), [booths]);
+  const eventBoundary = geoBoundaries.find((b) => b.boundary_type === "event_boundary" && (b.points_geo?.length ?? 0) >= 3) ?? null;
+
+  const mapCenter = useMemo(() => {
+    if (selectedEvent?.lat != null && selectedEvent?.lng != null) return { lat: selectedEvent.lat, lng: selectedEvent.lng };
+    const anchor = CITY_CENTERS[0];
+    return { lat: anchor.lat, lng: anchor.lng };
+  }, [selectedEvent]);
+
+  // Nearby vendors/events for spatial reference while tracing - reuses data
+  // already loaded on this page, no extra query.
+  const contextPins: ZoneMapContextPin[] = useMemo(() => {
+    if (!selectedEvent?.lat || !selectedEvent?.lng) return [];
+    const near = (lat: number | null, lng: number | null) =>
+      lat != null &&
+      lng != null &&
+      Math.abs(lat - selectedEvent.lat!) < CONTEXT_RADIUS_DEG &&
+      Math.abs(lng - selectedEvent.lng!) < CONTEXT_RADIUS_DEG;
+    const vendorPins: ZoneMapContextPin[] = vendors
+      .filter((v) => near(v.lat, v.lng))
+      .map((v) => ({ id: `vendor-${v.id}`, lat: v.lat!, lng: v.lng!, label: v.business_name, emoji: "\u{1F3EA}" }));
+    const eventPins: ZoneMapContextPin[] = events
+      .filter((e) => e.id !== eventId && near(e.lat, e.lng))
+      .map((e) => ({ id: `event-${e.id}`, lat: e.lat!, lng: e.lng!, label: e.name, emoji: "\u{1F3AA}" }));
+    return [...vendorPins, ...eventPins];
+  }, [vendors, events, selectedEvent, eventId]);
+
+  const zoneMapMode = previewPublic ? "public" : zoneUiMode === "view" ? "view" : zoneUiMode;
+
   async function handleBoothClick(booth: Booth) {
+    if (previewPublic) return;
     setError(null);
     const nextStatus = STATUS_CYCLE[booth.status];
     const reopening = nextStatus === "open";
@@ -272,7 +354,8 @@ export default function AdminZonesPage() {
 
   /** Repost a past event's zone layout onto a new/repeating occurrence
    * instead of redrawing it from scratch — booths and boundaries copy
-   * over with the same positions/shapes/tiers, but vendor claims and
+   * over with the same positions/shapes/tiers (percentage grid or real
+   * lat/lng, whichever the source event used), but vendor claims and
    * occupied/reserved status reset since it's a fresh event instance. */
   async function copyZoneLayout() {
     if (!eventId || !copyFromEventId || copyFromEventId === eventId) return;
@@ -305,6 +388,8 @@ export default function AdminZonesPage() {
                 y: b.y,
                 width: b.width,
                 height: b.height,
+                lat: b.lat,
+                lng: b.lng,
               })),
             )
             .select("*")
@@ -319,6 +404,7 @@ export default function AdminZonesPage() {
                 boundary_type: b.boundary_type,
                 label: b.label,
                 points: b.points,
+                points_geo: b.points_geo,
                 vendor_id: null,
               })),
             )
@@ -347,6 +433,137 @@ export default function AdminZonesPage() {
     setBoundaries((prev) => prev.filter((b) => b.id !== id));
   }
 
+  // --- Geo mode: boundary tracing -------------------------------------------------
+
+  function startTraceBoundary() {
+    setZoneUiMode("draw-boundary");
+    setDrawnGeoPoints([]);
+    setError(null);
+  }
+
+  function undoLastGeoPoint() {
+    setDrawnGeoPoints((prev) => prev.slice(0, -1));
+  }
+
+  async function finishTraceBoundary() {
+    if (!eventId || drawnGeoPoints.length < 3) {
+      setError("Trace at least 3 points to close the boundary shape.");
+      return;
+    }
+    setError(null);
+    const supabase = createClient();
+    const { data, error: insertError } = await supabase
+      .from("zone_boundaries")
+      .insert({ event_id: eventId, boundary_type: "event_boundary", points: [], points_geo: drawnGeoPoints })
+      .select("*")
+      .single<ZoneBoundary>();
+    if (insertError || !data) {
+      setError(insertError?.message ?? "Could not save the event boundary.");
+      return;
+    }
+    setBoundaries((prev) => [...prev, data]);
+    setDrawnGeoPoints([]);
+    setZoneUiMode("view");
+  }
+
+  async function editEventBoundary() {
+    if (!eventBoundary) return;
+    if (!window.confirm("Redraw the event boundary? The current traced shape will be deleted so you can retrace it.")) return;
+    setError(null);
+    const supabase = createClient();
+    const { error: deleteError } = await supabase.from("zone_boundaries").delete().eq("id", eventBoundary.id);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    setBoundaries((prev) => prev.filter((b) => b.id !== eventBoundary.id));
+    startTraceBoundary();
+  }
+
+  // --- Geo mode: feature placement -------------------------------------------------
+
+  function startPlacing(type: PlacingType) {
+    setZoneUiMode("place-features");
+    setPlacingType(type);
+    setPendingPlacement(null);
+    setPlacingLabel("");
+    setError(null);
+  }
+
+  function stopPlacing() {
+    setZoneUiMode("view");
+    setPlacingType(null);
+    setPendingPlacement(null);
+    setPlacingLabel("");
+  }
+
+  function handleGeoPlaceRejected(reason: string) {
+    setError(reason);
+  }
+
+  function handleGeoPlacePoint(point: { lat: number; lng: number }) {
+    setError(null);
+    setPendingPlacement(point);
+  }
+
+  async function savePendingPlacement() {
+    if (!pendingPlacement || !placingType || !eventId) return;
+    setError(null);
+    const supabase = createClient();
+    if (placingType === "booth") {
+      const nextNumber = Math.max(0, ...booths.map((b) => b.booth_number ?? 0)) + 1;
+      const { data, error: insertError } = await supabase
+        .from("booths")
+        .insert({
+          event_id: eventId,
+          label: placingLabel.trim() || String(nextNumber),
+          booth_number: nextNumber,
+          tier: "standard",
+          status: "open",
+          lat: pendingPlacement.lat,
+          lng: pendingPlacement.lng,
+        })
+        .select("*")
+        .single<Booth>();
+      if (insertError || !data) {
+        setError(insertError?.message ?? "Could not place booth.");
+        return;
+      }
+      logActivity(supabase, "booth", data.id, `Booth ${data.booth_number}`, "Placed on Event Zone map");
+      setBooths((prev) => [...prev, data]);
+    } else {
+      const { data, error: insertError } = await supabase
+        .from("zone_features")
+        .insert({
+          event_id: eventId,
+          feature_type: placingType,
+          label: placingLabel.trim() || null,
+          lat: pendingPlacement.lat,
+          lng: pendingPlacement.lng,
+        })
+        .select("*")
+        .single<ZoneFeature>();
+      if (insertError || !data) {
+        setError(insertError?.message ?? "Could not place feature.");
+        return;
+      }
+      setFeatures((prev) => [...prev, data]);
+    }
+    setPendingPlacement(null);
+    setPlacingLabel("");
+  }
+
+  async function deleteFeature(id: string) {
+    setError(null);
+    const supabase = createClient();
+    const { error: deleteError } = await supabase.from("zone_features").delete().eq("id", id);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    setFeatures((prev) => prev.filter((f) => f.id !== id));
+  }
+
   function exportZoneWord() {
     const vendorNameById = Object.fromEntries(vendors.map((v) => [v.id, v.business_name]));
     const eventName = events.find((e) => e.id === eventId)?.name ?? "Event";
@@ -355,11 +572,19 @@ export default function AdminZonesPage() {
         (b) =>
           `<tr><td>${b.booth_number ?? b.label}</td><td>${b.tier}</td><td>${b.status}</td><td>${
             b.vendor_id ? (vendorNameById[b.vendor_id] ?? "Unknown vendor") : "—"
-          }</td><td>${b.width ?? 8}% × ${b.height ?? 8}%</td></tr>`,
+          }</td><td>${b.lat != null ? `${b.lat.toFixed(5)}, ${b.lng!.toFixed(5)}` : `${b.width ?? 8}% × ${b.height ?? 8}%`}</td></tr>`,
       )
       .join("");
     const boundaryRows = boundaries
-      .map((bd) => `<tr><td>${bd.boundary_type.replace("_", " ")}</td><td>${bd.label ?? "—"}</td><td>${bd.points.length} points</td></tr>`)
+      .map(
+        (bd) =>
+          `<tr><td>${bd.boundary_type.replace("_", " ")}</td><td>${bd.label ?? "—"}</td><td>${
+            bd.points_geo?.length ?? bd.points.length
+          } points</td></tr>`,
+      )
+      .join("");
+    const featureRows = features
+      .map((f) => `<tr><td>${FEATURE_TYPE_LABEL[f.feature_type]}</td><td>${f.label ?? "—"}</td><td>${f.lat.toFixed(5)}, ${f.lng.toFixed(5)}</td></tr>`)
       .join("");
     const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8"><title>${eventName} — Zone Inventory</title></head>
@@ -368,7 +593,7 @@ export default function AdminZonesPage() {
 <p>Generated ${new Date().toLocaleString("en-US")}</p>
 <h2>Booths (${booths.length})</h2>
 <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-family:Calibri,Arial,sans-serif;font-size:11pt;">
-<thead><tr><th>Booth #</th><th>Tier</th><th>Status</th><th>Vendor</th><th>Size</th></tr></thead>
+<thead><tr><th>Booth #</th><th>Tier</th><th>Status</th><th>Vendor</th><th>Position</th></tr></thead>
 <tbody>${boothRows}</tbody>
 </table>
 <h2>Boundaries (${boundaries.length})</h2>
@@ -376,6 +601,15 @@ export default function AdminZonesPage() {
 <thead><tr><th>Type</th><th>Label</th><th>Points</th></tr></thead>
 <tbody>${boundaryRows}</tbody>
 </table>
+${
+  features.length > 0
+    ? `<h2>Infrastructure (${features.length})</h2>
+<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-family:Calibri,Arial,sans-serif;font-size:11pt;">
+<thead><tr><th>Type</th><th>Label</th><th>Position</th></tr></thead>
+<tbody>${featureRows}</tbody>
+</table>`
+    : ""
+}
 </body></html>`;
     const blob = new Blob([html], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
@@ -413,7 +647,9 @@ export default function AdminZonesPage() {
         </Link>
       </div>
       <p className="mt-1 text-sm text-slate-600 print:hidden">
-        Tap a booth to cycle Open → Reserved → Occupied. Add fences, gates, exits, and vendor areas below.
+        {dataMode === "geo"
+          ? "Trace the real event boundary on the map, then place booths, stages, and infrastructure inside it."
+          : "Tap a booth to cycle Open → Reserved → Occupied. Add fences, gates, exits, and vendor areas below."}
       </p>
 
       <div className="mt-6 print:hidden">
@@ -452,9 +688,26 @@ export default function AdminZonesPage() {
               >
                 🖨️ Print
               </button>
+              {dataMode === "geo" && (
+                <button
+                  type="button"
+                  onClick={() => setPreviewPublic((v) => !v)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                    previewPublic ? "bg-slate-900 text-white" : "border border-indigo-400 text-indigo-700 hover:bg-indigo-50"
+                  }`}
+                >
+                  {previewPublic ? "✓ Previewing as Public" : "👁 Preview as Public"}
+                </button>
+              )}
             </>
           )}
         </div>
+        {dataMode === "legacy" && (
+          <p className="mt-2 text-xs text-amber-700">
+            This event has an existing grid-based layout from before real-map tracing. It keeps working exactly as
+            before here. (Real-map tracing is available for every event that doesn&apos;t have one of these yet.)
+          </p>
+        )}
       </div>
 
       {eventId && !loadingZone && booths.length === 0 && boundaries.length === 0 && events.length > 1 && (
@@ -496,211 +749,404 @@ export default function AdminZonesPage() {
 
       {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
 
-      <div className="mt-6">
-        {loadingZone && <p className="text-sm text-slate-500">Loading zone map…</p>}
-        {!loadingZone && eventId && (
-          <ZoneMap
-            booths={booths}
-            boundaries={boundaries}
-            mode="admin"
-            onBoothClick={handleBoothClick}
-            vendorNameById={Object.fromEntries(vendors.map((v) => [v.id, v.business_name]))}
-          />
-        )}
-        {!loadingZone && eventId && booths.length === 0 && (
-          <p className="mt-3 text-sm text-slate-500">No booths yet for this event — add one below.</p>
-        )}
-      </div>
-
-      {booths.length > 0 && (
-        <div className="mt-3 space-y-1">
-          {booths.map((b) => (
-            <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-              <span className="font-semibold text-slate-800">
-                Booth {b.booth_number ?? b.label} <span className="text-xs font-normal text-slate-400">({b.status})</span>
-              </span>
-              <select
-                value={b.vendor_id ?? ""}
-                onChange={(e) => assignBoothVendor(b, e.target.value)}
-                className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
-              >
-                <option value="">Unassigned</option>
-                {vendors.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.business_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {eventId && (
-        <form onSubmit={addBooth} className="mt-6 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-700">Booth #</label>
-            <input
-              type="text"
-              placeholder="1"
-              value={newNumber}
-              onChange={(e) => setNewNumber(e.target.value)}
-              className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700">Tier</label>
-            <select
-              value={newTier}
-              onChange={(e) => setNewTier(e.target.value as Booth["tier"])}
-              className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="standard">Standard</option>
-              <option value="top">Top Booth</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700">X% (optional)</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={newX}
-              onChange={(e) => setNewX(e.target.value)}
-              className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700">Y% (optional)</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={newY}
-              onChange={(e) => setNewY(e.target.value)}
-              className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700">Width %</label>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={newWidth}
-              onChange={(e) => setNewWidth(e.target.value)}
-              className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700">Height %</label>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={newHeight}
-              onChange={(e) => setNewHeight(e.target.value)}
-              className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700">Vendor (optional)</label>
-            <select
-              value={newVendorId}
-              onChange={(e) => setNewVendorId(e.target.value)}
-              className="mt-1 w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="">Unassigned</option>
-              {vendors.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.business_name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
-            Add Booth
-          </button>
-        </form>
-      )}
-
-      {eventId && (
-        <form onSubmit={addBoundary} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-end gap-2">
-            <div>
-              <label className="block text-xs font-medium text-slate-700">Boundary type</label>
-              <select
-                value={newBoundaryType}
-                onChange={(e) => setNewBoundaryType(e.target.value as BoundaryType)}
-                className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              >
-                {BOUNDARY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace("_", " ")}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700">Label (optional)</label>
-              <input
-                type="text"
-                placeholder="North Fence"
-                value={newBoundaryLabel}
-                onChange={(e) => setNewBoundaryLabel(e.target.value)}
-                className="mt-1 w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+      {dataMode === "geo" ? (
+        <>
+          <div className="mt-6">
+            {loadingZone && <p className="text-sm text-slate-500">Loading zone map…</p>}
+            {!loadingZone && eventId && (
+              <ZoneMapLeaflet
+                mode={zoneMapMode}
+                center={mapCenter}
+                boundaries={geoBoundaries}
+                booths={geoBooths}
+                features={features}
+                contextPins={contextPins}
+                onBoothClick={handleBoothClick}
+                drawnPoints={drawnGeoPoints}
+                onDrawPoint={(p) => setDrawnGeoPoints((prev) => [...prev, p])}
+                placingType={placingType}
+                onPlacePoint={handleGeoPlacePoint}
+                onPlaceRejected={handleGeoPlaceRejected}
               />
-            </div>
-            <button
-              type="button"
-              onClick={() => setDrawMode((v) => !v)}
-              className="rounded-full border border-indigo-300 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
-            >
-              {drawMode ? "Switch to typing coordinates" : "✏️ Switch to drawing on map"}
-            </button>
-            <button type="submit" className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
-              Add Boundary
-            </button>
+            )}
           </div>
 
-          {drawMode ? (
-            <ZoneBoundaryDrawer
-              booths={booths}
-              existingBoundaries={boundaries}
-              points={drawnPoints}
-              onChange={setDrawnPoints}
-            />
-          ) : (
-            <div>
-              <label className="block text-xs font-medium text-slate-700">
-                Points <span className="font-normal text-slate-400">(x,y; x,y; … — 0-100 grid)</span>
-              </label>
-              <input
-                type="text"
-                placeholder="10,10; 90,10"
-                value={newBoundaryPoints}
-                onChange={(e) => setNewBoundaryPoints(e.target.value)}
-                className="mt-1 w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
+          {!previewPublic && eventId && !loadingZone && (
+            <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 print:hidden">
+              {zoneUiMode === "draw-boundary" ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-indigo-700">
+                    ✏️ Tracing boundary — click the map to place corners ({drawnGeoPoints.length} placed)
+                  </span>
+                  <button
+                    type="button"
+                    disabled={drawnGeoPoints.length === 0}
+                    onClick={undoLastGeoPoint}
+                    className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    ↶ Undo Last
+                  </button>
+                  <button
+                    type="button"
+                    disabled={drawnGeoPoints.length === 0}
+                    onClick={() => setDrawnGeoPoints([])}
+                    className="rounded-full border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    disabled={drawnGeoPoints.length < 3}
+                    onClick={finishTraceBoundary}
+                    className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    ✓ Finish Boundary
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setZoneUiMode("view");
+                      setDrawnGeoPoints([]);
+                    }}
+                    className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : eventBoundary ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-slate-600">✓ Event boundary traced ({eventBoundary.points_geo?.length ?? 0} points)</span>
+                  <button
+                    type="button"
+                    onClick={editEventBoundary}
+                    className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Edit Boundary
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startTraceBoundary}
+                  className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                >
+                  ✏️ Trace Event Boundary
+                </button>
+              )}
+
+              {eventBoundary && zoneUiMode !== "draw-boundary" && (
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <p className="text-xs font-medium text-slate-700">Place inside the boundary</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {PLACEABLE_TYPES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => startPlacing(t)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                          placingType === t
+                            ? "bg-slate-900 text-white"
+                            : "border border-slate-300 text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {t === "booth" ? "🏪 Booth" : FEATURE_TYPE_LABEL[t]}
+                      </button>
+                    ))}
+                    {zoneUiMode === "place-features" && (
+                      <button
+                        type="button"
+                        onClick={stopPlacing}
+                        className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 hover:underline"
+                      >
+                        Done Placing
+                      </button>
+                    )}
+                  </div>
+                  {zoneUiMode === "place-features" && !pendingPlacement && (
+                    <p className="mt-2 text-xs text-slate-500">Click inside the shaded boundary to place a {placingType}.</p>
+                  )}
+                  {pendingPlacement && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-2">
+                      <input
+                        type="text"
+                        placeholder={placingType === "booth" ? "Booth label (optional)" : "Label (optional)"}
+                        value={placingLabel}
+                        onChange={(e) => setPlacingLabel(e.target.value)}
+                        className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={savePendingPlacement}
+                        className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingPlacement(null);
+                          setPlacingLabel("");
+                        }}
+                        className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 hover:underline"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
-        </form>
-      )}
 
-      {boundaries.length > 0 && (
-        <ul className="mt-3 space-y-1 text-sm text-slate-600">
-          {boundaries.map((b) => (
-            <li key={b.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
-              <span>
-                <strong className="capitalize">{b.boundary_type.replace("_", " ")}</strong>
-                {b.label ? ` — ${b.label}` : ""} ({b.points.length} points)
-              </span>
-              <button type="button" onClick={() => deleteBoundary(b.id)} className="text-xs font-semibold text-red-600 underline">
-                Remove
+          {geoBooths.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {geoBooths.map((b) => (
+                <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <span className="font-semibold text-slate-800">
+                    Booth {b.booth_number ?? b.label} <span className="text-xs font-normal text-slate-400">({b.status})</span>
+                  </span>
+                  <select
+                    value={b.vendor_id ?? ""}
+                    onChange={(e) => assignBoothVendor(b, e.target.value)}
+                    className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                  >
+                    <option value="">Unassigned</option>
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.business_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {features.length > 0 && !previewPublic && (
+            <ul className="mt-3 space-y-1 text-sm text-slate-600">
+              {features.map((f) => (
+                <li key={f.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <span>
+                    <strong>{FEATURE_TYPE_LABEL[f.feature_type]}</strong>
+                    {f.label ? ` — ${f.label}` : ""}
+                  </span>
+                  <button type="button" onClick={() => deleteFeature(f.id)} className="text-xs font-semibold text-red-600 underline">
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="mt-6">
+            {loadingZone && <p className="text-sm text-slate-500">Loading zone map…</p>}
+            {!loadingZone && eventId && (
+              <ZoneMap
+                booths={booths}
+                boundaries={boundaries}
+                mode="admin"
+                onBoothClick={handleBoothClick}
+                vendorNameById={Object.fromEntries(vendors.map((v) => [v.id, v.business_name]))}
+              />
+            )}
+            {!loadingZone && eventId && booths.length === 0 && (
+              <p className="mt-3 text-sm text-slate-500">No booths yet for this event — add one below.</p>
+            )}
+          </div>
+
+          {booths.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {booths.map((b) => (
+                <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <span className="font-semibold text-slate-800">
+                    Booth {b.booth_number ?? b.label} <span className="text-xs font-normal text-slate-400">({b.status})</span>
+                  </span>
+                  <select
+                    value={b.vendor_id ?? ""}
+                    onChange={(e) => assignBoothVendor(b, e.target.value)}
+                    className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                  >
+                    <option value="">Unassigned</option>
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.business_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {eventId && (
+            <form onSubmit={addBooth} className="mt-6 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Booth #</label>
+                <input
+                  type="text"
+                  placeholder="1"
+                  value={newNumber}
+                  onChange={(e) => setNewNumber(e.target.value)}
+                  className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Tier</label>
+                <select
+                  value={newTier}
+                  onChange={(e) => setNewTier(e.target.value as Booth["tier"])}
+                  className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="standard">Standard</option>
+                  <option value="top">Top Booth</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">X% (optional)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={newX}
+                  onChange={(e) => setNewX(e.target.value)}
+                  className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Y% (optional)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={newY}
+                  onChange={(e) => setNewY(e.target.value)}
+                  className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Width %</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={newWidth}
+                  onChange={(e) => setNewWidth(e.target.value)}
+                  className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Height %</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={newHeight}
+                  onChange={(e) => setNewHeight(e.target.value)}
+                  className="mt-1 w-20 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Vendor (optional)</label>
+                <select
+                  value={newVendorId}
+                  onChange={(e) => setNewVendorId(e.target.value)}
+                  className="mt-1 w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Unassigned</option>
+                  {vendors.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.business_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button type="submit" className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+                Add Booth
               </button>
-            </li>
-          ))}
-        </ul>
+            </form>
+          )}
+
+          {eventId && (
+            <form onSubmit={addBoundary} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-end gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Boundary type</label>
+                  <select
+                    value={newBoundaryType}
+                    onChange={(e) => setNewBoundaryType(e.target.value as BoundaryType)}
+                    className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    {BOUNDARY_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t.replace("_", " ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Label (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="North Fence"
+                    value={newBoundaryLabel}
+                    onChange={(e) => setNewBoundaryLabel(e.target.value)}
+                    className="mt-1 w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDrawMode((v) => !v)}
+                  className="rounded-full border border-indigo-300 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                >
+                  {drawMode ? "Switch to typing coordinates" : "✏️ Switch to drawing on map"}
+                </button>
+                <button type="submit" className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+                  Add Boundary
+                </button>
+              </div>
+
+              {drawMode ? (
+                <ZoneBoundaryDrawer
+                  booths={booths}
+                  existingBoundaries={boundaries}
+                  points={drawnPoints}
+                  onChange={setDrawnPoints}
+                />
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">
+                    Points <span className="font-normal text-slate-400">(x,y; x,y; … — 0-100 grid)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="10,10; 90,10"
+                    value={newBoundaryPoints}
+                    onChange={(e) => setNewBoundaryPoints(e.target.value)}
+                    className="mt-1 w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
+            </form>
+          )}
+
+          {boundaries.length > 0 && (
+            <ul className="mt-3 space-y-1 text-sm text-slate-600">
+              {boundaries.map((b) => (
+                <li key={b.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <span>
+                    <strong className="capitalize">{b.boundary_type.replace("_", " ")}</strong>
+                    {b.label ? ` — ${b.label}` : ""} ({b.points_geo?.length ?? b.points.length} points)
+                  </span>
+                  <button type="button" onClick={() => deleteBoundary(b.id)} className="text-xs font-semibold text-red-600 underline">
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );

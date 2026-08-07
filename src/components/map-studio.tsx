@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { CITY_CENTERS } from "@/lib/geo";
 import { BASE_PATH } from "@/lib/site";
 import { loadLeaflet, TILE_LAYER_URL, TILE_LAYER_ATTRIBUTION } from "@/lib/map/leaflet-loader";
+import { entityDivIcon, syncEditableLayer, type MapDraft } from "@/lib/map/leaflet-shared";
 
 /** The `pins` table's `category` column has a check constraint of its
  * own, separate from (and much narrower than) the map's visual icon
@@ -50,34 +51,12 @@ type EventRow = {
   location_verified_at: string | null;
 };
 
-type Draft = { lat: number; lng: number };
+type Draft = MapDraft;
 type DraftSetter = React.Dispatch<React.SetStateAction<Record<string, Draft>>>;
 
 const VENDOR_COLOR = "#4338ca"; // indigo
 const EVENT_COLOR = "#0f766e"; // teal
 const DIRTY_COLOR = "#d97706"; // amber - staged, unsaved drag
-const NEEDS_REVIEW_RING = "#dc2626"; // red halo - never manually verified
-
-/** Vendor/event markers need to read as visually distinct from a plain
- * pin (which uses Leaflet's default teardrop marker image) and need to
- * carry two independent pieces of state at a glance, since the edit
- * panel is only open for whichever one is selected: the base color says
- * what layer it belongs to and whether it has an unsaved drag pending
- * (amber overrides everything else), and a red halo says its stored
- * coordinates have never actually been checked against the map. */
-function entityDivIcon(
-  L: NonNullable<Window["L"]>,
-  opts: { id: string; emoji: string; color: string; needsReview: boolean },
-) {
-  const ring = opts.needsReview
-    ? `box-shadow:0 0 0 3px ${NEEDS_REVIEW_RING},0 1px 4px rgba(0,0,0,.45);`
-    : "box-shadow:0 1px 4px rgba(0,0,0,.45);";
-  const html =
-    `<div data-entity-id="${opts.id}" style="width:26px;height:26px;border-radius:50%;background:${opts.color};` +
-    `border:3px solid #fff;${ring}display:flex;align-items:center;justify-content:center;font-size:13px;">` +
-    `${opts.emoji}</div>`;
-  return L.divIcon({ html, className: "", iconSize: [26, 26], iconAnchor: [13, 13] });
-}
 
 function stageDraft(setDrafts: DraftSetter, id: string, lat: number, lng: number) {
   setDrafts((prev) => ({ ...prev, [id]: { lat, lng } }));
@@ -89,67 +68,6 @@ function clearDraft(setDrafts: DraftSetter, id: string) {
     delete next[id];
     return next;
   });
-}
-
-/** The one place marker sync happens, shared by every editable layer
- * (pins, vendors, events, and whatever comes next) instead of copy-pasting
- * the same add/update/remove loop per layer. A draft position (staged but
- * not yet saved) always wins over the entity's own stored lat/lng so a
- * marker never snaps back mid-edit. `onDragEnd`/`onClick` only ever
- * receive the entity's id (never the whole object) - handlers are bound
- * once, at marker-creation time, so anything beyond a stable id would be
- * a stale closure the moment that entity's other fields changed. */
-function syncEditableLayer<T extends { id: string; lat: number; lng: number }>(config: {
-  L: NonNullable<Window["L"]>;
-  map: import("leaflet").Map;
-  markersRef: React.MutableRefObject<Map<string, import("leaflet").Marker>>;
-  entities: T[];
-  drafts: Record<string, Draft>;
-  show: boolean;
-  icon?: (entity: T, isDirty: boolean) => import("leaflet").DivIcon;
-  opacity?: (entity: T) => number;
-  tooltip: (entity: T, isDirty: boolean) => string;
-  onDragEnd: (id: string, lat: number, lng: number) => void;
-  onClick: (id: string) => void;
-}) {
-  const { L, map, markersRef, entities, drafts, show, icon, opacity, tooltip, onDragEnd, onClick } = config;
-  if (!show) {
-    for (const [, marker] of markersRef.current) marker.remove();
-    markersRef.current.clear();
-    return;
-  }
-
-  const seen = new Set<string>();
-  for (const entity of entities) {
-    seen.add(entity.id);
-    const draft = drafts[entity.id];
-    const lat = draft ? draft.lat : entity.lat;
-    const lng = draft ? draft.lng : entity.lng;
-    let marker = markersRef.current.get(entity.id);
-    if (!marker) {
-      const opts: import("leaflet").MarkerOptions = { draggable: true };
-      if (icon) opts.icon = icon(entity, false);
-      marker = L.marker([lat, lng], opts).addTo(map);
-      const id = entity.id;
-      marker.on("dragend", () => {
-        const pos = marker!.getLatLng();
-        onDragEnd(id, pos.lat, pos.lng);
-      });
-      marker.on("click", () => onClick(id));
-      markersRef.current.set(entity.id, marker);
-    } else {
-      marker.setLatLng([lat, lng]);
-    }
-    if (icon) marker.setIcon(icon(entity, !!draft));
-    if (opacity) marker.setOpacity(opacity(entity));
-    marker.bindTooltip(tooltip(entity, !!draft), { permanent: false });
-  }
-  for (const [id, marker] of markersRef.current) {
-    if (!seen.has(id)) {
-      marker.remove();
-      markersRef.current.delete(id);
-    }
-  }
 }
 
 export function MapStudio({
