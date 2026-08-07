@@ -22,6 +22,12 @@ const BOUNDARY_STYLE: Record<
   gate: { stroke: "#16a34a", dash: "0", icon: "🚪", label: "Gate" },
   exit: { stroke: "#dc2626", dash: "0", icon: "🏃", label: "Exit" },
   vendor_area: { stroke: "#2563eb", dash: "6,2", icon: "🛍️", label: "Vendor Area" },
+  // 'event_boundary'/'path' are only ever created by the new Leaflet Event
+  // Zone editor (real lat/lng, never this legacy percentage-grid renderer)
+  // - entries exist here only so BOUNDARY_STYLE stays exhaustive over the
+  // full BoundaryType union.
+  event_boundary: { stroke: "#dc2626", dash: "4,2", icon: "🚩", label: "Event Boundary" },
+  path: { stroke: "#a16207", dash: "1,3", icon: "🚶", label: "Walking Path" },
 };
 
 function pointsToPath(points: { x: number; y: number }[]): string {

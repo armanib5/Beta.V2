@@ -162,15 +162,24 @@ export interface Booth {
   y: number | null;
   width: number | null;
   height: number | null;
+  /** Real-world coordinates, set only for booths placed via the Leaflet
+   * Event Zone editor - null for legacy percentage-grid booths (x/y). */
+  lat: number | null;
+  lng: number | null;
   created_at: string;
   updated_at: string;
 }
 
-export type BoundaryType = "fence" | "gate" | "exit" | "vendor_area";
+export type BoundaryType = "fence" | "gate" | "exit" | "vendor_area" | "event_boundary" | "path";
 
 export interface ZoneBoundaryPoint {
   x: number;
   y: number;
+}
+
+export interface ZoneBoundaryGeoPoint {
+  lat: number;
+  lng: number;
 }
 
 export interface ZoneBoundary {
@@ -179,7 +188,35 @@ export interface ZoneBoundary {
   boundary_type: BoundaryType;
   label: string | null;
   points: ZoneBoundaryPoint[];
+  /** Real-world traced boundary, set only via the Leaflet Event Zone
+   * editor - null for legacy percentage-grid boundaries (points). */
+  points_geo: ZoneBoundaryGeoPoint[] | null;
   vendor_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ZoneFeatureType =
+  | "stage"
+  | "seating"
+  | "food"
+  | "bar"
+  | "gate"
+  | "entrance"
+  | "exit"
+  | "info"
+  | "restroom";
+
+/** Point-placed event infrastructure (stage, restroom, gate marker, etc.)
+ * inside a traced event boundary - never vendor-claimable, so it lives in
+ * its own table rather than as a `booths` row (see migration 0059). */
+export interface ZoneFeature {
+  id: string;
+  event_id: string;
+  feature_type: ZoneFeatureType;
+  label: string | null;
+  lat: number;
+  lng: number;
   created_at: string;
   updated_at: string;
 }

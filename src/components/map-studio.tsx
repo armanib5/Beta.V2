@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CITY_CENTERS } from "@/lib/geo";
 import { BASE_PATH } from "@/lib/site";
+import { loadLeaflet, TILE_LAYER_URL, TILE_LAYER_ATTRIBUTION } from "@/lib/map/leaflet-loader";
 
 /** The `pins` table's `category` column has a check constraint of its
  * own, separate from (and much narrower than) the map's visual icon
@@ -51,12 +52,6 @@ type EventRow = {
 
 type Draft = { lat: number; lng: number };
 type DraftSetter = React.Dispatch<React.SetStateAction<Record<string, Draft>>>;
-
-declare global {
-  interface Window {
-    L?: typeof import("leaflet");
-  }
-}
 
 const VENDOR_COLOR = "#4338ca"; // indigo
 const EVENT_COLOR = "#0f766e"; // teal
@@ -157,26 +152,6 @@ function syncEditableLayer<T extends { id: string; lat: number; lng: number }>(c
   }
 }
 
-/** Loads the same vendored Leaflet build the public map already uses
- * (public/map/vendor/leaflet/*) instead of adding a second copy of the
- * same library as an npm dependency. */
-function loadLeaflet(): Promise<NonNullable<Window["L"]>> {
-  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
-  if (window.L) return Promise.resolve(window.L);
-  return new Promise((resolve, reject) => {
-    const css = document.createElement("link");
-    css.rel = "stylesheet";
-    css.href = `${BASE_PATH}/map/vendor/leaflet/leaflet.css`;
-    document.head.appendChild(css);
-
-    const script = document.createElement("script");
-    script.src = `${BASE_PATH}/map/vendor/leaflet/leaflet.js`;
-    script.onload = () => (window.L ? resolve(window.L) : reject(new Error("Leaflet failed to load")));
-    script.onerror = () => reject(new Error("Leaflet failed to load"));
-    document.head.appendChild(script);
-  });
-}
-
 export function MapStudio({
   initialPins,
   initialVendors = [],
@@ -262,9 +237,7 @@ export function MapStudio({
         if (cancelled || !mapDivRef.current || mapRef.current) return;
         const center = CITY_CENTERS[0];
         const map = L.map(mapDivRef.current).setView([center.lat, center.lng], 13);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "&copy; OpenStreetMap contributors",
-        }).addTo(map);
+        L.tileLayer(TILE_LAYER_URL, { attribution: TILE_LAYER_ATTRIBUTION }).addTo(map);
         mapRef.current = map;
         setMapReady(true);
       })
