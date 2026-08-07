@@ -518,7 +518,7 @@ function DirectoryCard({
             href={`${BASE_PATH}/board/?flyerId=${encodeURIComponent(item.id.replace(/^event:/, ""))}`}
             className="inline-block self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
           >
-            📌 View on Board
+            🗒️ View Flyer on the Board
           </a>
           <a
             href={`${BASE_PATH}/map/?showEvent=${encodeURIComponent(item.id.replace(/^event:/, ""))}`}

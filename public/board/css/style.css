@@ -43,7 +43,7 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 .cc{flex-shrink:0;padding:5px 13px;border-radius:13px;border:none;cursor:pointer;font-size:11px;font-weight:700;color:#fff;opacity:.82;white-space:nowrap;transition:transform .15s,opacity .15s;}
 .cc:hover{transform:scale(1.07);opacity:1;}
 .cc.on{opacity:1;box-shadow:0 0 0 2px rgba(255,255,255,.6) inset,0 3px 10px rgba(0,0,0,.4);}
-.cc.market{background:var(--g);}.cc.foodhall{background:var(--go);}.cc.bars{background:var(--wn);}.cc.artwalk{background:var(--bl);}.cc.cityart{background:var(--pu);}.cc.parks{background:var(--pk);}.cc.venue{background:var(--br);}.cc.seasonal{background:var(--cr8);}.cc.shop{background:var(--re);}.cc.centers{background:#0d6b4f;}.cc.workshop{background:#2c5f8a;}.cc.homecook{background:#c26a1d;}.cc.other{background:#6b7280;}
+.cc.market{background:var(--g);}.cc.foodhall{background:var(--go);}.cc.bars{background:var(--wn);}.cc.artwalk{background:var(--bl);}.cc.cityart{background:var(--pu);}.cc.parks{background:var(--pk);}.cc.venue{background:var(--br);}.cc.seasonal{background:var(--cr8);}.cc.shop{background:var(--re);}.cc.centers{background:#0d6b4f;}.cc.museum{background:#8a6d3b;}.cc.hotel{background:#0f766e;}.cc.workshop{background:#2c5f8a;}.cc.homecook{background:#c26a1d;}.cc.other{background:#6b7280;}
 .hero{text-align:center;padding:38px 20px 24px;background:radial-gradient(ellipse at 50% 0%,rgba(218,184,112,.14),transparent 65%);}
 .hero h1{font-family:'Special Elite',monospace;font-size:clamp(36px,9vw,64px);color:var(--cl);letter-spacing:3px;text-shadow:0 0 50px rgba(218,184,112,.35),2px 3px 0 rgba(0,0,0,.6);}
 .hero .sub{font-style:italic;color:rgba(218,184,112,.65);font-size:16px;margin-top:5px;}
