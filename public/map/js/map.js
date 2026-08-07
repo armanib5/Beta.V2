@@ -6,7 +6,8 @@ var ICONS = {
   art: "\u{1F5BC}", mask: "\u{1F3AD}", star: "⭐", bag: "\u{1F6CD}",
   P: "P", restroom: "\u{1F6BB}", train: "\u{1F686}",
   school: "\u{1F3EB}", hospital: "\u{1F3E5}", church: "⛪", plate: "\u{1F37D}\u{FE0F}", hotel: "\u{1F3E8}",
-  grad: "\u{1F393}", pot: "\u{1F372}", sparkle: "\u{2728}", building: "\u{1F3DB}\u{FE0F}"
+  grad: "\u{1F393}", pot: "\u{1F372}", sparkle: "\u{2728}", building: "\u{1F3DB}\u{FE0F}",
+  museum: "\u{1F3FA}"
 };
 
 /* Vendor-controlled strings (name/description/address) get concatenated
@@ -354,7 +355,7 @@ var LOV_CAT_SLUG_TO_MAP = {
   "cultural-festival": "venue", "gaming-festival": "venue", "outdoor-movie": "venue",
   "community-event": "centers", "restaurant": "restaurants", "bar": "bars",
   "workshop-class": "workshop", "park-event": "parks", "city-art": "cityart",
-  "museum": "centers"
+  "museum": "museum"
 };
 
 function loadLovEvents() {

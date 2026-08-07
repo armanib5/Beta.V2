@@ -10,9 +10,10 @@ var C={
   centers:{l:"Centers",i:"&#127970;",c:"#0d6b4f"},
   shop:{l:"Shops",i:"&#128717;",c:"#c0392b"},
   homecook:{l:"Home Cook",i:"&#127858;",c:"#c26a1d"},
+  museum:{l:"Museums",i:"&#127994;",c:"#8a6d3b"},
   other:{l:"&#10024; Other",i:"&#10024;",c:"#6b7280"}
 };
-var ORD=["seasonal","workshop","market","foodhall","bars","cityart","parks","venue","centers","shop","homecook","other"];
+var ORD=["seasonal","workshop","market","foodhall","bars","cityart","parks","venue","centers","museum","shop","homecook","other"];
 var CN={sj:"San Jose, CA",sc:"Santa Clara, CA",sv:"Sunnyvale, CA",mv:"Mountain View, CA",camp:"Campbell, CA",gil:"Gilroy, CA"};
 var CITY_ABBR={sj:"SJ",sc:"SC",sv:"SV",mv:"MV",camp:"Camp",gil:"Gil"};
 function setBrand(v){
@@ -461,7 +462,7 @@ var LOV_CAT_SLUG_TO_BOARD={
   "cultural-festival":"venue","gaming-festival":"venue","outdoor-movie":"venue",
   "community-event":"centers","restaurant":"bars","bar":"bars",
   "workshop-class":"workshop","park-event":"parks","city-art":"cityart",
-  "museum":"centers"
+  "museum":"museum"
 };
 /* Resolves a real city+hood from the row's own lat/lng (every seeded row
    has one) instead of only trusting section_zone, which is null on every

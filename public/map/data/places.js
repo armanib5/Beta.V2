@@ -28,11 +28,12 @@ var CATS = {
   "hospitals": { "l": "Hospitals", "c": "#dc2626", "icon": "hospital" },
   "churches": { "l": "Churches", "c": "#7c3aed", "icon": "church" },
   "hotels": { "l": "Hotels", "c": "#0f766e", "icon": "hotel" },
-  "centers": { "l": "Centers", "c": "#0d6b4f", "icon": "building" }
+  "centers": { "l": "Centers", "c": "#0d6b4f", "icon": "building" },
+  "museum": { "l": "Museums", "c": "#8a6d3b", "icon": "museum" }
 };
 
 /* Order controls the category filter row. */
-var CAT_ORDER = ["market","foodhall","restaurants","bars","cityart","venue","seasonal","workshop","centers","parks","shop","homecook","other","parking","restrooms","transit","schools","hospitals","churches","hotels"];
+var CAT_ORDER = ["market","foodhall","restaurants","bars","cityart","venue","seasonal","workshop","centers","museum","parks","shop","homecook","other","parking","restrooms","transit","schools","hospitals","churches","hotels"];
 
 var HOODS = [
   { "id": "downtown", "l": "Downtown San Jose", "lat": 37.3382, "lng": -121.8863, "zoom": 15 },
