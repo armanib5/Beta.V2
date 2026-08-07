@@ -471,6 +471,33 @@ function cityHoodFromRow(r){
   return {city:"sj",hood:"downtown"};
 }
 
+/* loadLovEvents/loadLovVendors/loadRealVendors all merge live Supabase
+   rows into `evts`/`vendors`, arrays that get restored from a stale
+   localStorage snapshot on every page load (see load()/js/vendors.js's
+   loadVendors()) and then re-persisted wholesale by save() the next time
+   *anything* local changes (posting or editing a flyer). Each of these
+   loaders used to only push a row if its id wasn't already present -
+   meaning once a real vendor or LOV event was cached even once, nothing
+   about it (category, name, description...) could ever update again on
+   that browser, no matter how many times the underlying database row
+   changed. This is why an admin changing a vendor's category could see
+   "Saved" from Supabase's own response while the Board kept showing the
+   old one indefinitely. Upserting instead means a fresh fetch always
+   wins - the database, not whatever got cached first, is the source of
+   truth for anything sourced from Supabase. */
+function upsertById(arr, ids, obj, preserveKeys){
+  var idx=ids.indexOf(obj.id);
+  if(idx<0){
+    arr.push(obj);
+    ids.push(obj.id);
+    return;
+  }
+  var existing=arr[idx];
+  var merged=Object.assign({},existing,obj);
+  (preserveKeys||[]).forEach(function(k){merged[k]=existing[k];});
+  arr[idx]=merged;
+}
+
 function loadLovEvents(){
   if(typeof V2_SUPABASE_URL==="undefined")return;
   fetch(V2_SUPABASE_URL+"/rest/v1/lov_entries?select=*,categories(slug)&type=eq.event&or=(publish_at.is.null,publish_at.lte."+encodeURIComponent(new Date().toISOString())+")",{
@@ -481,12 +508,11 @@ function loadLovEvents(){
     rows.forEach(function(r){
       if(r.status&&r.status!=="active")return;
       var id="lov-"+r.id;
-      if(existingIds.indexOf(id)>=0)return;
       var loc=cityHoodFromRow(r);
       var slug=r.categories?r.categories.slug:null;
       var cat=(slug&&LOV_CAT_SLUG_TO_BOARD[slug])||(r.recurrence?"market":"seasonal");
       var d=r.event_date?r.event_date.slice(0,10):recurrenceToDayCode(r.recurrence);
-      evts.push({
+      upsertById(evts,existingIds,{
         id:id,flyerId:r.id,cat:cat,lbl:r.booth_tier==="top"?"Top 10":(r.recurrence?"Recurring":"Live Festival"),
         exp:false,city:loc.city,hood:loc.hood,
         t:r.name,w:r.recurrence||(r.event_date?r.event_date.slice(0,10):""),d:d,
@@ -495,7 +521,7 @@ function loadLovEvents(){
         hostVendorId:r.hosting_vendor_id||null,
         focalX:r.flyer_focal_x,focalY:r.flyer_focal_y,
         top:!!(r.booth_tier==="top"||r.category_tier==="top_10"||r.is_featured)
-      });
+      },[]);
     });
     expire();
     renderToday();
@@ -555,11 +581,10 @@ function loadLovVendors(){
     rows.forEach(function(r){
       if(r.status&&r.status!=="active")return;
       var id="lov-"+r.id;
-      if(existingIds.indexOf(id)>=0)return;
       var loc=cityHoodFromRow(r);
       var slug=r.categories?r.categories.slug:null;
       var cat=(slug&&LOV_CAT_SLUG_TO_BOARD[slug])||"market";
-      vendors.push({
+      upsertById(vendors,existingIds,{
         id:id,name:r.name,cat:cat,
         desc:r.location||"",menu:"",address:r.location||"",
         contact:{phone:"",email:""},website:r.website_url||"",
@@ -568,7 +593,7 @@ function loadLovVendors(){
         featured:false,verified:false,
         boost:{tier:null,active:false,until:"",radius:null},
         mx:0,my:0,city:loc.city,hood:loc.hood,events:[],gallery:[],logo:"",cover:r.flyer_image_url||"",status:"approved"
-      });
+      },["events","gallery"]);
     });
     if(typeof renderPins==="function")renderPins();
     openVendorFromQuery();
@@ -603,35 +628,31 @@ function loadRealVendors(){
       var loc=(r.lat!=null&&r.lng!=null&&typeof nearestCityCenter==="function")
         ? (function(){var n=nearestCityCenter(r.lat,r.lng);var p=n.id.split("-")[0];return {city:CN[p]?p:"sj",hood:n.id.slice(p.length+1)};})()
         : {city:"sj",hood:"downtown"};
-      if(existingIds.indexOf(id)<0){
-        vendors.push({
-          id:id,name:r.business_name,cat:cat,
-          desc:r.short_description||"",menu:"",address:"",
-          contact:{phone:r.phone||"",email:""},website:r.website_url||"",
-          social:{instagram:r.instagram_handle||""},
-          hours:{mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""},
-          featured:!!r.is_founding_vendor,verified:true,
-          boost:{tier:r.is_top10?"anchor":null,active:!!r.is_top10,until:"",radius:null},
-          mx:0,my:0,city:loc.city,hood:loc.hood,events:[],gallery:[],logo:r.logo_url||"",cover:r.logo_url||"",status:"approved",
-          slug:r.slug,hubType:r.hub_type
-        });
-      }
-      if(existingEvtIds.indexOf(id)<0){
-        /* opens_at wasn't tracked at all before - every vendor was hardcoded
-           "daily" (always open), so a vendor boosted/featured ahead of their
-           real opening date showed a misleading green "Open Now" badge.
-           Only treat as "daily/ongoing" once that date has actually passed. */
-        var notYetOpen=r.opens_at&&r.opens_at>dateKeyOf(new Date());
-        evts.push({
-          id:id,cat:cat,lbl:notYetOpen?"Opening Soon":(r.is_top10?"Top 10":(r.is_founding_vendor?"Founding Vendor":"Vendor")),
-          exp:false,city:loc.city,hood:loc.hood,
-          t:r.business_name+(r.is_top10?" ⭐":""),w:notYetOpen?("Opens "+r.opens_at):"",
-          d:notYetOpen?r.opens_at:"daily",
-          a:"",ph:"",wb:r.website_url||"",ds:r.short_description||"",
-          photo:r.logo_url||"",focalX:r.logo_focal_x,focalY:r.logo_focal_y,
-          top:!!(r.is_top10||r.category_tier==="top_10"||r.is_featured)
-        });
-      }
+      upsertById(vendors,existingIds,{
+        id:id,name:r.business_name,cat:cat,
+        desc:r.short_description||"",menu:"",address:"",
+        contact:{phone:r.phone||"",email:""},website:r.website_url||"",
+        social:{instagram:r.instagram_handle||""},
+        hours:{mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""},
+        featured:!!r.is_founding_vendor,verified:true,
+        boost:{tier:r.is_top10?"anchor":null,active:!!r.is_top10,until:"",radius:null},
+        mx:0,my:0,city:loc.city,hood:loc.hood,events:[],gallery:[],logo:r.logo_url||"",cover:r.logo_url||"",status:"approved",
+        slug:r.slug,hubType:r.hub_type
+      },["events","gallery"]);
+      /* opens_at wasn't tracked at all before - every vendor was hardcoded
+         "daily" (always open), so a vendor boosted/featured ahead of their
+         real opening date showed a misleading green "Open Now" badge.
+         Only treat as "daily/ongoing" once that date has actually passed. */
+      var notYetOpen=r.opens_at&&r.opens_at>dateKeyOf(new Date());
+      upsertById(evts,existingEvtIds,{
+        id:id,cat:cat,lbl:notYetOpen?"Opening Soon":(r.is_top10?"Top 10":(r.is_founding_vendor?"Founding Vendor":"Vendor")),
+        exp:false,city:loc.city,hood:loc.hood,
+        t:r.business_name+(r.is_top10?" ⭐":""),w:notYetOpen?("Opens "+r.opens_at):"",
+        d:notYetOpen?r.opens_at:"daily",
+        a:"",ph:"",wb:r.website_url||"",ds:r.short_description||"",
+        photo:r.logo_url||"",focalX:r.logo_focal_x,focalY:r.logo_focal_y,
+        top:!!(r.is_top10||r.category_tier==="top_10"||r.is_featured)
+      },[]);
     });
     if(typeof renderPins==="function")renderPins();
     if(typeof renderToday==="function")renderToday();
@@ -695,7 +716,18 @@ function eventSortKey(ev){
   if(ev.d&&ev.d.length===10){
     var p=ev.d.split("-").map(Number);
     var diff=new Date(p[0],p[1]-1,p[2]).getTime()-todayMs();
-    return diff<0?(1000000-diff):diff;
+    // Past events must always sort after every future/today event, no
+    // matter how many milliseconds apart either one is. The old
+    // "1000000 - diff" offset was far too small at millisecond scale
+    // (1,000,000ms is under 17 minutes) to actually separate "any past
+    // date" from "any future date" - a recent past event's raw diff
+    // magnitude could still out-rank a genuinely upcoming one further
+    // out, which is exactly why an older event like Pride could sort
+    // ahead of an upcoming one like SJ Jazz Fest. 1e15 (a quadrillion
+    // ms, ~31,700 years) is larger than any realistic diff, so every
+    // past date always sorts after every future one, most-recent-past
+    // first within that group.
+    return diff<0?(1e15+Math.abs(diff)):diff;
   }
   return -1;
 }
@@ -1322,10 +1354,21 @@ function openDetail(id){
 
   var btns=document.createElement("div");btns.className="dbtnrow";
   var sh=document.createElement("button");sh.className="ab gray";sh.textContent="Share";sh.onclick=(function(id){return function(){shareEv(id);};})(ev.id);
-  var ed=document.createElement("button");ed.className="ab green";ed.textContent="Edit";ed.onclick=(function(id){return function(){editEv(id);};})(ev.id);
-  var dl=document.createElement("button");dl.className="ab dark";dl.textContent="Remove";dl.onclick=(function(id){return function(){delEv(id);};})(ev.id);
+  btns.appendChild(sh);
+  // Edit/Remove used to render for every visitor with no check at all -
+  // neither call ever wrote to the real database (both only mutate this
+  // browser's own local/localStorage copy, see editEv()/delEv()), but
+  // showing edit controls on someone else's flyer to any random visitor
+  // is still a real permissions bug on its own, independent of what the
+  // buttons technically do under the hood. Only an admin or the flyer's
+  // own vendor host may see them now.
+  if(canEditFlyer(ev)){
+    var ed=document.createElement("button");ed.className="ab green";ed.textContent="Edit";ed.onclick=(function(id){return function(){editEv(id);};})(ev.id);
+    var dl=document.createElement("button");dl.className="ab dark";dl.textContent="Remove";dl.onclick=(function(id){return function(){delEv(id);};})(ev.id);
+    btns.appendChild(ed);btns.appendChild(dl);
+  }
   var rp=document.createElement("button");rp.className="ab gray";rp.textContent="Report";rp.onclick=(function(id,t){return function(){openReportForm("event",id,t);};})(ev.id,ev.t);
-  btns.appendChild(sh);btns.appendChild(ed);btns.appendChild(dl);btns.appendChild(rp);
+  btns.appendChild(rp);
   body.appendChild(btns);
 
   dp.appendChild(body);
@@ -1498,6 +1541,24 @@ function shareEv(id){
   if(navigator.share){navigator.share({title:ev.t,text:ev.ds,url:location.href}).catch(function(){});return;}
   if(!navigator.clipboard){alert("Copy the URL from your browser bar.");return;}
   navigator.clipboard.writeText(location.href).then(function(){alert("Link copied!");},function(){alert("Couldn't copy automatically - copy the URL from your browser bar.");});
+}
+
+/* Admin check reuses the same non-authoritative localStorage hint the
+   nav/pending-badge already read - fine here since Edit/Remove never
+   write to the real database anyway (see the callers), so this is a
+   pure UI-visibility decision, not a security boundary. Vendor-owner
+   check uses the REAL session (readNextAuthSession(), shared/
+   next-auth-bridge.js) rather than the hint, since it's comparing an
+   actual id, not just a yes/no flag. */
+function canEditFlyer(ev){
+  try{
+    var raw=window.localStorage.getItem("citypinned_session_hint");
+    var hint=raw?JSON.parse(raw):null;
+    if(hint&&hint.signedIn&&hint.isAdmin)return true;
+  }catch(e){}
+  if(typeof readNextAuthSession!=="function")return false;
+  var session=readNextAuthSession();
+  return !!(session&&ev.hostVendorId&&session.userId===ev.hostVendorId);
 }
 
 function delEv(id){

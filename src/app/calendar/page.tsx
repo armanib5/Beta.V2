@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Category, LovEntry } from "@/lib/types";
 import { EventCalendar } from "@/components/event-calendar";
 import { CITIES, CITY_CENTERS, getAnchor, haversineDistanceMiles, nearestCityCenter } from "@/lib/geo";
+import { compareEventPriority } from "@/lib/event-priority";
 
 function cityForEvent(event: LovEntry): string {
   if (event.section_zone) {
@@ -31,9 +32,8 @@ export default function CalendarPage() {
       .eq("type", "event")
       .eq("status", "active")
       .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
-      .order("event_date")
       .returns<LovEntry[]>()
-      .then(({ data }) => setEvents(data ?? []));
+      .then(({ data }) => setEvents([...(data ?? [])].sort(compareEventPriority)));
     supabase
       .from("categories")
       .select("*")
