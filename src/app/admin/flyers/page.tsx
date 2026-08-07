@@ -182,6 +182,23 @@ export default function AdminFlyersPage() {
     setLoadingHistoryId(null);
   }
 
+  async function deleteFlyer(f: LovEntry) {
+    if (!window.confirm(`Permanently delete "${f.name}"? This removes its board assignments, booths, and event zone data too. This can't be undone.`)) {
+      return;
+    }
+    setError(null);
+    const supabase = createClient();
+    const { error: deleteError } = await supabase.from("lov_entries").delete().eq("id", f.id);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    setFlyers((prev) => prev.filter((row) => row.id !== f.id));
+    setRotations((prev) => prev.filter((r) => r.flyer_id !== f.id));
+    logActivity(supabase, "event", f.id, f.name, "Deleted", "Permanently removed via Flyer Rotation");
+    flash(`✓ Deleted ${f.name}`);
+  }
+
   async function addAssignment(e: React.FormEvent) {
     e.preventDefault();
     if (!flyerId) return;
@@ -546,6 +563,13 @@ export default function AdminFlyersPage() {
                     <option value="archived">Archived</option>
                     <option value="rejected">Rejected</option>
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => deleteFlyer(f)}
+                    className="rounded-full border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                  >
+                    🗑 Delete
+                  </button>
                 </div>
               </div>
 
