@@ -7,13 +7,35 @@ import { checkIsAdmin } from "@/lib/admin";
 
 export default function AdminHubPage() {
   const [status, setStatus] = useState<"loading" | "denied" | "ready">("loading");
+  const [needsReviewCount, setNeedsReviewCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     const supabase = createClient();
-    checkIsAdmin(supabase).then((isAdmin) => {
+    checkIsAdmin(supabase).then(async (isAdmin) => {
       if (cancelled) return;
       setStatus(isAdmin ? "ready" : "denied");
+      if (!isAdmin) return;
+      // Same criteria Map Studio uses to flag a pin "needs review" - a
+      // count here so the queue is visible from the hub instead of only
+      // discoverable by already knowing to open Map Studio and look.
+      const [{ count: vendorCount }, { count: eventCount }] = await Promise.all([
+        supabase
+          .from("vendors")
+          .select("id", { count: "exact", head: true })
+          .not("lat", "is", null)
+          .not("lng", "is", null)
+          .is("location_verified_at", null),
+        supabase
+          .from("lov_entries")
+          .select("id", { count: "exact", head: true })
+          .eq("type", "event")
+          .not("lat", "is", null)
+          .not("lng", "is", null)
+          .is("location_verified_at", null),
+      ]);
+      if (cancelled) return;
+      setNeedsReviewCount((vendorCount ?? 0) + (eventCount ?? 0));
     });
     return () => {
       cancelled = true;
@@ -73,7 +95,14 @@ export default function AdminHubPage() {
           href="/admin/map-studio"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >
-          <p className="font-bold text-slate-900">Map Studio</p>
+          <div className="flex items-center gap-2">
+            <p className="font-bold text-slate-900">Map Studio</p>
+            {needsReviewCount > 0 && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+                {needsReviewCount} needs review
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-slate-600">
             Add, edit, drag, and remove pins on the real map — with a live link to see exactly what the public sees.
           </p>

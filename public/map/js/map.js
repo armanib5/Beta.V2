@@ -338,9 +338,11 @@ function loadApprovedPins() {
    /calendar. Fetched the same way loadApprovedPins() pulls in V1's own
    pins, so seeding an event once makes it show up here too instead of two
    places drifting apart. section_zone picks the hood directly when set;
-   otherwise falls back to the nearest hood by coordinates, and to this
-   city's default center when the event has no lat/lng of its own at all
-   (an event without a location shouldn't just disappear from the map). */
+   otherwise falls back to the nearest hood by coordinates. A row with no
+   section_zone AND no lat/lng is skipped entirely rather than pinned to
+   the city center — a precise-looking marker in the wrong spot is worse
+   than not showing at all, and Map Studio's needs-review queue is where
+   an admin gives it a real location. */
 /* Real category (Farmers Market, Comedy Show, ...) maps to a Map
    category key - "everything non-recurring is seasonal" put shows/fairs
    in the wrong bucket instead of Theaters/Farmers Market. */
@@ -369,12 +371,18 @@ function loadLovEvents() {
       var lat = r.lat, lng = r.lng, hood;
       if (r.section_zone) {
         var bySection = CITY_CENTERS.find(function (c) { return c.section === r.section_zone; });
-        hood = bySection ? nearestHood(bySection.lat, bySection.lng).hood : "downtown";
-        if (lat == null || lng == null) { lat = bySection ? bySection.lat : HOODS[0].lat; lng = bySection ? bySection.lng : HOODS[0].lng; }
+        if (bySection) {
+          hood = nearestHood(bySection.lat, bySection.lng).hood;
+          if (lat == null || lng == null) { lat = bySection.lat; lng = bySection.lng; }
+        } else if (lat != null && lng != null) {
+          hood = nearestHood(lat, lng).hood;
+        } else {
+          return; // unresolvable section_zone and no lat/lng - skip rather than mis-place
+        }
       } else if (lat != null && lng != null) {
         hood = nearestHood(lat, lng).hood;
       } else {
-        lat = HOODS[0].lat; lng = HOODS[0].lng; hood = HOODS[0].id; // city-center fallback
+        return; // no location data at all - skip rather than pin to the city center
       }
       var slug = r.categories ? r.categories.slug : null;
       var cat = (slug && LOV_CAT_SLUG_TO_MAP[slug]) || (r.recurrence ? "market" : "seasonal");
@@ -411,12 +419,18 @@ function loadLovVendors() {
       var lat = r.lat, lng = r.lng, hood;
       if (r.section_zone) {
         var bySection = CITY_CENTERS.find(function (c) { return c.section === r.section_zone; });
-        hood = bySection ? nearestHood(bySection.lat, bySection.lng).hood : "downtown";
-        if (lat == null || lng == null) { lat = bySection ? bySection.lat : HOODS[0].lat; lng = bySection ? bySection.lng : HOODS[0].lng; }
+        if (bySection) {
+          hood = nearestHood(bySection.lat, bySection.lng).hood;
+          if (lat == null || lng == null) { lat = bySection.lat; lng = bySection.lng; }
+        } else if (lat != null && lng != null) {
+          hood = nearestHood(lat, lng).hood;
+        } else {
+          return; // unresolvable section_zone and no lat/lng - skip rather than mis-place
+        }
       } else if (lat != null && lng != null) {
         hood = nearestHood(lat, lng).hood;
       } else {
-        lat = HOODS[0].lat; lng = HOODS[0].lng; hood = HOODS[0].id;
+        return; // no location data at all - skip rather than pin to the city center
       }
       var slug = r.categories ? r.categories.slug : null;
       var cat = (slug && LOV_CAT_SLUG_TO_MAP[slug]) || "market";
