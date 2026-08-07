@@ -103,8 +103,8 @@ export default function HomePage() {
               className="rounded-2xl border border-amber-200 bg-white p-5 text-center shadow-sm hover:shadow-md"
             >
               <p className="text-2xl">📍</p>
-              <p className="mt-2 font-bold text-slate-900">Add a Pin</p>
-              <p className="mt-1 text-sm text-slate-600">Drop a pin for your business or event</p>
+              <p className="mt-2 font-bold text-slate-900">Manage My Pin</p>
+              <p className="mt-1 text-sm text-slate-600">Vendors: log in to place your business exactly on the map</p>
             </a>
           </div>
         </div>

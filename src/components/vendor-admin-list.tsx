@@ -572,6 +572,11 @@ export function VendorAdminList({
                 >
                   {STATUS_BADGE[vendor.status].label}
                 </span>
+                {vendor.is_test_account && (
+                  <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-purple-700">
+                    🧪 TEST
+                  </span>
+                )}
               </div>
               <p className="truncate text-xs text-slate-600">{vendor.contact_email}</p>
               {(vendor.is_founding_vendor || vendor.is_top10 || reapprovedIds.has(vendor.id)) && (

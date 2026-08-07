@@ -116,6 +116,16 @@ export default function AdminHubPage() {
           </p>
         </Link>
         <Link
+          href="/admin/cleanup"
+          className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
+        >
+          <p className="font-bold text-slate-900">🧹 Admin Cleanup</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Test accounts, incomplete signups, and duplicate vendors — flag, merge, archive, or delete. Nothing
+            happens automatically.
+          </p>
+        </Link>
+        <Link
           href="/admin/legacy"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >

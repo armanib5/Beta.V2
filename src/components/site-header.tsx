@@ -46,7 +46,7 @@ const appLinks = [
 const boardLinks = [
   { href: `${BASE_PATH}/board/`, label: "The Board" },
   { href: `${BASE_PATH}/map/`, label: "The Map" },
-  { href: `${BASE_PATH}/pins/`, label: "Add a Pin" },
+  { href: `${BASE_PATH}/pins/`, label: "Manage My Pin" },
 ];
 
 type Profile = Pick<Vendor, "business_name" | "logo_url"> | null;

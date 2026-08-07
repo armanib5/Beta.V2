@@ -1280,19 +1280,21 @@ function openDetail(id){
   var dloc=document.createElement("div");dloc.className="dloc";
   var dadr=document.createElement("span");dadr.className="dadr";dadr.textContent=ev.a;
   var mapBtn=document.createElement("a");mapBtn.className="ab blue";mapBtn.href=mu;mapBtn.target="_blank";mapBtn.textContent="Open in Maps";
-  var pinBtn=document.createElement("a");pinBtn.className="ab gold";
+  dloc.appendChild(dadr);dloc.appendChild(mapBtn);
   if(ev.mapId){
     /* This event already has a real pin on our map (not a fresh
-       submission) - link straight to it instead of opening /pins/,
-       which would let someone create a duplicate pin for the same
-       event, same as happened here once already. */
+       submission) - link straight to it. /pins/index.html only ever edits
+       the CURRENT LOGGED-IN VENDOR's own pin now (not a general "create a
+       pin for any flyer" tool), so there's no "Add to Map" equivalent for
+       a flyer with no pin yet - a random viewer browsing the board has no
+       way to create one for someone else's business, and the old link
+       here (title/addr/cat query params) pointed at a page that stopped
+       reading them once /pins/ was rewritten to be vendor-only. */
+    var pinBtn=document.createElement("a");pinBtn.className="ab gold";
     pinBtn.textContent="Find on Our Map";
     pinBtn.href="../map/index.html?showPlace="+encodeURIComponent(ev.mapId);
-  }else{
-    pinBtn.textContent="Add to Map";
-    pinBtn.href="../pins/index.html?title="+encodeURIComponent(ev.t)+"&addr="+encodeURIComponent(ev.a)+"&cat="+encodeURIComponent(ev.cat);
+    dloc.appendChild(pinBtn);
   }
-  dloc.appendChild(dadr);dloc.appendChild(mapBtn);dloc.appendChild(pinBtn);
 
   body.appendChild(rib);body.appendChild(h2);body.appendChild(dw);body.appendChild(dloc);
 
@@ -1483,6 +1485,12 @@ function cls(){
   document.getElementById("detPanel").innerHTML="";
   document.getElementById("frmPanel").innerHTML="";
   document.querySelectorAll(".mp.pulse").forEach(function(p){p.classList.remove("pulse");});
+  // The map-pin step's Leaflet instance is attached to a DOM node that
+  // just got wiped above - drop the reference so the next time the form
+  // opens, setupFPinMap() builds a genuinely fresh map instead of trying
+  // to reuse one pointed at a removed element.
+  if(fPinMap){fPinMap.remove();fPinMap=null;}
+  fPinMarker=null;fPinCoords=null;fPinVendorSession=null;
 }
 
 function shareEv(id){
@@ -1605,6 +1613,90 @@ function refreshFormCategoriesIfOpen(){
   }
 }
 
+/* Optional "pin this on the map" step for the public flyer form - a
+   small embedded Leaflet picker (same vendored build every other map on
+   the site uses) that, when used, saves the exact tapped/dragged spot as
+   this flyer's own lat/lng instead of the coarse neighborhood-center
+   fallback submitFlyerToSupabase() falls back to otherwise. Fully
+   optional - skipping it just means the flyer lands wherever the
+   selected neighborhood's default center is, same as before this existed. */
+var fPinMap=null, fPinMarker=null, fPinCoords=null, fPinVendorSession=null;
+
+function pinStepHtml(){
+  return "<label class='full' style='margin-top:10px;display:flex;align-items:center;gap:8px;font-weight:600;'>"+
+    "<input type='checkbox' id='fPinToggle' style='width:auto;'> &#128205; Pin this business/event on the CityPinned map (optional)</label>"+
+    "<p class='fnote'>Skip this and we'll place it at your neighborhood's general area instead - come back and use this any time to set the exact spot.</p>"+
+    "<div id='fPinMapWrap' style='display:none;'>"+
+      "<div id='fPinMap' style='height:220px;border-radius:10px;overflow:hidden;margin-top:8px;'></div>"+
+      "<p class='fnote' id='fPinCoordNote'>Tap the map to place a pin, then drag it to fine-tune.</p>"+
+      "<label class='full' id='fPinVendorRow' style='display:none;margin-top:6px;'>"+
+        "<input type='checkbox' id='fPinVendorToggle' checked style='width:auto;'> Also set this as my business's location on the map</label>"+
+    "</div>";
+}
+
+/* Wires up the checkbox/map after openForm() sets the panel's innerHTML -
+   has to run after, since the elements it binds to don't exist until
+   that HTML is in the DOM. Also does a lightweight, one-time check for a
+   real logged-in vendor session (the Board otherwise never needs its own
+   Supabase Auth client - everything else here is anonymous fetch calls)
+   so a vendor posting their own flyer can optionally update their
+   business's own map location at the same time, the same field
+   /pins/index.html manages. */
+function initPinStep(){
+  var toggle=document.getElementById("fPinToggle");
+  if(!toggle)return;
+  fPinCoords=null;
+  toggle.onchange=function(){
+    var wrap=document.getElementById("fPinMapWrap");
+    if(toggle.checked){
+      wrap.style.display="block";
+      if(!fPinMap)setupFPinMap();
+      else setTimeout(function(){fPinMap.invalidateSize();},50);
+      checkVendorSessionForPinStep();
+    }else{
+      wrap.style.display="none";
+    }
+  };
+}
+
+function checkVendorSessionForPinStep(){
+  if(fPinVendorSession!==null)return; // already checked this form session
+  // readNextAuthSession() (shared/next-auth-bridge.js) reads the real
+  // vendor login cookie the Next.js app writes - a plain supabase-js
+  // client's own getSession() only ever checks localStorage and would
+  // never see it, same gap /pins/ had before it was fixed the same way.
+  if(typeof readNextAuthSession!=="function"){fPinVendorSession=false;return;}
+  var session=readNextAuthSession();
+  fPinVendorSession=session?{accessToken:session.accessToken,userId:session.userId}:false;
+  var row=document.getElementById("fPinVendorRow");
+  if(row&&fPinVendorSession)row.style.display="block";
+}
+
+function setupFPinMap(){
+  if(typeof L==="undefined")return;
+  var center=(typeof hoodCoords==="function")?hoodCoords(curCity,curHood):null;
+  var lat=center?center.lat:37.3382, lng=center?center.lng:-121.8863;
+  fPinMap=L.map("fPinMap",{zoomControl:true,center:[lat,lng],zoom:13});
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{
+    attribution:"&copy; OpenStreetMap &copy; CARTO",subdomains:"abcd",maxZoom:20
+  }).addTo(fPinMap);
+  fPinMap.on("click",function(e){placeFPinMarker(e.latlng);});
+  setTimeout(function(){fPinMap.invalidateSize();},50);
+}
+
+function placeFPinMarker(latlng){
+  if(fPinMarker)fPinMap.removeLayer(fPinMarker);
+  fPinMarker=L.marker(latlng,{draggable:true}).addTo(fPinMap);
+  fPinMarker.on("dragend",function(){fPinCoords=fPinMarker.getLatLng();updateFPinCoordNote();});
+  fPinCoords=latlng;
+  updateFPinCoordNote();
+}
+
+function updateFPinCoordNote(){
+  var note=document.getElementById("fPinCoordNote");
+  if(note&&fPinCoords)note.textContent="Pin placed at "+fPinCoords.lat.toFixed(5)+", "+fPinCoords.lng.toFixed(5)+" - drag it to fine-tune, or tap elsewhere on the map.";
+}
+
 function openForm(defCat){
   var fp=document.getElementById("frmPanel");
   var hoodField="";
@@ -1612,9 +1704,10 @@ function openForm(defCat){
     var hoodOpts=HOODS_SJ.map(function(h){return "<option value='"+h.id+"'"+(h.id===curHood?" selected":"")+">"+h.l+"</option>";}).join("");
     hoodField="<label>Neighborhood</label><select id='fhood'>"+hoodOpts+"</select>";
   }
-  fp.innerHTML="<div class='fi'><h2>Post a Flyer</h2><p class='fnote'>Submitted flyers are reviewed by an admin before they go live on the board.</p><label>Title *</label><input id='ft' type='text' placeholder='e.g. Japantown Night Market'><label>Category</label><select id='fcat'></select><p class='fnote' id='fcatNote'>Loading the full category list…</p>"+hoodField+"<label>When</label><input id='fw' type='text' placeholder='e.g. Saturdays 10am-2pm'><label>Date or recurrence</label><select id='fdate'><option value=''>None</option><option value='today'>Today</option><option value='daily'>Every Day</option><option value='mon'>Mondays</option><option value='tue'>Tuesdays</option><option value='wed'>Wednesdays</option><option value='thu'>Thursdays</option><option value='fri'>Fridays</option><option value='sat'>Saturdays</option><option value='sun'>Sundays</option><option value='monthly'>First Friday Monthly</option></select><label>Address *</label><input id='fa' type='text' placeholder='e.g. 87 N San Pedro St San Jose CA'><label>Phone</label><input id='fph' type='text' placeholder='(408) 555-0100'><label>Website</label><input id='fws' type='text' placeholder='https://'><label>Description</label><textarea id='fd' placeholder='Tell people what this is...'></textarea><label>Parking</label><input id='fpk' type='text' placeholder='e.g. ParkSJ garage 90 min free'><label>Transit</label><input id='ftr' type='text' placeholder='e.g. VTA Route 68, 5 min walk'><div class='facts'><button class='bcan' id='frmCan'>Cancel</button><button class='bsub' id='frmSub'>Submit for Review</button></div></div>";
+  fp.innerHTML="<div class='fi'><h2>Post a Flyer</h2><p class='fnote'>Fill in the title below, add whatever else you know, and submit — an admin reviews every flyer before it goes live on the board, so it's fine to leave fields blank for now and fix them later.</p><label>Title *</label><input id='ft' type='text' placeholder='e.g. Japantown Night Market'><p class='fnote'>The only field you have to fill in.</p><label>Category</label><select id='fcat'></select><p class='fnote' id='fcatNote'>Loading the full category list…</p>"+hoodField+"<label>When</label><input id='fw' type='text' placeholder='e.g. Saturdays 10am-2pm'><p class='fnote'>Free text people will read, like hours or a schedule.</p><label>Date or recurrence</label><select id='fdate'><option value=''>None</option><option value='today'>Today</option><option value='daily'>Every Day</option><option value='mon'>Mondays</option><option value='tue'>Tuesdays</option><option value='wed'>Wednesdays</option><option value='thu'>Thursdays</option><option value='fri'>Fridays</option><option value='sat'>Saturdays</option><option value='sun'>Sundays</option><option value='monthly'>First Friday Monthly</option></select><p class='fnote'>Controls when this shows as live on the board - pick the closest match, or leave it as None.</p><label>Address (optional)</label><input id='fa' type='text' placeholder='e.g. 87 N San Pedro St San Jose CA'><p class='fnote'>Skip this if you'd rather set an exact spot on the map below.</p><label>Phone</label><input id='fph' type='text' placeholder='(408) 555-0100'><label>Website</label><input id='fws' type='text' placeholder='https://'><label>Description</label><textarea id='fd' placeholder='Tell people what this is...'></textarea><label>Parking</label><input id='fpk' type='text' placeholder='e.g. ParkSJ garage 90 min free'><label>Transit</label><input id='ftr' type='text' placeholder='e.g. VTA Route 68, 5 min walk'>"+pinStepHtml()+"<div class='facts'><button class='bcan' id='frmCan'>Cancel</button><button class='bsub' id='frmSub'>Submit for Review</button></div></div>";
   document.getElementById("fcat").dataset.defCat=defCat||"";
   renderCategoryOptions(defCat);
+  initPinStep();
   document.getElementById("frmCan").onclick=cls;
   document.getElementById("frmSub").onclick=subForm;
   document.getElementById("frmOv").classList.add("on");
@@ -1631,7 +1724,7 @@ function openForm(defCat){
 function subForm(){
   var t=document.getElementById("ft").value.trim();
   var a=document.getElementById("fa").value.trim();
-  if(!t||!a){alert("Please add a title and address.");return;}
+  if(!t){alert("Please add a title.");return;}
   var eid=document.getElementById("frmPanel").dataset.eid;
   if(!eid){submitFlyerToSupabase(t,a);return;}
 
@@ -1677,6 +1770,12 @@ function submitFlyerToSupabase(t,a){
   if(parking)detailsParts.push("Parking: "+parking);
   if(transit)detailsParts.push("Transit: "+transit);
 
+  // A manually-placed pin always wins over the neighborhood-center
+  // fallback - it's a precise, admin-reviewable location instead of a
+  // coarse guess, exactly what this step exists to let someone provide.
+  var pinLat=fPinCoords?fPinCoords.lat:(loc?loc.lat:null);
+  var pinLng=fPinCoords?fPinCoords.lng:(loc?loc.lng:null);
+
   var payload={
     type:"event",name:t,location:a,
     category_id:categoryIsReal?(categoryId||null):null,
@@ -1684,8 +1783,12 @@ function submitFlyerToSupabase(t,a){
     event_date:isSpecificDate?dateVal:null,
     website_url:normalizeUrl(website)||null,
     details:detailsParts.join(" · ")||null,
-    lat:loc?loc.lat:null,lng:loc?loc.lng:null
+    lat:pinLat,lng:pinLng,
+    location_verified_at:fPinCoords?new Date().toISOString():null
   };
+
+  var vendorToggle=document.getElementById("fPinVendorToggle");
+  var alsoUpdateVendor=!!(fPinCoords&&vendorToggle&&vendorToggle.checked&&fPinVendorSession);
 
   var submitBtn=document.getElementById("frmSub");
   if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="Submitting…";}
@@ -1695,8 +1798,19 @@ function submitFlyerToSupabase(t,a){
     body:JSON.stringify(payload)
   }).then(function(res){
     if(!res.ok)throw new Error("submit failed");
+    // Best-effort - the flyer submission above already succeeded and is
+    // what the "Thanks!" message confirms, so a failure updating the
+    // vendor's own profile location here doesn't roll anything back or
+    // block the success message; it just silently skips that extra step.
+    if(alsoUpdateVendor){
+      fetch(V2_SUPABASE_URL+"/rest/v1/vendors?id=eq."+encodeURIComponent(fPinVendorSession.userId),{
+        method:"PATCH",
+        headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+fPinVendorSession.accessToken,"Content-Type":"application/json",Prefer:"return=minimal"},
+        body:JSON.stringify({lat:pinLat,lng:pinLng,location_verified_at:new Date().toISOString()})
+      }).then(function(){});
+    }
     cls();
-    alert("Thanks! Your flyer was submitted and will appear here once an admin approves it.");
+    alert("Thanks! Your flyer was submitted and will appear here once an admin approves it."+(alsoUpdateVendor?" Your business's map location was updated too.":""));
   }).catch(function(){
     if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="Submit for Review";}
     alert("Sorry, something went wrong submitting your flyer. Please try again.");

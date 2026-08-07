@@ -78,6 +78,8 @@ export interface Vendor {
   relationship_status: RelationshipStatus | null;
   last_contact_date: string | null;
   next_followup_date: string | null;
+  location_verified_at: string | null;
+  is_test_account: boolean;
   created_at: string;
   updated_at: string;
 }

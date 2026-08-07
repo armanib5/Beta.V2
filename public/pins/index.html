@@ -25,8 +25,9 @@
   <div id="loginGate" style="display:none;">
     <div class="sb-notice">
       <h2>Log in required</h2>
-      <p id="loginGateMsg">This page edits YOUR business's own pin, so we need to know who you are first.</p>
+      <p id="loginGateMsg">This page moves an existing vendor account's pin, so we need to know who you are first.</p>
       <p><a href="/vendor/login" style="color:#daB870;">Log In</a> — then come back to this page.</p>
+      <p style="margin-top:14px;font-size:13px;">Not a vendor yet? <a href="/vendor/signup" style="color:#daB870;">Create your free listing</a> first — you'll be able to place your pin right after.</p>
     </div>
   </div>
 
@@ -59,8 +60,8 @@
 </div>
 
 <script src="../map/vendor/leaflet/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/v2-supabase-config.js?v=1"></script>
-<script src="js/pins.js?v=3"></script>
+<script src="../shared/next-auth-bridge.js?v=1"></script>
+<script src="js/pins.js?v=4"></script>
 </body>
 </html>
