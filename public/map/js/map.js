@@ -567,6 +567,75 @@ function addNoticeCircle(n) {
   circle.bindPopup(html, { maxWidth: 280 });
 }
 
+/* Event Zones (booth/boundary system built in the Admin Event Zone editor)
+   had no public renderer anywhere on the site - admins could trace a real
+   footprint, place booths/stages/gates, and save it, but a visitor had no
+   way to ever see it. This is that renderer: read-only, always-on like
+   Public Notices above, since a festival footprint is useful context
+   whether or not a visitor has filtered to a specific category. Only
+   events with a traced `event_boundary` (points_geo) render anything -
+   the older percentage-grid layout (e.g. the Farmers Market) has no real
+   lat/lng and was never meant to appear here. */
+var EVENT_ZONE_FEATURE_ICON = {
+  stage: "\u{1F3A4}", seating: "\u{1FA91}", food: "\u{1F354}", bar: "\u{1F37A}",
+  gate: "\u{1F6AA}", entrance: "\u{27A1}\u{FE0F}", exit: "\u{1F3C3}",
+  info: "\u{2139}\u{FE0F}", restroom: "\u{1F6BB}"
+};
+var EVENT_ZONE_FEATURE_LABEL = {
+  stage: "Stage", seating: "Seating", food: "Food", bar: "Bar", gate: "Gate",
+  entrance: "Entrance", exit: "Exit", info: "Information Booth", restroom: "Restroom"
+};
+
+function eventZoneMarkerIcon(glyph) {
+  return L.divIcon({
+    className: "",
+    html: '<div style="width:26px;height:26px;border-radius:50%;background:#1e293b;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;">' + glyph + '</div>',
+    iconSize: [26, 26], iconAnchor: [13, 13]
+  });
+}
+
+function loadEventZones() {
+  if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
+  var headers = { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY };
+  return Promise.all([
+    fetch(V2_SUPABASE_URL + "/rest/v1/zone_boundaries?boundary_type=eq.event_boundary&points_geo=not.is.null&select=id,event_id,label,points_geo,lov_entries(name)", { headers: headers }).then(function (r) { return r.json(); }),
+    fetch(V2_SUPABASE_URL + "/rest/v1/zone_features?select=*", { headers: headers }).then(function (r) { return r.json(); }),
+    fetch(V2_SUPABASE_URL + "/rest/v1/booths?select=*&lat=not.is.null&lng=not.is.null", { headers: headers }).then(function (r) { return r.json(); })
+  ]).then(function (results) {
+    var boundaries = Array.isArray(results[0]) ? results[0] : [];
+    var features = Array.isArray(results[1]) ? results[1] : [];
+    var booths = Array.isArray(results[2]) ? results[2] : [];
+    boundaries.forEach(function (b) {
+      if (!b.points_geo || b.points_geo.length < 3) return;
+      addEventBoundaryPolygon(b);
+      features.filter(function (f) { return f.event_id === b.event_id; }).forEach(addEventFeatureMarker);
+      booths.filter(function (bo) { return bo.event_id === b.event_id; }).forEach(addEventBoothMarker);
+    });
+  }).catch(function () {});
+}
+
+function addEventBoundaryPolygon(b) {
+  var latlngs = b.points_geo.map(function (p) { return [p.lat, p.lng]; });
+  var eventName = (b.lov_entries && b.lov_entries.name) || b.label || "Event Zone";
+  var poly = L.polygon(latlngs, {
+    color: "#dc2626", weight: 2, dashArray: "6 4", fillColor: "#dc2626", fillOpacity: 0.08
+  }).addTo(map);
+  poly.bindTooltip(eventName + " — Event Zone", { sticky: true });
+}
+
+function addEventFeatureMarker(f) {
+  var glyph = EVENT_ZONE_FEATURE_ICON[f.feature_type] || "\u{1F4CD}";
+  var label = EVENT_ZONE_FEATURE_LABEL[f.feature_type] || f.feature_type;
+  var marker = L.marker([f.lat, f.lng], { icon: eventZoneMarkerIcon(glyph) }).addTo(map);
+  marker.bindPopup("<strong>" + escapeHtml(label) + "</strong>" + (f.label ? "<br>" + escapeHtml(f.label) : ""));
+}
+
+function addEventBoothMarker(bo) {
+  var statusLabel = bo.status === "open" ? "Open" : bo.status === "reserved" ? "Reserved" : "Occupied";
+  var marker = L.marker([bo.lat, bo.lng], { icon: eventZoneMarkerIcon("\u{1F3EA}") }).addTo(map);
+  marker.bindPopup("<strong>Booth " + escapeHtml(String(bo.booth_number != null ? bo.booth_number : bo.label)) + "</strong><br>" + statusLabel);
+}
+
 /* A vendor's "Find on Our Map" button lands here with ?q=<name> instead
    of jumping straight to /pins/ to create a new pin - this runs the same
    search the search box does (now that live-approved pins are loaded)
@@ -931,6 +1000,7 @@ function initMap() {
   loadLovVendors();
   loadVendorPins();
   loadPublicNotices();
+  loadEventZones();
   checkAdminPendingBadge();
   setInterval(checkAdminPendingBadge, 45000);
 
