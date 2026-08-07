@@ -53,6 +53,28 @@ function toggleFav(id) {
    via My Dashboard regardless of visibility, so submitting doesn't feel
    like it vanished. */
 function isVendorVisible(v) { return v.status === "approved" && v.active !== false; }
+
+/* Same reasoning as app.js's canEditFlyer(): a real Supabase-backed
+   vendor ("vendor-"+id) or guest LOV listing ("lov-"+id) synced in here
+   gets overwritten again by the next loadRealVendors()/loadLovVendors()
+   fetch regardless of what this device saves locally, so showing Edit to
+   every visitor was never a data-integrity risk - but it's still a real
+   permissions/UX bug on its own (looks editable, "saves" successfully,
+   then silently reverts). Admin, this device's own claimed listing
+   (isMyVendor - the same check the "My Vendor Dashboard" already uses),
+   or a real vendor's own authenticated session may edit; everyone else
+   just sees the read-only profile. */
+function canEditVendor(v) {
+  try {
+    var raw = window.localStorage.getItem("citypinned_session_hint");
+    var hint = raw ? JSON.parse(raw) : null;
+    if (hint && hint.signedIn && hint.isAdmin) return true;
+  } catch (e) {}
+  if (typeof isMyVendor === "function" && isMyVendor(v.id)) return true;
+  if (typeof readNextAuthSession !== "function") return false;
+  var session = readNextAuthSession();
+  return !!(session && v.id === "vendor-" + session.userId);
+}
 function vendorEvents(v) {
   return (v.events || []).map(function (id) {
     return evts.find(function (e) { return e.id === id; });
@@ -182,15 +204,19 @@ function openVendorDetail(id, fromEventId) {
   var dirBtn = document.createElement("a"); dirBtn.className = "ab green"; dirBtn.target = "_blank";
   dirBtn.href = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(v.address || v.name);
   dirBtn.textContent = "Directions";
-  var editBtn = document.createElement("button"); editBtn.className = "ab dark"; editBtn.textContent = "Edit";
-  editBtn.addEventListener("click", function () { openVendorForm(v.cat, v.id); });
   var promoBtn = document.createElement("button"); promoBtn.className = "ab green"; promoBtn.textContent = "🚀 Promote";
   promoBtn.addEventListener("click", function () { openPromoPicker(v.id); });
   var msgBtn = document.createElement("button"); msgBtn.className = "ab gray"; msgBtn.disabled = true;
   msgBtn.style.opacity = ".5"; msgBtn.textContent = "Message (Coming Soon)";
   var reportBtn = document.createElement("button"); reportBtn.className = "ab gray"; reportBtn.textContent = "Report";
   reportBtn.addEventListener("click", function () { openReportForm("vendor", v.id, v.name); });
-  btns.appendChild(favBtn); btns.appendChild(shareBtn); btns.appendChild(mapBtn2); btns.appendChild(dirBtn); btns.appendChild(editBtn); btns.appendChild(promoBtn); btns.appendChild(msgBtn); btns.appendChild(reportBtn);
+  btns.appendChild(favBtn); btns.appendChild(shareBtn); btns.appendChild(mapBtn2); btns.appendChild(dirBtn);
+  if (canEditVendor(v)) {
+    var editBtn = document.createElement("button"); editBtn.className = "ab dark"; editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", function () { openVendorForm(v.cat, v.id); });
+    btns.appendChild(editBtn);
+  }
+  btns.appendChild(promoBtn); btns.appendChild(msgBtn); btns.appendChild(reportBtn);
   body.appendChild(btns);
 
   dp.appendChild(body);
