@@ -44,6 +44,7 @@ const STATUS_STYLES: Record<LovEntry["status"], string> = {
   pending: "bg-amber-100 text-amber-800",
   draft: "bg-slate-200 text-slate-700",
   archived: "bg-red-100 text-red-800",
+  rejected: "bg-red-100 text-red-800",
 };
 
 function toCsv(rows: Row[]): string {

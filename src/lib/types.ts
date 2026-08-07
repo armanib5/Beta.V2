@@ -135,8 +135,18 @@ export interface LovEntry {
   updated_at: string;
 }
 
-export type FlyerStatus = "active" | "draft" | "pending" | "archived";
+export type FlyerStatus = "active" | "draft" | "pending" | "archived" | "rejected";
 export type FlyerBoard = "master" | "weekly" | "today";
+
+export interface LovStatusLog {
+  id: string;
+  lov_entry_id: string;
+  old_status: string | null;
+  new_status: string;
+  reviewer_email: string | null;
+  reason: string | null;
+  changed_at: string;
+}
 
 export interface FlyerRotation {
   id: string;

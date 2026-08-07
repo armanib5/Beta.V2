@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { logActivity } from "@/lib/activity";
-import type { Category, FlyerBoard, FlyerRotation, FlyerStatus, LovEntry, Vendor } from "@/lib/types";
+import type { Category, FlyerBoard, FlyerRotation, FlyerStatus, LovEntry, LovStatusLog, Vendor } from "@/lib/types";
 import { FlyerCropEditor } from "@/components/flyer-crop-editor";
 
 const MAX_FLYER_PHOTO_BYTES = 8 * 1024 * 1024;
@@ -31,6 +31,11 @@ export default function AdminFlyersPage() {
   const [flyers, setFlyers] = useState<LovEntry[]>([]);
   const [rotations, setRotations] = useState<FlyerRotation[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
+  const [historyOpenId, setHistoryOpenId] = useState<string | null>(null);
+  const [statusLog, setStatusLog] = useState<Record<string, LovStatusLog[]>>({});
+  const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null);
 
   const [flyerId, setFlyerId] = useState("");
   const [board, setBoard] = useState<FlyerBoard>("weekly");
@@ -126,15 +131,52 @@ export default function AdminFlyersPage() {
   const flyerById = useMemo(() => new Map(flyers.map((f) => [f.id, f])), [flyers]);
   const pendingFlyers = useMemo(() => flyers.filter((f) => f.status === "pending"), [flyers]);
 
-  async function setFlyerStatus(id: string, next: FlyerStatus) {
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
+  }
+
+  async function setFlyerStatus(id: string, next: FlyerStatus, reason?: string) {
     setError(null);
     const supabase = createClient();
+    const flyer = flyerById.get(id);
+    const oldStatus = flyer?.status ?? null;
     const { error: updateError } = await supabase.from("lov_entries").update({ status: next }).eq("id", id);
     if (updateError) {
       setError(updateError.message);
       return;
     }
     setFlyers((prev) => prev.map((f) => (f.id === id ? { ...f, status: next } : f)));
+    const { data: userData } = await supabase.auth.getUser();
+    const { data: logRow } = await supabase
+      .from("lov_status_log")
+      .insert({
+        lov_entry_id: id,
+        old_status: oldStatus,
+        new_status: next,
+        reviewer_email: userData.user?.email ?? null,
+        reason: reason?.trim() || null,
+      })
+      .select("*")
+      .single<LovStatusLog>();
+    if (logRow) {
+      setStatusLog((prev) => ({ ...prev, [id]: [logRow, ...(prev[id] ?? [])] }));
+    }
+    flash(`✓ ${flyer?.name ?? "Flyer"} marked ${next}`);
+  }
+
+  async function loadStatusLog(id: string) {
+    if (statusLog[id]) return;
+    setLoadingHistoryId(id);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("lov_status_log")
+      .select("*")
+      .eq("lov_entry_id", id)
+      .order("changed_at", { ascending: false })
+      .returns<LovStatusLog[]>();
+    setStatusLog((prev) => ({ ...prev, [id]: data ?? [] }));
+    setLoadingHistoryId(null);
   }
 
   async function addAssignment(e: React.FormEvent) {
@@ -253,6 +295,7 @@ export default function AdminFlyersPage() {
         date). The board rolls over automatically at midnight — no manual refresh needed.
       </p>
 
+      {toast && <p role="status" aria-live="polite" className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">{toast}</p>}
       {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
 
       {pendingFlyers.length > 0 && (
@@ -268,7 +311,7 @@ export default function AdminFlyersPage() {
                 <p className="text-sm font-bold text-slate-900">{f.name}</p>
                 <p className="mt-0.5 text-xs text-slate-600">{f.location || "No address given"}</p>
                 {f.details && <p className="mt-1 text-xs text-slate-500">{f.details}</p>}
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setFlyerStatus(f.id, "active")}
@@ -276,9 +319,19 @@ export default function AdminFlyersPage() {
                   >
                     ✓ Approve
                   </button>
+                  <input
+                    type="text"
+                    placeholder="Reason (optional)"
+                    value={rejectReason[f.id] ?? ""}
+                    onChange={(e) => setRejectReason((prev) => ({ ...prev, [f.id]: e.target.value }))}
+                    className="w-40 rounded-full border border-slate-300 px-2.5 py-1 text-xs"
+                  />
                   <button
                     type="button"
-                    onClick={() => setFlyerStatus(f.id, "archived")}
+                    onClick={() => {
+                      setFlyerStatus(f.id, "rejected", rejectReason[f.id]);
+                      setRejectReason((prev) => ({ ...prev, [f.id]: "" }));
+                    }}
                     className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-200"
                   >
                     ✕ Reject
@@ -468,6 +521,17 @@ export default function AdminFlyersPage() {
                       ✏️ Crop
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = historyOpenId === f.id ? null : f.id;
+                      setHistoryOpenId(next);
+                      if (next) loadStatusLog(f.id);
+                    }}
+                    className="rounded-full border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    🗂 History
+                  </button>
                   <select
                     value={f.status}
                     onChange={(e) => setFlyerStatus(f.id, e.target.value as FlyerStatus)}
@@ -477,9 +541,33 @@ export default function AdminFlyersPage() {
                     <option value="pending">Pending</option>
                     <option value="draft">Draft</option>
                     <option value="archived">Archived</option>
+                    <option value="rejected">Rejected</option>
                   </select>
                 </div>
               </div>
+
+              {historyOpenId === f.id && (
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <p className="text-xs font-semibold text-slate-700">Approval History</p>
+                  {loadingHistoryId === f.id && <p className="mt-1 text-xs text-slate-500">Loading…</p>}
+                  {loadingHistoryId !== f.id && (statusLog[f.id]?.length ?? 0) === 0 && (
+                    <p className="mt-1 text-xs text-slate-500">No status changes logged yet.</p>
+                  )}
+                  {(statusLog[f.id]?.length ?? 0) > 0 && (
+                    <ul className="mt-1 space-y-1 text-xs text-slate-600">
+                      {statusLog[f.id]!.map((entry) => (
+                        <li key={entry.id}>
+                          {entry.old_status ? `${entry.old_status} → ` : ""}
+                          <strong>{entry.new_status}</strong>
+                          {entry.reviewer_email ? ` by ${entry.reviewer_email}` : ""} —{" "}
+                          {new Date(entry.changed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                          {entry.reason ? ` — "${entry.reason}"` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
 
               {editingFlyerId === f.id && (
                 <div className="mt-3 grid gap-4 border-t border-slate-100 pt-3 sm:grid-cols-2">
