@@ -337,24 +337,36 @@ function applySharedAnchorOnLoad(){
    the database - exactly what was happening to every real flyer before
    this fix. Only gives up (and offers to create one) after both of the
    loaders that populate evts have had their turn. */
-var openFlyerTitle=null,openFlyerAttempts=0;
+/* ?flyerId=<lov_entries id> is the stable link - Calendar/Map/Directory all
+   pass the real id now, so linking never breaks because a display title
+   doesn't match byte-for-byte. ?openFlyer=<title> is kept only so old
+   shared/bookmarked links (or anything still built off just a name) keep
+   working - tried second, and only that path ever offers to create a new
+   flyer, since a stable id that doesn't resolve means the event genuinely
+   isn't there (deleted/archived), not that it needs to be created. */
+var openFlyerQuery=null,openFlyerAttempts=0;
 function openFlyerFromQuery(){
-  if(openFlyerTitle===undefined)return;
-  if(openFlyerTitle===null){
+  if(openFlyerQuery===undefined)return;
+  if(openFlyerQuery===null){
     var params=new URLSearchParams(location.search);
-    openFlyerTitle=params.get("openFlyer")||undefined;
-    if(!openFlyerTitle)return;
+    var id=params.get("flyerId"),title=params.get("openFlyer");
+    if(!id&&!title){openFlyerQuery=undefined;return;}
+    openFlyerQuery={id:id,title:title};
   }
   openFlyerAttempts++;
-  var match=evts.find(function(e){return e.t.toLowerCase()===openFlyerTitle.toLowerCase();});
-  if(match){openDetail(match.id);openFlyerTitle=undefined;return;}
+  var match=openFlyerQuery.id
+    ?evts.find(function(e){return e.flyerId===openFlyerQuery.id;})
+    :evts.find(function(e){return e.t.toLowerCase()===openFlyerQuery.title.toLowerCase();});
+  if(match){openDetail(match.id);openFlyerQuery=undefined;return;}
   if(openFlyerAttempts>=2){
-    var wantsToCreate=confirm("Couldn't find a flyer titled \""+openFlyerTitle+"\" on the Board yet.\n\nPost one now with this title pre-filled?");
-    if(wantsToCreate){
-      openForm("");
-      setTimeout(function(){var ft=document.getElementById("ft");if(ft)ft.value=openFlyerTitle;},50);
+    if(!openFlyerQuery.id){
+      var wantsToCreate=confirm("Couldn't find a flyer titled \""+openFlyerQuery.title+"\" on the Board yet.\n\nPost one now with this title pre-filled?");
+      if(wantsToCreate){
+        openForm("");
+        setTimeout(function(){var ft=document.getElementById("ft");if(ft)ft.value=openFlyerQuery.title;},50);
+      }
     }
-    openFlyerTitle=undefined;
+    openFlyerQuery=undefined;
   }
 }
 

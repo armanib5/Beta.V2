@@ -275,7 +275,7 @@ function EventCard({ event, category }: { event: LovEntry; category?: Category }
           <span className="mt-1 block text-xs font-semibold text-amber-600">🏆 Top Booth event</span>
         )}
         <a
-          href={`${BASE_PATH}/board/?openFlyer=${encodeURIComponent(event.name)}`}
+          href={`${BASE_PATH}/board/?flyerId=${encodeURIComponent(event.id)}`}
           className="mt-2 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
         >
           🗒️ View Flyer on the Board

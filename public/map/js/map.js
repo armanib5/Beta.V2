@@ -173,7 +173,7 @@ function showFullDetail(id) {
   html += '<div class="dbtnrow">';
   html += '<a class="bp-btn blue" href="' + mu + '" target="_blank" rel="noopener">Directions</a>';
   if (p.wb) html += '<a class="bp-btn purple" href="' + p.wb + '" target="_blank" rel="noopener">Website</a>';
-  html += '<a class="bp-btn gold" href="../board/index.html?openFlyer=' + encodeURIComponent(p.t) + '">View/Edit on Board</a>';
+  html += '<a class="bp-btn gold" href="../board/index.html?' + (p.flyerId ? "flyerId=" + encodeURIComponent(p.flyerId) : "openFlyer=" + encodeURIComponent(p.t)) + '">View/Edit on Board</a>';
   html += '<button class="bp-btn gray" onclick="openReportForm(\'' + p.id + '\', \'' + p.t.replace(/'/g, "&#39;") + '\')" title="Report Listing / Unauthorized Pin">🚩 Report</button>';
   html += '</div>';
   document.getElementById("detailPanel").innerHTML = html;
@@ -378,7 +378,7 @@ function loadLovEvents() {
       var slug = r.categories ? r.categories.slug : null;
       var cat = (slug && LOV_CAT_SLUG_TO_MAP[slug]) || (r.recurrence ? "market" : "seasonal");
       var place = {
-        id: "lov-" + r.id, cat: cat, hood: hood,
+        id: "lov-" + r.id, flyerId: r.id, cat: cat, hood: hood,
         t: r.name, a: r.location || "", ds: r.recurrence || "",
         lat: lat, lng: lng, wb: r.website_url || undefined,
         flyer: r.flyer_image_url || null
@@ -420,7 +420,7 @@ function loadLovVendors() {
       var slug = r.categories ? r.categories.slug : null;
       var cat = (slug && LOV_CAT_SLUG_TO_MAP[slug]) || "market";
       var place = {
-        id: id, cat: cat, hood: hood,
+        id: id, flyerId: r.id, cat: cat, hood: hood,
         t: r.name, a: r.location || "", ds: r.details || "",
         lat: lat, lng: lng, wb: r.website_url || undefined,
         flyer: r.flyer_image_url || null
