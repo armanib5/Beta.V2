@@ -74,98 +74,7 @@ function sortByProximity(list,getLat,getLng){
     return haversine(anchor.lat,anchor.lng,la,getLng(a))-haversine(anchor.lat,anchor.lng,lb,getLng(b));
   });
 }
-var DEF=[
-{id:"fm",cat:"market",lbl:"Weekly Market",exp:false,
- t:"Downtown SJ Farmers Market",w:"Wednesdays 9:00am - 1:30pm",d:"wed",
- a:"101 Paseo de San Antonio, San Jose, CA 95113",ph:"(408) 555-0100",wb:"https://downtownsanjosefarmersmarket.com",
- ds:"One of downtown San Jose's most beloved weekly traditions. Over 20 local farms and vendors every Wednesday on Paseo de San Antonio.",
- tags:["Produce","Weekly","Free Entry","Dog Friendly"],photo:"",g:[],mx:420,my:434,ed:"",ms:"",
- pk:"ParkSJ garage 90 min free. Entrances on 2nd and 3rd Street.",
- tr:"VTA Light Rail Convention Center stop 5 min walk. Routes 68 522.",
- ac:"Fully accessible. Wide pathways accessible parking.",
- fam:"Family friendly stroller-friendly.",
- fp:"2 min walk",fd:"18 min walk or 5 min ride",
- vg:[
-  {g:"Farmers",items:["Xiong Farms - Asian veggies","Lopez Family Farm - conventional fruits","Bay Fresh - strawberries","Green Mix Ranch - organic veggies"]},
-  {g:"Packaged Food",items:["California Bakeshop - artisanal bakery cookies empanadas","Brothers Products SF - hummus yogurt","Hurno - pastries","Mango Blossom Apiary - honey","Baby Tiger Bakery - conchas baked goods","Valley Toffee LLC - multi-variety toffee"]},
-  {g:"Hot Food",items:["Dumpling King - dumplings","Chikens Tamales - tamales vegan empanadas","Thai Street Food - satay papaya salad thai tea","Jadens Kettle Corn","Cuisina Express - Filipino food"]},
-  {g:"Arts and Crafts",items:["Sea Moss Healing - sea moss soaps","Plant Code - essential oils 2nd 4th Wed","Starme - handmade clothes"]}
- ]},
-{id:"sm",cat:"foodhall",lbl:"Food Hall Daily",exp:false,
- t:"SoFA Market",w:"Open Daily 11am - 9pm",d:"daily",
- a:"387 S 1st St, San Jose, CA 95113",ph:"(408) 642-5270",wb:"https://sofamarketsj.com",
- ds:"A permanent downtown food hall with multiple restaurants and a craft cocktail bar in the SoFA District.",
- tags:["Food Hall","Daily","Permanent","Bar","Outdoor Seating"],photo:"",g:[],mx:480,my:572,ed:"",ms:"",
- pk:"Street parking on 1st and 2nd. ParkSJ on 2nd Street.",
- tr:"VTA Route 65 68 on 1st Street. 10 min walk from Convention Center.",
- ac:"Accessible entrance on S 1st Street.",fam:"Family friendly.",
- fp:"6 min walk south",fd:"22 min walk or 6 min ride",
- vg:[
-  {g:"Restaurants",items:["Vietnoms - pho banh mi Vietnamese Ste 121","3 Hermanos Mexican - tacos burritos cocktail bar 105","Pizzeria Rosa Maria - wood-fired pizza 104","Umi Hand Roll Bar - sushi outdoor seating","Habana Cuba Restaurant - Cuban classics closed Mondays","Iscu Tea - temporarily closed"]},
-  {g:"Bar",items:["Fountainhead Bar - craft cocktails back of SoFA Noon-9pm"]}
- ]},
-{id:"wc",cat:"seasonal",lbl:"World Cup Free",exp:false,
- t:"Soccer Celebration - World Cup Watch Party",w:"June 11 - July 19 All 104 matches live",d:"today",
- a:"San Pedro Square Market, 87 N San Pedro St, San Jose, CA 95110",ph:"(408) 792-3033",wb:"https://sanpedrosquaremarket.com",
- ds:"Bay Areas largest free World Cup watch party. All 104 FIFA World Cup 2026 matches live on multiple jumbo screens. Official San Jose USA Soccer watch party location.",
- tags:["Free","World Cup","Watch Party","All Matches"],photo:"",g:[],mx:200,my:248,ed:"2026-07-19",ms:"",
- pk:"San Pedro Street garage nearby.",tr:"VTA Route 522 on Santa Clara.",
- ac:"Accessible open air market.",fam:"Very family friendly all ages welcome.",
- fp:"12 min walk north",fd:"22 min walk or 6 min ride",vg:[]},
-{id:"aw",cat:"seasonal",lbl:"Monthly Art Walk",exp:false,
- t:"South First Fridays ArtWalk",w:"First Friday Monthly 5pm - 9pm",d:"monthly",
- a:"South 1st Street, SoFA District, San Jose, CA",ph:"",wb:"https://southfirstfridays.com",
- ds:"Free self-guided evening art walk through downtown galleries museums live music and pop-up art installations.",
- tags:["Art","Music","Free","Monthly","All Ages"],photo:"",g:[],mx:480,my:568,ed:"",
- ms:"Confirming gallery list vendor lineup beer garden vintage market this month.",
- pk:"Street parking on S 1st 2nd 3rd. Free after 6pm in many garages.",
- tr:"VTA Route 65 68. Walk south from Convention Center light rail.",
- ac:"Most galleries fully accessible.",fam:"100 percent family friendly.",
- fp:"8 min walk south",fd:"24 min walk or 7 min ride",vg:[]},
-{id:"gs",cat:"cityart",lbl:"City Art On View",exp:false,
- t:"Gaiascope at Circle of Palms",w:"May 22 - Aug 18 2026 Always open",d:"",
- a:"Circle of Palms Plaza, 127 S Market St, San Jose, CA 95113",ph:"",wb:"https://www.sanjoseca.gov",
- ds:"Three suspended kaleidoscope sculptures by artist Brooke Einbender at Circle of Palms Plaza next to Plaza de Cesar Chavez.",
- tags:["Public Art","Free","Always Open","Outdoor"],photo:"",g:[],mx:342,my:498,ed:"2026-08-18",ms:"",
- pk:"Market Street garage one block north.",tr:"VTA Convention Center stop 2 min walk.",
- ac:"Fully accessible outdoor plaza.",fam:"Very family friendly.",
- fp:"1 min walk adjacent",fd:"20 min walk or 5 min ride",vg:[]},
-{id:"j4",cat:"seasonal",lbl:"4th of July",exp:false,
- t:"4th of July Downtown Events",w:"Friday July 4 2026 Various times",d:"2026-07-04",
- a:"Downtown San Jose, CA Multiple Locations",ph:"",wb:"https://www.sanjoseca.gov",
- ds:"Independence Day celebrations across downtown San Jose. Fireworks live music food vendors and family activities.",
- tags:["Seasonal","Fireworks","Free","Annual","Family"],photo:"",g:[],mx:420,my:468,ed:"2026-07-04",
- ms:"Full schedule not confirmed. Check sanjoseca.gov.",
- pk:"Arrive early. Many garages free on holiday.",tr:"Take VTA extra service on holiday.",
- ac:"Most venues accessible.",fam:"Perfect for families.",
- fp:"At or near Plaza de Cesar Chavez",fd:"20 min walk or 5 min ride",vg:[]},
-{id:"ht",cat:"venue",lbl:"Theater Downtown",exp:false,
- t:"Hammer Theatre Center",w:"Box Office Hours Vary",d:"daily",
- a:"101 Paseo de San Antonio, San Jose, CA 95113",ph:"(408) 924-8501",wb:"https://www.hammertheatre.com",
- ds:"Premier performing arts venue on Paseo de San Antonio. Part of San Jose State University. Hosts theater dance opera and community performances year-round.",
- tags:["Theater","Performing Arts","SJSU","Downtown"],photo:"",g:[],mx:440,my:416,ed:"",ms:"",
- pk:"ParkSJ garages on 2nd and 3rd Street.",tr:"VTA light rail Convention Center stop 5 min walk.",
- ac:"Fully accessible.",fam:"Family friendly events check listings.",
- fp:"3 min walk",fd:"19 min walk",vg:[]},
-{id:"ct",cat:"venue",lbl:"Historic Theater",exp:false,
- t:"California Theatre",w:"Box Office Hours Vary",d:"daily",
- a:"345 S 1st St, San Jose, CA 95113",ph:"(408) 792-4111",wb:"https://www.sanjosetheaters.org",
- ds:"Magnificently restored 1927 Spanish Colonial Revival theater. Home to Opera San Jose and Symphony Silicon Valley.",
- tags:["Theater","Opera","Symphony","Historic","1927"],photo:"",g:[],mx:480,my:553,ed:"",ms:"",
- pk:"Street parking on 1st and 2nd.",tr:"VTA Route 65 68 on 1st Street.",
- ac:"Accessible entrance and seating.",fam:"Family appropriate shows available.",
- fp:"5 min walk south",fd:"20 min walk",vg:[]},
-{id:"cp",cat:"venue",lbl:"Performing Arts",exp:false,
- t:"Center for the Performing Arts",w:"Box Office Hours Vary",d:"daily",
- a:"255 Almaden Blvd, San Jose, CA 95113",ph:"(408) 792-4111",wb:"https://www.sanjosetheaters.org",
- ds:"Major performing arts center hosting Broadway shows concerts dance and cultural performances adjacent to the Convention Center.",
- tags:["Theater","Broadway","Concerts","Dance"],photo:"",g:[],mx:200,my:565,ed:"",ms:"",
- pk:"Adjacent garages. Convention Center garage nearby.",tr:"VTA Convention Center light rail stop 5 min walk.",
- ac:"Fully accessible large venue.",fam:"Many family-friendly shows.",
- fp:"8 min walk",fd:"15 min walk",vg:[]}
-];
-
-var KEY="pinnedsj-v9",evts=[],mS=1,mX=0,mY=0,pan=false,ps={x:0,y:0};
+var KEY="pinnedsj-v10",evts=[],mS=1,mX=0,mY=0,pan=false,ps={x:0,y:0};
 /* Public flyer self-submission - one flag, easy to toggle either way. */
 var SHOW_POST_FLYER=true;
 
@@ -421,9 +330,14 @@ function setupBgParallax(){
   bindStripParallax(document.getElementById("corkTop10List"));
 }
 
+/* Used to fall back to a hardcoded array of V1-era placeholder events
+   (a fake "South First Fridays ArtWalk" among them) whenever localStorage
+   was empty - a first-time visitor saw fake events mixed permanently
+   into their local cache instead of the real ones loadLovEvents() merges
+   in a moment later. Starts empty now; real data always wins. */
 function load(){
-  try{var r=localStorage.getItem(KEY);evts=r?JSON.parse(r):JSON.parse(JSON.stringify(DEF));}
-  catch(e){evts=JSON.parse(JSON.stringify(DEF));}
+  try{var r=localStorage.getItem(KEY);evts=r?JSON.parse(r):[];}
+  catch(e){evts=[];}
   expire();
 }
 
