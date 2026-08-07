@@ -199,6 +199,40 @@ export default function AdminFlyersPage() {
     flash(`✓ Deleted ${f.name}`);
   }
 
+  // Exact name match only (case-insensitive/trimmed) - matches the
+  // existing DB-level dedupe precedent (migrations 0005/0058), which is
+  // also exact-match. Never auto-applied: this only surfaces a
+  // suggestion for the admin to confirm, since silently merging two
+  // different real events that happen to share a name would be worse
+  // than leaving a flyer's photo empty.
+  function findPossibleSourceFlyer(f: LovEntry): LovEntry | null {
+    const target = f.name.trim().toLowerCase();
+    const match = flyers.find(
+      (row) => row.id !== f.id && row.flyer_image_url && row.name.trim().toLowerCase() === target,
+    );
+    return match ?? null;
+  }
+
+  async function copyFromFlyer(target: LovEntry, source: LovEntry) {
+    setError(null);
+    const supabase = createClient();
+    const patch = {
+      flyer_image_url: source.flyer_image_url,
+      flyer_focal_x: source.flyer_focal_x,
+      flyer_focal_y: source.flyer_focal_y,
+      location: target.location || source.location,
+      details: target.details || source.details,
+    };
+    const { error: updateError } = await supabase.from("lov_entries").update(patch).eq("id", target.id);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setFlyers((prev) => prev.map((row) => (row.id === target.id ? { ...row, ...patch } : row)));
+    logActivity(supabase, "event", target.id, target.name, "Copied flyer photo/info from duplicate", `from ${source.name}`);
+    flash(`✓ Copied photo from "${source.name}"`);
+  }
+
   async function addAssignment(e: React.FormEvent) {
     e.preventDefault();
     if (!flyerId) return;
@@ -489,7 +523,9 @@ export default function AdminFlyersPage() {
           A flyer&apos;s own status controls whether it shows up anywhere on the public board at all.
         </p>
         <div className="mt-3 space-y-2">
-          {flyers.map((f) => (
+          {flyers.map((f) => {
+            const sourceFlyer = !f.flyer_image_url ? findPossibleSourceFlyer(f) : null;
+            return (
             <div key={f.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-3">
@@ -572,6 +608,21 @@ export default function AdminFlyersPage() {
                   </button>
                 </div>
               </div>
+
+              {sourceFlyer && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+                  <p className="text-xs text-indigo-800">
+                    A flyer named &quot;{sourceFlyer.name}&quot; already has a photo —
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => copyFromFlyer(f, sourceFlyer)}
+                    className="rounded-full bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                  >
+                    Copy photo + details from it
+                  </button>
+                </div>
+              )}
 
               {historyOpenId === f.id && (
                 <div className="mt-3 border-t border-slate-100 pt-3">
@@ -736,7 +787,8 @@ export default function AdminFlyersPage() {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
