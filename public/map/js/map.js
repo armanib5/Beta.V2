@@ -27,6 +27,9 @@ var map, clusterGroup, userMarker, activeCity = "sj", activeHood = "downtown", a
 var markerById = {};
 var zoneLayers = {};
 var userLoc = null;
+// event_id -> hosting_vendor_id, for every event row regardless of
+// whether it got its own PLACES entry - see loadLovEvents().
+var hostVendorIdByEventId = {};
 
 /* A place is "live" only while its schedule says it's actually happening
    right now (mirrors Baypinned3's isToday/expire logic) - so a Wednesday
@@ -368,6 +371,12 @@ function loadLovEvents() {
     if (!Array.isArray(rows)) return;
     rows.forEach(function (r) {
       if (r.status && r.status !== "active") return;
+      // Captured for every event row regardless of whether it gets a
+      // PLACES entry below - an event hosted at a vendor with no lat/lng
+      // and no section_zone of its own is exactly the case that gets
+      // skipped just below, but "Find Event" still needs to resolve it
+      // to the host's pin, so this can't live on the (possibly-absent) place object.
+      if (r.hosting_vendor_id) hostVendorIdByEventId[r.id] = r.hosting_vendor_id;
       var lat = r.lat, lng = r.lng, hood;
       if (r.section_zone) {
         var bySection = CITY_CENTERS.find(function (c) { return c.section === r.section_zone; });
@@ -609,6 +618,11 @@ function eventZoneMarkerIcon(glyph) {
   });
 }
 
+// Populated by addEventBoundaryPolygon() as each traced zone is drawn -
+// lets "Find Event" look up "does this event have a real zone shape to
+// fit/highlight" in O(1) instead of re-scanning the map's layers.
+var zoneLayerByEventId = {};
+
 function loadEventZones() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
   var headers = { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY };
@@ -636,6 +650,18 @@ function addEventBoundaryPolygon(b) {
     color: "#dc2626", weight: 2, dashArray: "6 4", fillColor: "#dc2626", fillOpacity: 0.08
   }).addTo(map);
   poly.bindTooltip(eventName + " — Event Zone", { sticky: true });
+  zoneLayerByEventId[b.event_id] = poly;
+}
+
+/* Brief pulse on whatever "Find Event" actually landed on (a zone
+   polygon or a marker's icon element) - arriving via flyTo alone gave no
+   feedback about which of several nearby pins/shapes was the actual
+   target. Respects prefers-reduced-motion via the .bp-find-pulse rule in
+   css/style.css, same pattern as the other pulse/blink animations there. */
+function pulseElement(el) {
+  if (!el) return;
+  el.classList.add("bp-find-pulse");
+  setTimeout(function () { el.classList.remove("bp-find-pulse"); }, 1800);
 }
 
 function addEventFeatureMarker(f) {
@@ -1011,15 +1037,13 @@ function initMap() {
   initFilterRow();
   initSearch();
   loadApprovedPins().then(handleSearchQuery);
-  // openEventFromQuery() needs PLACES to already contain the fetched
-  // lov_entries rows, which (unlike the static places.js data
-  // openPlaceFromQuery() checks synchronously below) only exist once
-  // these two fetches resolve - checking PLACES before they land would
-  // silently fail to find a real, freshly-created event every time.
-  var lovDataLoaded = Promise.all([loadLovEvents(), loadLovVendors()]);
-  loadVendorPins();
+  // openEventFromQuery() needs PLACES/zoneLayerByEventId/markerById
+  // already populated from these four fetches (unlike the static
+  // places.js data openPlaceFromQuery() checks synchronously below) -
+  // checking before they land would silently fail to find a real,
+  // freshly-created event, zone, or host-vendor pin every time.
+  var lovDataLoaded = Promise.all([loadLovEvents(), loadLovVendors(), loadVendorPins(), loadEventZones()]);
   loadPublicNotices();
-  loadEventZones();
   checkAdminPendingBadge();
   setInterval(checkAdminPendingBadge, 45000);
 
@@ -1070,8 +1094,8 @@ function initMap() {
    opens straight to that pin instead of defaulting to the location
    prompt, so a flyer's map button always lands on the one real pin
    rather than ever inviting a duplicate submission. */
-function flyToPlace(p) {
-  var loc = nearestHood(p.lat, p.lng);
+function switchToLatLng(lat, lng) {
+  var loc = nearestHood(lat, lng);
   if (loc.city !== activeCity) {
     activeCity = loc.city;
     document.querySelectorAll(".citytab").forEach(function (x) { x.classList.toggle("on", x.dataset.cityId === activeCity); });
@@ -1084,6 +1108,10 @@ function flyToPlace(p) {
     setAreaLabel(hoodObj.l, hoodHasPlaces(hoodObj.id));
     applyFilters();
   }
+}
+
+function flyToPlace(p) {
+  switchToLatLng(p.lat, p.lng);
   flyTo(p.lat, p.lng, 18);
   setTimeout(function () { showFlyer(p); }, 400);
 }
@@ -1100,14 +1128,44 @@ function openPlaceFromQuery() {
 
 /* "Find Event" (Calendar/Board -> Map) - unlike ?showPlace= (a PLACES
    array id), this carries the real lov_entries.id so the destination can
-   be smarter than a bare pin: a traced Event Zone gets fit-to-bounds +
-   highlighted, an event hosted at a vendor with no pin of its own flies
-   to the host's pin instead, and only the plain case falls back to the
-   same flyTo+popup behavior openPlaceFromQuery already uses. */
+   be smarter than a bare pin, in priority order:
+   (a) has a traced Event Zone -> fit the map to its real footprint and
+       pulse the outline, instead of just flying to a single point.
+   (b) no zone, but hosted at a vendor with its own pin -> fly to the
+       host's pin and pulse it, since the event has no location of its
+       own to show.
+   (c) plain pin -> same flyTo+popup behavior openPlaceFromQuery uses. */
 function openEventFromQuery() {
   var params = new URLSearchParams(location.search);
   var eventId = params.get("showEvent");
   if (!eventId) return false;
+
+  var zonePoly = zoneLayerByEventId[eventId];
+  if (zonePoly) {
+    var bounds = zonePoly.getBounds();
+    var center = bounds.getCenter();
+    switchToLatLng(center.lat, center.lng);
+    map.stop();
+    map.fitBounds(bounds, { padding: [40, 40] });
+    setTimeout(function () { pulseElement(zonePoly.getElement ? zonePoly.getElement() : zonePoly._path); }, 300);
+    return true;
+  }
+
+  var hostVendorId = hostVendorIdByEventId[eventId];
+  if (hostVendorId) {
+    var hostMarker = markerById["vendor-" + hostVendorId];
+    if (hostMarker) {
+      var hostLatLng = hostMarker.getLatLng();
+      switchToLatLng(hostLatLng.lat, hostLatLng.lng);
+      flyTo(hostLatLng.lat, hostLatLng.lng, 18);
+      setTimeout(function () {
+        if (hostMarker.bpPlace) showFlyer(hostMarker.bpPlace);
+        pulseElement(hostMarker._icon);
+      }, 400);
+      return true;
+    }
+  }
+
   var p = PLACES.find(function (x) { return x.flyerId === eventId; });
   if (!p) return false;
   flyToPlace(p);
