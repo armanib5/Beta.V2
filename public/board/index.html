@@ -6,7 +6,7 @@
 <title>BayPinned SJ</title>
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Libre+Franklin:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../map/vendor/leaflet/leaflet.css">
-<link rel="stylesheet" href="css/style.css?v=4">
+<link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
 <div class="bg"></div>
@@ -77,32 +77,6 @@
   <div class="tscr" id="corkTop10List" hidden></div>
 </div>
 <main class="boards" id="bView"></main>
-<section id="adminSec" style="max-width:1060px;margin:0 auto;padding:0 14px 20px;display:none;">
-  <div class="sh" style="margin-bottom:6px;"><h2 style="font-family:'Special Elite',monospace;color:var(--cl);font-size:20px;">Admin Dashboard</h2></div>
-  <p style="color:rgba(218,184,112,.5);font-size:12.5px;margin-bottom:14px;">Placeholder admin tools until real accounts/roles exist - anyone with the ?admin=1 link can reach this.</p>
-  <div class="admintabs">
-    <button class="admintab on" data-tab="events" onclick="showAdminTab('events')">Events</button>
-    <button class="admintab" data-tab="vendors" onclick="showAdminTab('vendors')">Vendors</button>
-    <button class="admintab" data-tab="bookings" onclick="showAdminTab('bookings')">Bookings</button>
-    <button class="admintab" data-tab="pricing" onclick="showAdminTab('pricing')">Pricing</button>
-    <button class="admintab" data-tab="hours" onclick="showAdminTab('hours')">Event Hours</button>
-  </div>
-  <div class="admintabpanel" id="adminTabEvents">
-    <div id="adminEventsList" style="display:flex;flex-direction:column;gap:8px;"></div>
-  </div>
-  <div class="admintabpanel" id="adminTabVendors" style="display:none;">
-    <div id="adminList" style="display:flex;flex-direction:column;gap:8px;"></div>
-  </div>
-  <div class="admintabpanel" id="adminTabBookings" style="display:none;">
-    <div id="adminBookingsList" style="display:flex;flex-direction:column;gap:8px;"></div>
-  </div>
-  <div class="admintabpanel" id="adminTabPricing" style="display:none;">
-    <div id="adminPricingForm"></div>
-  </div>
-  <div class="admintabpanel" id="adminTabHours" style="display:none;">
-    <div id="adminHoursForm"></div>
-  </div>
-</section>
 <footer>Pinned SJ &middot; Downtown San Jose &middot; Free for locals &middot; Pay only when you want to be featured</footer>
 </div>
 <div class="ov" id="detOv"><div class="dpanel" id="detPanel"></div></div>
@@ -117,12 +91,12 @@
 <script src="../shared/geo-anchor.js?v=1"></script>
 <script src="../shared/v2-supabase-config.js?v=1"></script>
 <script src="../shared/next-auth-bridge.js?v=1"></script>
-<script src="js/app.js?v=22"></script>
+<script src="js/app.js?v=23"></script>
 <script src="js/storage.js?v=2"></script>
 <script src="data/vendors.js?v=4"></script>
 <script src="js/vendors.js?v=4"></script>
 <script src="js/promo.js?v=3"></script>
-<script src="js/promo-ui.js?v=2"></script>
+<script src="js/promo-ui.js?v=3"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/supabase-config.js"></script>
 <script src="../shared/supabase-client.js"></script>

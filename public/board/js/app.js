@@ -1838,7 +1838,6 @@ function hPin(id){
 function showBoards(){
   document.getElementById("bView").style.display="block";
   document.getElementById("tdwrap").style.display="block";
-  document.getElementById("adminSec").style.display="none";
   document.getElementById("nB").classList.add("on");
   document.getElementById("nM").classList.remove("on");
 }

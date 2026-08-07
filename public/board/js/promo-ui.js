@@ -389,128 +389,7 @@ function updateDashNavVisibility() {
   if (btn) btn.style.display = getMyVendorIds().length ? "inline-block" : "none";
 }
 
-/* ── Admin Dashboard tabs ── */
-
-/* Every flyer across every category board, grouped by board, newest
-   first within each group - the admin panel had no way to see all
-   flyers at all before this (only Vendors/Bookings/Pricing/Hours). */
-function renderAdminEvents() {
-  var list = document.getElementById("adminEventsList");
-  if (!list) return;
-  list.innerHTML = "";
-  if (!evts.length) { list.innerHTML = "<p class='aempty'>No flyers yet.</p>"; return; }
-
-  ORD.forEach(function (cat) {
-    var items = evts.filter(function (e) { return e.cat === cat; });
-    if (!items.length) return;
-    var groupHead = document.createElement("div");
-    groupHead.style.cssText = "font-family:'Special Elite',monospace;color:var(--cl);font-size:13px;margin:14px 0 6px;";
-    groupHead.textContent = (C[cat] ? C[cat].l : cat) + " (" + items.length + ")";
-    list.appendChild(groupHead);
-
-    items.forEach(function (ev) {
-      var row = document.createElement("div");
-      row.style.cssText = "background:rgba(253,246,224,.06);border:1px solid rgba(218,184,112,.2);border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;";
-      var live = isLiveNow(ev);
-      var name = document.createElement("div");
-      name.style.cssText = "font-family:'Special Elite',monospace;font-size:12.5px;color:var(--cl);flex:1;min-width:160px;";
-      name.innerHTML = escHtml(ev.t) + (live ? " <span style='color:#22c55e;font-weight:700;'>&#9679; LIVE</span>" : "") +
-        "<br><span style='opacity:.65;font-size:10.5px;'>" + escHtml(ev.w || "") + (ev.exp ? " &middot; expired" : "") + "</span>";
-      row.appendChild(name);
-
-      var viewBtn = document.createElement("button"); viewBtn.className = "nb"; viewBtn.textContent = "View";
-      viewBtn.onclick = function () { showBoards(); openDetail(ev.id); };
-      var editBtn = document.createElement("button"); editBtn.className = "nb"; editBtn.textContent = "Edit";
-      editBtn.onclick = function () { showBoards(); editEv(ev.id); };
-      var removeBtn = document.createElement("button"); removeBtn.className = "nb"; removeBtn.textContent = "Remove";
-      removeBtn.onclick = function () { if (confirm("Remove \"" + ev.t + "\"?")) { delEv(ev.id); renderAdminEvents(); } };
-      row.appendChild(viewBtn); row.appendChild(editBtn); row.appendChild(removeBtn);
-      list.appendChild(row);
-    });
-  });
-}
-function showAdminTab(tab) {
-  document.querySelectorAll(".admintab").forEach(function (b) { b.classList.toggle("on", b.dataset.tab === tab); });
-  var panels = { events: "adminTabEvents", vendors: "adminTabVendors", bookings: "adminTabBookings", pricing: "adminTabPricing", hours: "adminTabHours" };
-  Object.keys(panels).forEach(function (t) {
-    var el = document.getElementById(panels[t]);
-    if (el) el.style.display = t === tab ? "block" : "none";
-  });
-  if (tab === "events") renderAdminEvents();
-  if (tab === "vendors") renderAdminList();
-  if (tab === "bookings") renderAdminBookings();
-  if (tab === "pricing") renderAdminPricing();
-  if (tab === "hours") renderAdminHours();
-}
-
-function renderAdminBookings() {
-  var list = document.getElementById("adminBookingsList");
-  if (!list) return;
-  var all = getBookings().slice().sort(function (a, b) { return new Date(b.purchasedAt) - new Date(a.purchasedAt); });
-  if (!all.length) { list.innerHTML = "<p class='aempty'>No bookings yet.</p>"; return; }
-  list.innerHTML = "";
-  all.forEach(function (b) {
-    var v = vendors.find(function (x) { return x.id === b.vendorId; });
-    var ev = evts.find(function (x) { return x.id === b.eventId; });
-    var detail = b.date + " " + fmtHour(b.hour) + " hour, " +
-      b.slots.slice().sort(function (a, c) { return a - c; }).map(function (i) { return slotTimeLabel(b.hour, i, b.type); }).join(", ");
-    var status = b.status === "cancelled" ? "cancelled" : bookingLiveStatus(b);
-    var row = document.createElement("div"); row.className = "abkrow";
-    row.innerHTML = "<span style='flex:1;min-width:180px;'><b>" + escHtml(v ? v.name : "?") + "</b> &middot; " + escHtml(ev ? ev.t : "?") +
-      "<br><span style='opacity:.65;font-size:10.5px;'>" + (b.type === "boost" ? "Boost" : "Featured") + " &middot; " + escHtml(detail) + " &middot; " + status + "</span></span>" +
-      "<span class='abk-amt'>$" + b.amount + "</span>";
-    if (b.status !== "cancelled") {
-      var cancelBtn = document.createElement("button"); cancelBtn.className = "nb"; cancelBtn.textContent = "Cancel";
-      cancelBtn.onclick = function () { if (confirm("Cancel this booking and free the slot?")) { cancelBooking(b.id); renderAdminBookings(); } };
-      row.appendChild(cancelBtn);
-    }
-    list.appendChild(row);
-  });
-}
-
-function renderAdminPricing() {
-  var wrap = document.getElementById("adminPricingForm");
-  if (!wrap) return;
-  var pricing = getPricing();
-  wrap.innerHTML = "<div class='aformgrid'>" +
-    "<label>Boost price ($)<input id='priceBoost' type='number' min='0' step='1' value='" + pricing.boost + "'></label>" +
-    "<label>Featured price ($)<input id='priceFeatured' type='number' min='0' step='1' value='" + pricing.featured + "'></label>" +
-    "</div><button class='nb on' id='savePricingBtn'>Save Pricing</button>";
-  document.getElementById("savePricingBtn").onclick = function () {
-    var b = parseFloat(document.getElementById("priceBoost").value) || 0;
-    var f = parseFloat(document.getElementById("priceFeatured").value) || 0;
-    setPricing({ boost: b, featured: f });
-    alert("Pricing updated.");
-  };
-}
-
-function renderAdminHours() {
-  var wrap = document.getElementById("adminHoursForm");
-  if (!wrap) return;
-  if (!evts.length) { wrap.innerHTML = "<p class='aempty'>No events yet.</p>"; return; }
-  var opts = evts.map(function (ev) { return "<option value='" + ev.id + "'>" + escHtml(ev.t) + "</option>"; }).join("");
-  wrap.innerHTML = "<div class='aformgrid'><label>Event<select id='hoursEventSel'>" + opts + "</select></label></div><div id='hoursGridWrap'></div>";
-  var sel = document.getElementById("hoursEventSel");
-  function draw() {
-    var ev = evts.find(function (x) { return x.id === sel.value; });
-    var gridWrap = document.getElementById("hoursGridWrap");
-    if (!ev) { gridWrap.innerHTML = ""; return; }
-    var hours = eventHourRange(ev);
-    var closed = closedHoursFor(ev.id);
-    var grid = hours.map(function (h) {
-      var isClosed = closed.indexOf(h) >= 0;
-      return "<button class='hourbtn" + (isClosed ? " closed" : " on") + "' data-hour='" + h + "'>" + fmtHour(h) + "<span class='hbstat'>" + (isClosed ? "Closed" : "Open") + "</span></button>";
-    }).join("");
-    gridWrap.innerHTML = "<p class='promo-sub' style='margin-top:10px;'>Tap an hour to open/close it for Boost booking.</p><div class='hourgrid'>" + grid + "</div>";
-    gridWrap.querySelectorAll(".hourbtn").forEach(function (btn) {
-      btn.onclick = function () { toggleHourClosed(ev.id, parseInt(btn.dataset.hour, 10)); draw(); };
-    });
-  }
-  sel.onchange = draw;
-  draw();
-}
-
-/* Re-renders whatever detail/admin/dashboard view is currently open so a
+/* Re-renders whatever detail/dashboard view is currently open so a
    just-purchased promotion (or a cross-tab change picked up via
    onPromoSync below) shows up immediately instead of needing a manual
    refresh. */
@@ -519,10 +398,6 @@ function refreshOpenViewsAfterPromo() {
   if (document.getElementById("detOv").classList.contains("on")) {
     if (dp.dataset.vid) openVendorDetail(dp.dataset.vid, dp.dataset.fromEvent || undefined);
     else if (dp.dataset.eid) openDetail(dp.dataset.eid);
-  }
-  if (document.getElementById("adminSec").style.display !== "none") {
-    var activeTab = document.querySelector(".admintab.on");
-    if (activeTab) showAdminTab(activeTab.dataset.tab);
   }
   if (document.getElementById("dashOv").classList.contains("on")) renderVendorDashboard();
 }
