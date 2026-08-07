@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CITY_CENTERS } from "@/lib/geo";
 import { BASE_PATH } from "@/lib/site";
-import { loadLeaflet, TILE_LAYER_URL, TILE_LAYER_ATTRIBUTION } from "@/lib/map/leaflet-loader";
+import { loadLeaflet, TILE_LAYER_URL, TILE_LAYER_ATTRIBUTION, TILE_LAYER_MAX_ZOOM } from "@/lib/map/leaflet-loader";
 import { entityDivIcon, syncEditableLayer, type MapDraft } from "@/lib/map/leaflet-shared";
 
 /** The `pins` table's `category` column has a check constraint of its
@@ -155,7 +155,7 @@ export function MapStudio({
         if (cancelled || !mapDivRef.current || mapRef.current) return;
         const center = CITY_CENTERS[0];
         const map = L.map(mapDivRef.current).setView([center.lat, center.lng], 13);
-        L.tileLayer(TILE_LAYER_URL, { attribution: TILE_LAYER_ATTRIBUTION }).addTo(map);
+        L.tileLayer(TILE_LAYER_URL, { attribution: TILE_LAYER_ATTRIBUTION, maxZoom: TILE_LAYER_MAX_ZOOM }).addTo(map);
         mapRef.current = map;
         setMapReady(true);
       })

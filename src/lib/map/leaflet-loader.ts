@@ -29,8 +29,14 @@ export function loadLeaflet(): Promise<NonNullable<Window["L"]>> {
 }
 
 /** The single tile provider shared by the Public Map, Admin Map Studio, and
- * the Event Zone editor - CARTO's hosted Voyager tiles (OSM data, but
- * served from infrastructure meant for production traffic, unlike hotlinking
- * tile.openstreetmap.org directly from a public, high-traffic page). */
-export const TILE_LAYER_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-export const TILE_LAYER_ATTRIBUTION = "&copy; OpenStreetMap &copy; CARTO";
+ * the Event Zone editor - Geoapify's hosted `osm-carto` tiles. This is the
+ * same open-source openstreetmap-carto stylesheet the app originally used
+ * (rich business/hotel/restaurant/landmark labels, not just streets and
+ * parks), served from production-safe infrastructure instead of hotlinking
+ * tile.openstreetmap.org directly. CARTO Voyager (the interim choice) was
+ * confirmed via direct tile comparison to omit this label tier entirely,
+ * at any zoom - not a threshold that panning/zooming would cross. */
+export const TILE_LAYER_URL = `https://maps.geoapify.com/v1/tile/osm-carto/{z}/{x}/{y}.png?apiKey=${process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY}`;
+export const TILE_LAYER_ATTRIBUTION =
+  '&copy; OpenStreetMap contributors, <a href="https://www.geoapify.com/" target="_blank" rel="noopener">Powered by Geoapify</a>';
+export const TILE_LAYER_MAX_ZOOM = 20;

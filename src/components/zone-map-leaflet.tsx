@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { loadLeaflet, TILE_LAYER_URL, TILE_LAYER_ATTRIBUTION } from "@/lib/map/leaflet-loader";
+import { loadLeaflet, TILE_LAYER_URL, TILE_LAYER_ATTRIBUTION, TILE_LAYER_MAX_ZOOM } from "@/lib/map/leaflet-loader";
 import { entityDivIcon, syncEditableLayer } from "@/lib/map/leaflet-shared";
 import { pointInPolygon } from "@/lib/geo-polygon";
 import type { Booth, ZoneBoundary, ZoneBoundaryGeoPoint, ZoneFeature, ZoneFeatureType } from "@/lib/types";
@@ -134,7 +134,7 @@ export function ZoneMapLeaflet({
       .then((L) => {
         if (cancelled || !mapDivRef.current || mapRef.current) return;
         const map = L.map(mapDivRef.current).setView([centerRef.current.lat, centerRef.current.lng], 17);
-        L.tileLayer(TILE_LAYER_URL, { attribution: TILE_LAYER_ATTRIBUTION }).addTo(map);
+        L.tileLayer(TILE_LAYER_URL, { attribution: TILE_LAYER_ATTRIBUTION, maxZoom: TILE_LAYER_MAX_ZOOM }).addTo(map);
         boundaryLayerGroupRef.current = L.layerGroup().addTo(map);
         drawLayerGroupRef.current = L.layerGroup().addTo(map);
         mapRef.current = map;

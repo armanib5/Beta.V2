@@ -861,11 +861,15 @@ function initLegend() {
 function initMap() {
   var start = HOODS[0];
   map = L.map("leafletMap", { zoomControl: false, center: [start.lat, start.lng], zoom: start.zoom });
-  /* Voyager (rather than plain Positron) keeps the same clean light look
-     but renders street names with much more contrast at higher zooms. */
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
-    subdomains: "abcd", maxZoom: 20
+  /* Geoapify's osm-carto style - the same open-source openstreetmap-carto
+     stylesheet this map originally used, with business/hotel/restaurant/
+     landmark labels intact, served from production-safe hosting instead
+     of hotlinking tile.openstreetmap.org directly. CARTO Voyager (tried
+     briefly) omits that entire label tier at any zoom - confirmed by
+     direct tile comparison, not just a config/zoom tweak. */
+  L.tileLayer("https://maps.geoapify.com/v1/tile/osm-carto/{z}/{x}/{y}.png?apiKey=de98591108e7443793908b4e4028ed5e", {
+    attribution: '&copy; OpenStreetMap contributors, <a href="https://www.geoapify.com/" target="_blank" rel="noopener">Powered by Geoapify</a>',
+    maxZoom: 20
   }).addTo(map);
 
   buildMarkers();
