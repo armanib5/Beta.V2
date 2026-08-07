@@ -1327,18 +1327,17 @@ function openDetail(id){
   var dadr=document.createElement("span");dadr.className="dadr";dadr.textContent=ev.a;
   var mapBtn=document.createElement("a");mapBtn.className="ab blue";mapBtn.href=mu;mapBtn.target="_blank";mapBtn.textContent="Open in Maps";
   dloc.appendChild(dadr);dloc.appendChild(mapBtn);
-  if(ev.mapId){
-    /* This event already has a real pin on our map (not a fresh
-       submission) - link straight to it. /pins/index.html only ever edits
-       the CURRENT LOGGED-IN VENDOR's own pin now (not a general "create a
-       pin for any flyer" tool), so there's no "Add to Map" equivalent for
-       a flyer with no pin yet - a random viewer browsing the board has no
-       way to create one for someone else's business, and the old link
-       here (title/addr/cat query params) pointed at a page that stopped
-       reading them once /pins/ was rewritten to be vendor-only. */
+  if(ev.flyerId){
+    /* This event already has a real database row (not a fresh
+       submission) - link straight to it on the map. ?showEvent= (unlike
+       the older ?showPlace=) carries the real lov_entries id, so the map
+       can look up a traced Event Zone or "hosted at a vendor" location
+       for it, not just fly to a bare lat/lng - see openEventFromQuery()
+       in map.js. This button existed before but never actually rendered:
+       it read ev.mapId, which nothing ever assigned. */
     var pinBtn=document.createElement("a");pinBtn.className="ab gold";
-    pinBtn.textContent="Find on Our Map";
-    pinBtn.href="../map/index.html?showPlace="+encodeURIComponent(ev.mapId);
+    pinBtn.textContent="📍 Find Event";
+    pinBtn.href="../map/index.html?showEvent="+encodeURIComponent(ev.flyerId);
     dloc.appendChild(pinBtn);
   }
 

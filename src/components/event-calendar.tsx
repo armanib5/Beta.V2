@@ -274,12 +274,20 @@ function EventCard({ event, category }: { event: LovEntry; category?: Category }
         {event.booth_tier === "top" && (
           <span className="mt-1 block text-xs font-semibold text-amber-600">🏆 Top Booth event</span>
         )}
-        <a
-          href={`${BASE_PATH}/board/?flyerId=${encodeURIComponent(event.id)}`}
-          className="mt-2 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
-        >
-          🗒️ View Flyer on the Board
-        </a>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <a
+            href={`${BASE_PATH}/board/?flyerId=${encodeURIComponent(event.id)}`}
+            className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
+          >
+            🗒️ View Flyer on the Board
+          </a>
+          <a
+            href={`${BASE_PATH}/map/?showEvent=${encodeURIComponent(event.id)}`}
+            className="inline-block rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-800 hover:bg-indigo-200"
+          >
+            📍 Find Event
+          </a>
+        </div>
       </div>
     </div>
   );

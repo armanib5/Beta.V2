@@ -512,16 +512,27 @@ function DirectoryCard({
         >
           🍽️ Menu Hub
         </Link>
+      ) : item.pill === "events" ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            href={`${BASE_PATH}/board/?flyerId=${encodeURIComponent(item.id.replace(/^event:/, ""))}`}
+            className="inline-block self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
+          >
+            📌 View on Board
+          </a>
+          <a
+            href={`${BASE_PATH}/map/?showEvent=${encodeURIComponent(item.id.replace(/^event:/, ""))}`}
+            className="inline-block self-start rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-800 hover:bg-indigo-200"
+          >
+            📍 Find Event
+          </a>
+        </div>
       ) : (
         <a
-          href={
-            item.pill === "events"
-              ? `${BASE_PATH}/board/?flyerId=${encodeURIComponent(item.id.replace(/^event:/, ""))}`
-              : `${BASE_PATH}/board/?openVendor=${encodeURIComponent(item.name)}`
-          }
+          href={`${BASE_PATH}/board/?openVendor=${encodeURIComponent(item.name)}`}
           className="mt-3 inline-block self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-200"
         >
-          {item.pill === "events" ? "📌 View on Board" : "🛒 Vendor Hub"}
+          🛒 Vendor Hub
         </a>
       )}
     </div>

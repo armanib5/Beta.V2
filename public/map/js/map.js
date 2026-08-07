@@ -1011,8 +1011,12 @@ function initMap() {
   initFilterRow();
   initSearch();
   loadApprovedPins().then(handleSearchQuery);
-  loadLovEvents();
-  loadLovVendors();
+  // openEventFromQuery() needs PLACES to already contain the fetched
+  // lov_entries rows, which (unlike the static places.js data
+  // openPlaceFromQuery() checks synchronously below) only exist once
+  // these two fetches resolve - checking PLACES before they land would
+  // silently fail to find a real, freshly-created event every time.
+  var lovDataLoaded = Promise.all([loadLovEvents(), loadLovVendors()]);
   loadVendorPins();
   loadPublicNotices();
   loadEventZones();
@@ -1028,6 +1032,7 @@ function initMap() {
   document.getElementById("flyerClose").onclick = hideFlyer;
   map.on("click", hideFlyer);
   if (openPlaceFromQuery()) return;
+  lovDataLoaded.then(function () { openEventFromQuery(); });
 
   /* An anchor already set on another page (city picked on the Vendor
      Directory, GPS fix taken on the Board) carries over here via shared
@@ -1065,12 +1070,7 @@ function initMap() {
    opens straight to that pin instead of defaulting to the location
    prompt, so a flyer's map button always lands on the one real pin
    rather than ever inviting a duplicate submission. */
-function openPlaceFromQuery() {
-  var params = new URLSearchParams(location.search);
-  var id = params.get("showPlace");
-  if (!id) return false;
-  var p = PLACES.find(function (x) { return x.id === id; });
-  if (!p) return false;
+function flyToPlace(p) {
   var loc = nearestHood(p.lat, p.lng);
   if (loc.city !== activeCity) {
     activeCity = loc.city;
@@ -1086,6 +1086,31 @@ function openPlaceFromQuery() {
   }
   flyTo(p.lat, p.lng, 18);
   setTimeout(function () { showFlyer(p); }, 400);
+}
+
+function openPlaceFromQuery() {
+  var params = new URLSearchParams(location.search);
+  var id = params.get("showPlace");
+  if (!id) return false;
+  var p = PLACES.find(function (x) { return x.id === id; });
+  if (!p) return false;
+  flyToPlace(p);
+  return true;
+}
+
+/* "Find Event" (Calendar/Board -> Map) - unlike ?showPlace= (a PLACES
+   array id), this carries the real lov_entries.id so the destination can
+   be smarter than a bare pin: a traced Event Zone gets fit-to-bounds +
+   highlighted, an event hosted at a vendor with no pin of its own flies
+   to the host's pin instead, and only the plain case falls back to the
+   same flyTo+popup behavior openPlaceFromQuery already uses. */
+function openEventFromQuery() {
+  var params = new URLSearchParams(location.search);
+  var eventId = params.get("showEvent");
+  if (!eventId) return false;
+  var p = PLACES.find(function (x) { return x.flyerId === eventId; });
+  if (!p) return false;
+  flyToPlace(p);
   return true;
 }
 
