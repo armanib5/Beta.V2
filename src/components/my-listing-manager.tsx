@@ -6,6 +6,22 @@ import type { LovEntry } from "@/lib/types";
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
+const STATUS_STYLES: Record<LovEntry["status"], string> = {
+  active: "bg-green-100 text-green-800",
+  pending: "bg-amber-100 text-amber-800",
+  draft: "bg-slate-200 text-slate-700",
+  archived: "bg-red-100 text-red-800",
+  rejected: "bg-red-100 text-red-800",
+};
+
+const STATUS_LABELS: Record<LovEntry["status"], string> = {
+  active: "Live",
+  pending: "Pending Review",
+  draft: "Draft",
+  archived: "Archived",
+  rejected: "Rejected",
+};
+
 export function MyListingManager({ vendorId, initialListings }: { vendorId: string; initialListings: LovEntry[] }) {
   const [listings, setListings] = useState(initialListings);
 
@@ -95,7 +111,21 @@ function ListingRow({
 
   return (
     <div className="rounded-xl border border-slate-200 p-4">
-      <p className="text-sm font-bold text-slate-900">{listing.name}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm font-bold text-slate-900">{listing.name}</p>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLES[listing.status]}`}>
+          {STATUS_LABELS[listing.status]}
+        </span>
+      </div>
+      {listing.status === "rejected" && (
+        <p className="mt-1 text-xs text-red-600">
+          This listing wasn&apos;t approved and isn&apos;t showing on the board. Message us if you&apos;d like to
+          resubmit it.
+        </p>
+      )}
+      {listing.status === "pending" && (
+        <p className="mt-1 text-xs text-amber-700">Waiting on admin review — it&apos;ll show on the board once approved.</p>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-4">
         <label className="relative h-24 w-24 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
           {listing.flyer_image_url ? (
