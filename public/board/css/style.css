@@ -298,3 +298,13 @@ footer{text-align:center;color:rgba(200,160,70,.35);font-size:12px;padding:20px 
   .slotgrid{grid-template-columns:repeat(2,1fr);}
   .promo-card .pc-price{float:none;display:block;margin-top:4px;}
 }
+
+/* Anyone who's asked their OS/browser to reduce motion gets each animation
+   replaced with a static but still visually distinct state, matching the
+   pattern already used in src/app/globals.css for the React app. */
+@media (prefers-reduced-motion: reduce) {
+  #adminPendingBadge,#adminPendingBadgeFloat{animation:none;opacity:1;}
+  .live{animation:none;}
+  .bsec{animation:none;}
+  .fc.live-now,.tc.live-now{animation:none;border-color:#22c55e;}
+}

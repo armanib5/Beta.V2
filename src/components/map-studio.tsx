@@ -769,10 +769,17 @@ export function MapStudio({
         {toast && <span className="text-xs font-semibold text-green-700">{toast}</span>}
       </div>
 
+      {/* order-* below puts the selected-pin editor panel (with its Save
+         buttons) ABOVE the map on a phone-height screen instead of below
+         a 520px map - same fix already applied to admin/zones (commit
+         01092ed) for the same reason: a Save button pushed below a tall
+         fixed-height map was effectively unreachable without a long
+         scroll. lg:order-none restores natural DOM order (map left,
+         panel right) once the grid actually has two columns. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        <div ref={mapDivRef} className="h-[520px] w-full rounded-xl border border-slate-300" />
+        <div ref={mapDivRef} className="order-2 h-[520px] w-full rounded-xl border border-slate-300 lg:order-none" />
 
-        <div className="rounded-xl border border-slate-300 bg-slate-50 p-4">
+        <div className="order-1 rounded-xl border border-slate-300 bg-slate-50 p-4 lg:order-none">
           {selectedVendor ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">

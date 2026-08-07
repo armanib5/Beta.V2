@@ -195,3 +195,12 @@ footer{text-align:center;color:rgba(200,160,70,.35);font-size:12px;padding:20px 
 .notice-popup dl{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:11.5px;margin:0;}
 .notice-popup dt{font-family:'Special Elite',monospace;text-transform:uppercase;letter-spacing:.5px;color:#8a6030;}
 .notice-popup dd{margin:0;color:#2a1800;}
+
+/* Anyone who's asked their OS/browser to reduce motion gets each animation
+   replaced with a static but still visually distinct state, matching the
+   pattern already used in src/app/globals.css for the React app. */
+@media (prefers-reduced-motion: reduce) {
+  .bp-livering{animation:none;opacity:0;}
+  .bp-livedot,.bp-livebadge{animation:none;}
+  #adminPendingBadge,#adminPendingBadgeFloat{animation:none;opacity:1;}
+}

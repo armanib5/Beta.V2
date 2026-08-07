@@ -365,7 +365,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
         <Legend swatch="border-amber-500 ring-2 ring-amber-400" label="Top Booth (gold ring)" />
       </div>
 
-      {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {loading && <p className="col-span-full text-sm text-slate-500">Loading booths…</p>}
