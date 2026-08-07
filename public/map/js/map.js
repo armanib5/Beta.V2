@@ -355,7 +355,7 @@ var LOV_CAT_SLUG_TO_MAP = {
   "cultural-festival": "venue", "gaming-festival": "venue", "outdoor-movie": "venue",
   "community-event": "centers", "restaurant": "restaurants", "bar": "bars",
   "workshop-class": "workshop", "park-event": "parks", "city-art": "cityart",
-  "museum": "museum"
+  "museum": "museum", "hotel": "hotel"
 };
 
 function loadLovEvents() {
