@@ -56,6 +56,7 @@ export default function AdminFlyersPage() {
     details: "",
     category_id: "",
     hosting_vendor_id: "",
+    website_url: "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -83,6 +84,7 @@ export default function AdminFlyersPage() {
       details: f.details ?? "",
       category_id: f.category_id ?? "",
       hosting_vendor_id: f.hosting_vendor_id ?? "",
+      website_url: f.website_url ?? "",
     });
   }
 
@@ -98,6 +100,7 @@ export default function AdminFlyersPage() {
       details: editForm.details.trim() || null,
       category_id: editForm.category_id || null,
       hosting_vendor_id: editForm.hosting_vendor_id || null,
+      website_url: editForm.website_url.trim() || null,
     };
     const { error: updateError } = await supabase.from("lov_entries").update(patch).eq("id", f.id);
     setSavingEdit(false);
@@ -607,6 +610,16 @@ export default function AdminFlyersPage() {
                         type="text"
                         value={editForm.location}
                         onChange={(e) => setEditForm((prev) => ({ ...prev, location: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">Website (optional)</label>
+                      <input
+                        type="url"
+                        placeholder="https://…"
+                        value={editForm.website_url}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, website_url: e.target.value }))}
                         className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
                       />
                     </div>
