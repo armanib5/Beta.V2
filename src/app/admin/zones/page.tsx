@@ -99,6 +99,7 @@ export default function AdminZonesPage() {
   const [status, setStatus] = useState<"loading" | "denied" | "ready">("loading");
   const [events, setEvents] = useState<LovEntry[]>([]);
   const [eventId, setEventId] = useState("");
+  const [eventSearch, setEventSearch] = useState("");
   const [booths, setBooths] = useState<Booth[]>([]);
   const [boundaries, setBoundaries] = useState<ZoneBoundary[]>([]);
   const [features, setFeatures] = useState<ZoneFeature[]>([]);
@@ -196,8 +197,10 @@ export default function AdminZonesPage() {
   const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const groupedEventsByCity = useMemo(() => {
+    const query = eventSearch.trim().toLowerCase();
+    const filtered = query ? events.filter((e) => e.name.toLowerCase().includes(query)) : events;
     const map = new Map<string, LovEntry[]>();
-    for (const e of events) {
+    for (const e of filtered) {
       const city = cityOfEvent(e);
       const list = map.get(city) ?? [];
       list.push(e);
@@ -207,11 +210,16 @@ export default function AdminZonesPage() {
       list.sort((a, b) => {
         const timingDiff = TIMING_ORDER[timingOfEvent(a, todayKey)] - TIMING_ORDER[timingOfEvent(b, todayKey)];
         if (timingDiff !== 0) return timingDiff;
-        return (b.event_date ?? "").localeCompare(a.event_date ?? "");
+        const dateDiff = (b.event_date ?? "").localeCompare(a.event_date ?? "");
+        // Recurring/dateless events (e.g. a monthly Art Walk) otherwise tie
+        // on an empty date and fall back to whatever order Supabase
+        // happened to return them in - alphabetical keeps the list scannable
+        // instead of effectively random.
+        return dateDiff !== 0 ? dateDiff : a.name.localeCompare(b.name);
       });
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [events, todayKey]);
+  }, [events, todayKey, eventSearch]);
 
   const selectedEvent = events.find((e) => e.id === eventId) ?? null;
   const dataMode = useMemo(() => computeDataMode(booths, boundaries), [booths, boundaries]);
@@ -654,13 +662,21 @@ ${
 
       <div className="mt-6 print:hidden">
         <label className="block text-sm font-medium text-slate-700">Event</label>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          value={eventSearch}
+          onChange={(e) => setEventSearch(e.target.value)}
+          placeholder="Search events by name…"
+          className="mt-1 w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <select
             value={eventId}
             onChange={(e) => setEventId(e.target.value)}
             className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
           >
             {events.length === 0 && <option value="">No events yet — create one in Venue Board</option>}
+            {events.length > 0 && groupedEventsByCity.length === 0 && <option value="">No events match &quot;{eventSearch}&quot;</option>}
             {groupedEventsByCity.map(([city, cityEvents]) => (
               <optgroup key={city} label={city}>
                 {cityEvents.map((event) => (
