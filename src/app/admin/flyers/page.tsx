@@ -57,6 +57,7 @@ export default function AdminFlyersPage() {
     category_id: "",
     hosting_vendor_id: "",
     website_url: "",
+    ticket_url: "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -85,6 +86,7 @@ export default function AdminFlyersPage() {
       category_id: f.category_id ?? "",
       hosting_vendor_id: f.hosting_vendor_id ?? "",
       website_url: f.website_url ?? "",
+      ticket_url: f.ticket_url ?? "",
     });
   }
 
@@ -101,6 +103,7 @@ export default function AdminFlyersPage() {
       category_id: editForm.category_id || null,
       hosting_vendor_id: editForm.hosting_vendor_id || null,
       website_url: editForm.website_url.trim() || null,
+      ticket_url: editForm.ticket_url.trim() || null,
     };
     const { error: updateError } = await supabase.from("lov_entries").update(patch).eq("id", f.id);
     setSavingEdit(false);
@@ -695,6 +698,16 @@ export default function AdminFlyersPage() {
                         placeholder="https://…"
                         value={editForm.website_url}
                         onChange={(e) => setEditForm((prev) => ({ ...prev, website_url: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">Tickets (optional)</label>
+                      <input
+                        type="url"
+                        placeholder="https://…"
+                        value={editForm.ticket_url}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, ticket_url: e.target.value }))}
                         className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
                       />
                     </div>

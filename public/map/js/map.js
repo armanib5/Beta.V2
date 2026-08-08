@@ -134,6 +134,7 @@ function flyerHtml(p) {
   html += '<a class="bp-btn blue" href="' + mu + '" target="_blank" rel="noopener">Directions</a>';
   html += '<button class="bp-btn gold" onclick="showFullDetail(\'' + p.id + '\')">Full Details</button>';
   if (p.wb) html += '<a class="bp-btn purple" href="' + p.wb + '" target="_blank" rel="noopener">Website</a>';
+  if (p.tk) html += '<a class="bp-btn purple" href="' + p.tk + '" target="_blank" rel="noopener">🎟 Tickets</a>';
   html += '<button class="bp-btn gray" onclick="openReportForm(\'' + p.id + '\', \'' + p.t.replace(/'/g, "&#39;") + '\')" title="Report Listing / Unauthorized Pin">🚩 Report</button>';
   html += '</div></div>';
   return html;
@@ -177,6 +178,7 @@ function showFullDetail(id) {
   html += '<div class="dbtnrow">';
   html += '<a class="bp-btn blue" href="' + mu + '" target="_blank" rel="noopener">Directions</a>';
   if (p.wb) html += '<a class="bp-btn purple" href="' + p.wb + '" target="_blank" rel="noopener">Website</a>';
+  if (p.tk) html += '<a class="bp-btn purple" href="' + p.tk + '" target="_blank" rel="noopener">🎟 Tickets</a>';
   html += '<a class="bp-btn gold" href="../board/index.html?' + (p.flyerId ? "flyerId=" + encodeURIComponent(p.flyerId) : "openFlyer=" + encodeURIComponent(p.t)) + '">View/Edit on Board</a>';
   html += '<button class="bp-btn gray" onclick="openReportForm(\'' + p.id + '\', \'' + p.t.replace(/'/g, "&#39;") + '\')" title="Report Listing / Unauthorized Pin">🚩 Report</button>';
   html += '</div>';
@@ -398,7 +400,7 @@ function loadLovEvents() {
       var place = {
         id: "lov-" + r.id, flyerId: r.id, cat: cat, hood: hood,
         t: r.name, a: r.location || "", ds: r.recurrence || "",
-        lat: lat, lng: lng, wb: r.website_url || undefined,
+        lat: lat, lng: lng, wb: r.website_url || undefined, tk: r.ticket_url || undefined,
         flyer: r.flyer_image_url || null
       };
       PLACES.push(place);

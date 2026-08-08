@@ -122,6 +122,7 @@ export interface LovEntry {
   vendor_id: string | null;
   recurrence: string | null;
   website_url: string | null;
+  ticket_url: string | null;
   section_zone: string | null;
   publish_at: string | null;
   details: string | null;

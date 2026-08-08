@@ -443,7 +443,7 @@ function loadLovEvents(){
         id:id,flyerId:r.id,cat:cat,lbl:r.booth_tier==="top"?"Top 10":(r.recurrence?"Recurring":"Live Festival"),
         exp:false,city:loc.city,hood:loc.hood,
         t:r.name,w:r.recurrence||(r.event_date?r.event_date.slice(0,10):""),d:d,
-        a:r.location||"",ph:"",wb:r.website_url||"",ds:r.details||r.recurrence||"",
+        a:r.location||"",ph:"",wb:r.website_url||"",tk:r.ticket_url||"",ds:r.details||r.recurrence||"",
         photo:r.flyer_image_url||"",ed:r.end_date?r.end_date.slice(0,10):undefined,
         hostVendorId:r.hosting_vendor_id||null,
         focalX:r.flyer_focal_x,focalY:r.flyer_focal_y,
@@ -1267,6 +1267,7 @@ function openDetail(id){
 
   if(ev.ph){var pline=document.createElement("p");pline.style.cssText="font-size:13px;margin-bottom:6px;";pline.innerHTML="Phone: <a href='tel:"+ev.ph+"' style='color:#2c5f8a;'>"+ev.ph+"</a>";body.appendChild(pline);}
   if(ev.wb){var wline=document.createElement("p");wline.style.cssText="font-size:13px;margin-bottom:14px;";wline.innerHTML="<a href='"+ev.wb+"' target='_blank' style='color:#2c5f8a;'>Visit Website</a>";body.appendChild(wline);}
+  if(ev.tk){var tline=document.createElement("p");tline.style.cssText="font-size:13px;margin-bottom:14px;";tline.innerHTML="<a href='"+ev.tk+"' target='_blank' style='color:#2c5f8a;'>🎟 Get Tickets</a>";body.appendChild(tline);}
 
   var igrid=document.createElement("div");igrid.className="igrid";
   function mkIbox(label,val){var b=document.createElement("div");b.className="ibox";b.innerHTML="<h4>"+label+"</h4><p>"+(val||"See organizer.")+"</p>";return b;}

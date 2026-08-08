@@ -270,6 +270,16 @@ function EventCard({ event, category }: { event: LovEntry; category?: Category }
               🌐 Website
             </a>
           )}
+          {event.ticket_url && (
+            <a
+              href={event.ticket_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-sm font-medium text-slate-900 underline"
+            >
+              🎟 Tickets
+            </a>
+          )}
         </div>
         {event.booth_tier === "top" && (
           <span className="mt-1 block text-xs font-semibold text-amber-600">🏆 Top Booth event</span>
