@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { loadLeaflet, TILE_LAYER_URL, TILE_LAYER_ATTRIBUTION, TILE_LAYER_MAX_ZOOM } from "@/lib/map/leaflet-loader";
 import { entityDivIcon, syncEditableLayer } from "@/lib/map/leaflet-shared";
-import { pointInPolygon } from "@/lib/geo-polygon";
+import { pointNearPolygon } from "@/lib/geo-polygon";
 import type { Booth, ZoneBoundary, ZoneBoundaryGeoPoint, ZoneFeature, ZoneFeatureType } from "@/lib/types";
 
 export type ZoneMapLeafletMode = "view" | "public" | "vendor-claim" | "draw-boundary" | "place-features";
@@ -162,9 +162,13 @@ export function ZoneMapLeaflet({
           (b) => b.boundary_type === "event_boundary" && b.points_geo && b.points_geo.length >= 3,
         );
         if (eventBoundary?.points_geo) {
-          const inside = pointInPolygon({ lat: e.latlng.lat, lng: e.latlng.lng }, eventBoundary.points_geo);
+          // Tolerant, not strict-inside-only: a traced boundary is often a
+          // thin strip following a street (see pointNearPolygon's own
+          // comment), so a click right next to the shaded outline should
+          // still count, not just one landing exactly inside it.
+          const inside = pointNearPolygon({ lat: e.latlng.lat, lng: e.latlng.lng }, eventBoundary.points_geo, 12);
           if (!inside) {
-            onPlaceRejected?.("Place inside the shaded event boundary.");
+            onPlaceRejected?.("Place inside (or right next to) the shaded event boundary.");
             return;
           }
         }
@@ -188,14 +192,24 @@ export function ZoneMapLeaflet({
       if (!b.points_geo || b.points_geo.length === 0) continue;
       const latlngs = b.points_geo.map((p) => [p.lat, p.lng] as [number, number]);
       const color = BOUNDARY_LINE_COLOR[b.boundary_type] ?? "#64748b";
+      // interactive: false on every boundary layer below is load-bearing, not
+      // cosmetic: Leaflet's vector layers swallow clicks on themselves by
+      // default, so a solid-filled boundary polygon silently ate every click
+      // landing inside it - exactly where the UI instructs admins to click
+      // to place a booth/stage. Non-interactive lets clicks pass through to
+      // the map's own click handler (registered above) instead of dying on
+      // the shape drawn on top of it. Hover tooltips are lost as a result,
+      // an acceptable trade for click-to-place actually working.
       if (b.boundary_type === "event_boundary" || b.boundary_type === "vendor_area") {
-        L.polygon(latlngs, { color, weight: 2, fillOpacity: 0.08, dashArray: b.boundary_type === "event_boundary" ? undefined : "6,4" })
-          .bindTooltip(b.label || (b.boundary_type === "event_boundary" ? "Event Boundary" : "Vendor Area"))
-          .addTo(group);
+        L.polygon(latlngs, {
+          color,
+          weight: 2,
+          fillOpacity: 0.08,
+          dashArray: b.boundary_type === "event_boundary" ? undefined : "6,4",
+          interactive: false,
+        }).addTo(group);
       } else {
-        L.polyline(latlngs, { color, weight: 3, dashArray: b.boundary_type === "fence" ? "4,3" : undefined })
-          .bindTooltip(b.label || b.boundary_type)
-          .addTo(group);
+        L.polyline(latlngs, { color, weight: 3, dashArray: b.boundary_type === "fence" ? "4,3" : undefined, interactive: false }).addTo(group);
       }
     }
      
@@ -211,10 +225,14 @@ export function ZoneMapLeaflet({
     if (mode !== "draw-boundary" || drawnPoints.length === 0) return;
     const latlngs = drawnPoints.map((p) => [p.lat, p.lng] as [number, number]);
     if (drawnPoints.length > 1) {
-      L.polygon(latlngs, { color: "#4f46e5", weight: 2, fillOpacity: 0.12, dashArray: "3,3" }).addTo(group);
+      // Same reasoning as the saved-boundary polygon above: non-interactive
+      // so a click landing on the growing shape (very likely once 3+ points
+      // are down) still reaches the map's click handler and adds the next
+      // trace point, instead of being swallowed by the polygon itself.
+      L.polygon(latlngs, { color: "#4f46e5", weight: 2, fillOpacity: 0.12, dashArray: "3,3", interactive: false }).addTo(group);
     }
     drawnPoints.forEach((p, i) => {
-      L.circleMarker([p.lat, p.lng], { radius: 5, color: "#4f46e5", fillColor: "#fff", fillOpacity: 1, weight: 2 })
+      L.circleMarker([p.lat, p.lng], { radius: 5, color: "#4f46e5", fillColor: "#fff", fillOpacity: 1, weight: 2, interactive: false })
         .bindTooltip(String(i + 1), { permanent: true, direction: "top", offset: [0, -6] })
         .addTo(group);
     });

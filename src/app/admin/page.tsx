@@ -86,9 +86,10 @@ export default function AdminHubPage() {
           href="/admin/zones"
           className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md"
         >
-          <p className="font-bold text-slate-900">Event Zone Map</p>
+          <p className="font-bold text-slate-900">Event Zone Studio</p>
           <p className="mt-1 text-sm text-slate-600">
-            Interactive booth grid with fences, gates, exits, and vendor-area boundaries.
+            Trace an event&apos;s real footprint on the map, then place booths, a stage, and other
+            infrastructure inside it.
           </p>
         </Link>
         <Link

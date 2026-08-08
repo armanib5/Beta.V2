@@ -267,7 +267,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
         <h1 className="text-2xl font-bold text-slate-900">Venue Board (Admin)</h1>
         <div className="flex gap-4">
           <Link href="/admin/zones" className="text-sm font-semibold text-slate-700 underline">
-            Zone Map →
+            Event Zone Studio →
           </Link>
           <Link href="/admin/vendors" className="text-sm font-semibold text-slate-700 underline">
             Vendor Approvals →

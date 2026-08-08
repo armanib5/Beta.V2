@@ -138,6 +138,10 @@ export default function AdminZonesPage() {
   const [pendingPlacement, setPendingPlacement] = useState<{ lat: number; lng: number } | null>(null);
   const [placingLabel, setPlacingLabel] = useState("");
   const [previewPublic, setPreviewPublic] = useState(false);
+  const [zonedEventIds, setZonedEventIds] = useState<Set<string>>(new Set());
+  const [placementHint, setPlacementHint] = useState<string | null>(null);
+  const [editingFeatureId, setEditingFeatureId] = useState<string | null>(null);
+  const [editingFeatureLabel, setEditingFeatureLabel] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -148,7 +152,7 @@ export default function AdminZonesPage() {
         setStatus("denied");
         return;
       }
-      const [{ data }, { data: vendorRows }] = await Promise.all([
+      const [{ data }, { data: vendorRows }, { data: boundaryRows }] = await Promise.all([
         supabase
           .from("lov_entries")
           .select("*")
@@ -156,11 +160,21 @@ export default function AdminZonesPage() {
           .order("event_date", { ascending: false })
           .returns<LovEntry[]>(),
         supabase.from("vendors").select("*").eq("status", "active").eq("is_internal", false).returns<Vendor[]>(),
+        // Which events already have a real traced footprint - drives the
+        // "Existing Event Zones" list below so an admin can find one (e.g.
+        // First Friday Art Walk) without knowing to search a giant
+        // all-events dropdown that doesn't say which ones have a zone yet.
+        supabase
+          .from("zone_boundaries")
+          .select("event_id, points_geo")
+          .eq("boundary_type", "event_boundary")
+          .returns<{ event_id: string; points_geo: ZoneBoundaryGeoPoint[] | null }[]>(),
       ]);
       if (cancelled) return;
       setEvents(data ?? []);
       setEventId(data?.[0]?.id ?? "");
       setVendors(vendorRows ?? []);
+      setZonedEventIds(new Set((boundaryRows ?? []).filter((b) => (b.points_geo?.length ?? 0) >= 3).map((b) => b.event_id)));
       setStatus("ready");
     });
     return () => {
@@ -226,6 +240,14 @@ export default function AdminZonesPage() {
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [events, todayKey, eventSearch]);
+
+  const zonedEvents = useMemo(
+    () =>
+      events
+        .filter((e) => zonedEventIds.has(e.id))
+        .sort((a, b) => TIMING_ORDER[timingOfEvent(a, todayKey)] - TIMING_ORDER[timingOfEvent(b, todayKey)] || a.name.localeCompare(b.name)),
+    [events, zonedEventIds, todayKey],
+  );
 
   const selectedEvent = events.find((e) => e.id === eventId) ?? null;
   const dataMode = useMemo(() => computeDataMode(booths, boundaries), [booths, boundaries]);
@@ -451,6 +473,13 @@ export default function AdminZonesPage() {
       return;
     }
     setBoundaries((prev) => prev.filter((x) => x.id !== b.id));
+    if (b.boundary_type === "event_boundary") {
+      setZonedEventIds((prev) => {
+        const next = new Set(prev);
+        next.delete(b.event_id);
+        return next;
+      });
+    }
     flash(`✓ Removed ${b.boundary_type.replace("_", " ")}`);
   }
 
@@ -485,6 +514,7 @@ export default function AdminZonesPage() {
     setBoundaries((prev) => [...prev, data]);
     setDrawnGeoPoints([]);
     setZoneUiMode("view");
+    setZonedEventIds((prev) => new Set(prev).add(eventId));
     flash("✓ Event boundary saved");
   }
 
@@ -499,6 +529,11 @@ export default function AdminZonesPage() {
       return;
     }
     setBoundaries((prev) => prev.filter((b) => b.id !== eventBoundary.id));
+    setZonedEventIds((prev) => {
+      const next = new Set(prev);
+      next.delete(eventId);
+      return next;
+    });
     flash("✓ Boundary cleared — retrace it now");
     startTraceBoundary();
   }
@@ -511,6 +546,7 @@ export default function AdminZonesPage() {
     setPendingPlacement(null);
     setPlacingLabel("");
     setError(null);
+    setPlacementHint(null);
   }
 
   function stopPlacing() {
@@ -518,14 +554,20 @@ export default function AdminZonesPage() {
     setPlacingType(null);
     setPendingPlacement(null);
     setPlacingLabel("");
+    setPlacementHint(null);
   }
 
+  // Shown right next to the map/palette (not the page-top error banner,
+  // which is easy to scroll past on a phone-height screen) so a click that
+  // lands outside the traced boundary - the most common reason "placing a
+  // stage/booth does nothing" - is impossible to miss: it fires right where
+  // the admin is already looking.
   function handleGeoPlaceRejected(reason: string) {
-    setError(reason);
+    setPlacementHint(reason);
   }
 
   function handleGeoPlacePoint(point: { lat: number; lng: number }) {
-    setError(null);
+    setPlacementHint(null);
     setPendingPlacement(point);
   }
 
@@ -576,6 +618,26 @@ export default function AdminZonesPage() {
     }
     setPendingPlacement(null);
     setPlacingLabel("");
+  }
+
+  async function saveFeatureLabel(f: ZoneFeature) {
+    const nextLabel = editingFeatureLabel.trim() || null;
+    setEditingFeatureId(null);
+    if (nextLabel === f.label) return;
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("zone_features")
+      .update({ label: nextLabel })
+      .eq("id", f.id)
+      .select("*")
+      .single<ZoneFeature>();
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not update label.");
+      return;
+    }
+    setFeatures((prev) => prev.map((x) => (x.id === f.id ? data : x)));
+    flash(`✓ Updated ${FEATURE_TYPE_LABEL[f.feature_type]} label`);
   }
 
   async function deleteFeature(f: ZoneFeature) {
@@ -668,7 +730,7 @@ ${
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <div className="flex items-center justify-between print:hidden">
-        <h1 className="text-2xl font-bold text-slate-900">Event Zone Map (Admin)</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Event Zone Studio</h1>
         <Link href="/admin/board" className="text-sm font-semibold text-slate-700 underline">
           Venue Board →
         </Link>
@@ -678,6 +740,35 @@ ${
           ? "Trace the real event boundary on the map, then place booths, stages, and infrastructure inside it."
           : "Tap a booth to cycle Open → Reserved → Occupied. Add fences, gates, exits, and vendor areas below."}
       </p>
+
+      {zonedEvents.length > 0 && (
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 print:hidden">
+          <p className="text-sm font-bold text-slate-900">Existing Event Zones ({zonedEvents.length})</p>
+          <p className="mt-0.5 text-xs text-slate-500">Events with a traced boundary already — jump straight into editing one.</p>
+          <div className="mt-3 space-y-1.5">
+            {zonedEvents.map((e) => (
+              <div
+                key={e.id}
+                className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 ${
+                  e.id === eventId ? "border-indigo-300 bg-indigo-50" : "border-slate-200"
+                }`}
+              >
+                <span className="text-sm text-slate-800">
+                  {TIMING_LABEL[timingOfEvent(e, todayKey)]} — <span className="font-semibold">{e.name}</span>
+                  {e.event_date ? ` — ${e.event_date}` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEventId(e.id)}
+                  className="shrink-0 rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                >
+                  ✏️ Edit Zone
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 print:hidden">
         <label className="block text-sm font-medium text-slate-700">Event</label>
@@ -885,7 +976,9 @@ ${
                     )}
                   </div>
                   {zoneUiMode === "place-features" && !pendingPlacement && (
-                    <p className="mt-2 text-xs text-slate-500">Click inside the shaded boundary to place a {placingType}.</p>
+                    <p className={`mt-2 text-xs ${placementHint ? "font-semibold text-red-600" : "text-slate-500"}`} role={placementHint ? "alert" : undefined}>
+                      {placementHint ?? `Click inside the shaded boundary to place a ${placingType}.`}
+                    </p>
                   )}
                   {pendingPlacement && (
                     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-2">
@@ -966,17 +1059,53 @@ ${
 
           {features.length > 0 && !previewPublic && (
             <ul className="mt-3 space-y-1 text-sm text-slate-600">
-              {features.map((f) => (
-                <li key={f.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <span>
+              {features.map((f) =>
+                editingFeatureId === f.id ? (
+                  <li key={f.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
                     <strong>{FEATURE_TYPE_LABEL[f.feature_type]}</strong>
-                    {f.label ? ` — ${f.label}` : ""}
-                  </span>
-                  <button type="button" onClick={() => deleteFeature(f)} className="text-xs font-semibold text-red-600 underline">
-                    Remove
-                  </button>
-                </li>
-              ))}
+                    <input
+                      type="text"
+                      value={editingFeatureLabel}
+                      onChange={(e) => setEditingFeatureLabel(e.target.value)}
+                      placeholder="Label (optional)"
+                      autoFocus
+                      className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => saveFeatureLabel(f)}
+                      className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+                    >
+                      Save
+                    </button>
+                    <button type="button" onClick={() => setEditingFeatureId(null)} className="text-xs font-semibold text-slate-500 hover:underline">
+                      Cancel
+                    </button>
+                  </li>
+                ) : (
+                  <li key={f.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <span>
+                      <strong>{FEATURE_TYPE_LABEL[f.feature_type]}</strong>
+                      {f.label ? ` — ${f.label}` : ""}
+                    </span>
+                    <span className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingFeatureId(f.id);
+                          setEditingFeatureLabel(f.label ?? "");
+                        }}
+                        className="text-xs font-semibold text-indigo-600 underline"
+                      >
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => deleteFeature(f)} className="text-xs font-semibold text-red-600 underline">
+                        Remove
+                      </button>
+                    </span>
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </>
