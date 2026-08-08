@@ -261,15 +261,18 @@ export default function AdminFlyersPage() {
     setCategory("");
   }
 
-  async function removeAssignment(id: string) {
+  async function removeAssignment(rotation: FlyerRotation) {
+    const flyerName = flyerById.get(rotation.flyer_id)?.name ?? "this flyer";
+    if (!window.confirm(`Remove ${flyerName} from ${BOARD_LABEL[rotation.assigned_board]}?`)) return;
     setError(null);
     const supabase = createClient();
-    const { error: deleteError } = await supabase.from("flyer_rotation").delete().eq("id", id);
+    const { error: deleteError } = await supabase.from("flyer_rotation").delete().eq("id", rotation.id);
     if (deleteError) {
       setError(deleteError.message);
       return;
     }
-    setRotations((prev) => prev.filter((r) => r.id !== id));
+    setRotations((prev) => prev.filter((r) => r.id !== rotation.id));
+    flash(`✓ Removed ${flyerName} from ${BOARD_LABEL[rotation.assigned_board]}`);
   }
 
   async function cycleAssignmentStatus(rotation: FlyerRotation) {
@@ -511,7 +514,7 @@ export default function AdminFlyersPage() {
                 >
                   {r.status}
                 </button>
-                <button type="button" onClick={() => removeAssignment(r.id)} className="text-xs font-semibold text-red-600 underline">
+                <button type="button" onClick={() => removeAssignment(r)} className="text-xs font-semibold text-red-600 underline">
                   Remove
                 </button>
               </div>

@@ -317,6 +317,12 @@ function EntityDetail({
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
+  }
 
   async function loadNotes() {
     const supabase = createClient();
@@ -406,6 +412,7 @@ function EntityDetail({
     setNewNoteBody("");
     await loadNotes();
     await loadTimeline();
+    flash("✓ Note added");
   }
 
   async function loadRevisions(noteId: string) {
@@ -430,13 +437,24 @@ function EntityDetail({
       setEditingNoteId(null);
       return;
     }
+    setError(null);
     const supabase = createClient();
     // Preserve history: archive the old body before overwriting it.
-    await supabase.from("admin_note_revisions").insert({ note_id: note.id, previous_body: note.body, edited_by_email: adminEmail });
-    await supabase
+    const { error: revisionError } = await supabase
+      .from("admin_note_revisions")
+      .insert({ note_id: note.id, previous_body: note.body, edited_by_email: adminEmail });
+    if (revisionError) {
+      setError(revisionError.message);
+      return;
+    }
+    const { error: updateError } = await supabase
       .from("admin_notes")
       .update({ body: editBody.trim(), updated_at: new Date().toISOString(), updated_by_email: adminEmail })
       .eq("id", note.id);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
     setEditingNoteId(null);
     setRevisionsByNote((prev) => {
       const next = { ...prev };
@@ -444,13 +462,20 @@ function EntityDetail({
       return next;
     });
     await loadNotes();
+    flash("✓ Note updated");
   }
 
   async function saveCrmField(patch: Partial<Vendor>) {
     if (!vendor) return;
+    setError(null);
     const supabase = createClient();
-    await supabase.from("vendors").update(patch).eq("id", vendor.id);
+    const { error: updateError } = await supabase.from("vendors").update(patch).eq("id", vendor.id);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
     onVendorUpdated(patch);
+    flash("✓ Updated");
   }
 
   return (
@@ -560,6 +585,7 @@ function EntityDetail({
           </button>
         </div>
         {error && <p role="alert" className="mt-2 text-sm font-medium text-red-600">{error}</p>}
+        {toast && <p role="status" aria-live="polite" className="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">{toast}</p>}
 
         <div className="mt-4 space-y-3">
           {notes.length === 0 && <p className="text-sm text-slate-500">No notes yet.</p>}

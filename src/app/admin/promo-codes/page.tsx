@@ -17,6 +17,12 @@ export default function AdminPromoCodesPage() {
   const [vendors, setVendors] = useState<Pick<Vendor, "id" | "business_name">[]>([]);
   const [grants, setGrants] = useState<PromoCodeGrant[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
+  }
 
   const [newCode, setNewCode] = useState(randomCode());
   const [newTierId, setNewTierId] = useState("");
@@ -84,12 +90,14 @@ export default function AdminPromoCodesPage() {
       return;
     }
     setCodes((prev) => [data, ...prev]);
+    flash(`✓ Created code ${data.code}`);
     setNewCode(randomCode());
     setNewMaxUses("1");
     setNewExpiresAt("");
   }
 
   async function toggleActive(code: PromoCode) {
+    if (code.is_active && !window.confirm(`Disable code "${code.code}"? Vendors won't be able to redeem it anymore.`)) return;
     setError(null);
     const supabase = createClient();
     const { data, error: updateError } = await supabase
@@ -103,6 +111,7 @@ export default function AdminPromoCodesPage() {
       return;
     }
     setCodes((prev) => prev.map((c) => (c.id === code.id ? data : c)));
+    flash(data.is_active ? `✓ ${data.code} re-enabled` : `✓ ${data.code} disabled`);
   }
 
   if (status === "loading") {
@@ -133,6 +142,7 @@ export default function AdminPromoCodesPage() {
       </p>
 
       {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+      {toast && <p role="status" aria-live="polite" className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">{toast}</p>}
 
       <form onSubmit={createCode} className="mt-6 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4">
         <div>
@@ -211,6 +221,7 @@ export default function AdminPromoCodesPage() {
               vendorNameById={vendorNameById}
               grants={grants.filter((g) => g.promo_code_id === c.id)}
               onChanged={loadGrants}
+              onFlash={flash}
             />
           </div>
         ))}
@@ -229,12 +240,14 @@ function CodeGrants({
   vendorNameById,
   grants,
   onChanged,
+  onFlash,
 }: {
   code: PromoCode;
   vendors: Pick<Vendor, "id" | "business_name">[];
   vendorNameById: Map<string, string>;
   grants: PromoCodeGrant[];
   onChanged: () => void;
+  onFlash: (msg: string) => void;
 }) {
   const grantedVendorIds = useMemo(() => new Set(grants.map((g) => g.vendor_id)), [grants]);
   const availableVendors = useMemo(() => vendors.filter((v) => !grantedVendorIds.has(v.id)), [vendors, grantedVendorIds]);
@@ -258,9 +271,12 @@ function CodeGrants({
     }
     setPickerVendorId("");
     onChanged();
+    onFlash(`✓ Authorized ${vendorNameById.get(pickerVendorId) ?? "vendor"} for ${code.code}`);
   }
 
   async function revokeVendor(vendorId: string) {
+    const vendorName = vendorNameById.get(vendorId) ?? "this vendor";
+    if (!window.confirm(`Revoke ${vendorName}'s access to code "${code.code}"?`)) return;
     setLocalError(null);
     const supabase = createClient();
     const { error: deleteError } = await supabase
@@ -273,6 +289,7 @@ function CodeGrants({
       return;
     }
     onChanged();
+    onFlash(`✓ Revoked ${vendorName}'s access to ${code.code}`);
   }
 
   return (

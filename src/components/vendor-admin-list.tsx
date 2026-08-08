@@ -324,14 +324,23 @@ export function VendorAdminList({
     );
     setBatchBusy(false);
     const updated = new Map<string, Vendor>();
+    const failed: string[] = [];
     for (const r of results) {
       if (r.data) {
         updated.set(r.data.id, r.data);
         logActivity(supabase, "vendor", r.data.id, r.data.business_name, "Updated (batch)", describePatch(patch));
+      } else if (r.error) {
+        failed.push(r.error.message);
       }
     }
     setVendors((prev) => prev.map((v) => updated.get(v.id) ?? v));
     setSelected(new Set());
+    if (failed.length > 0) {
+      setError(`${updated.size} updated, ${failed.length} failed: ${failed[0]}`);
+    } else {
+      setConfirmation(`✓ Updated ${updated.size} vendor${updated.size === 1 ? "" : "s"} — ${describePatch(patch)}`);
+      window.setTimeout(() => setConfirmation((c) => (c?.startsWith("✓") ? null : c)), 4000);
+    }
   }
 
   const boostRequests = vendors.filter((v) => v.boost_requested_at && !v.is_top10);
@@ -524,7 +533,11 @@ export function VendorAdminList({
           <button
             type="button"
             disabled={batchBusy}
-            onClick={() => batchUpdate({ status: "rejected" })}
+            onClick={() => {
+              if (window.confirm(`Reject all ${selected.size} selected vendor(s)? They'll be hidden from the public site.`)) {
+                batchUpdate({ status: "rejected" });
+              }
+            }}
             className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
           >
             Reject All
@@ -639,7 +652,11 @@ export function VendorAdminList({
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => updateVendor(vendor.id, { status: "rejected" })}
+                  onClick={() => {
+                    if (window.confirm(`Reject ${vendor.business_name}? They'll be hidden from the public site.`)) {
+                      updateVendor(vendor.id, { status: "rejected" });
+                    }
+                  }}
                   className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                 >
                   {busy ? "Saving…" : "Reject"}
@@ -649,7 +666,11 @@ export function VendorAdminList({
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => updateVendor(vendor.id, { status: "suspended" })}
+                  onClick={() => {
+                    if (window.confirm(`Suspend ${vendor.business_name}? They'll be hidden from the public site until reactivated.`)) {
+                      updateVendor(vendor.id, { status: "suspended" });
+                    }
+                  }}
                   className="rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
                 >
                   {busy ? "Saving…" : "Suspend"}

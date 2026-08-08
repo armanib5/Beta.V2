@@ -105,6 +105,12 @@ export default function AdminZonesPage() {
   const [features, setFeatures] = useState<ZoneFeature[]>([]);
   const [loadingZone, setLoadingZone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
+  }
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
 
@@ -271,6 +277,7 @@ export default function AdminZonesPage() {
     }
     logActivity(supabase, "booth", data.id, `Booth ${data.booth_number ?? data.label}`, `Status → ${nextStatus}`);
     setBooths((prev) => prev.map((b) => (b.id === booth.id ? data : b)));
+    flash(`✓ Booth ${data.booth_number ?? data.label} → ${nextStatus}`);
   }
 
   async function addBooth(e: React.FormEvent) {
@@ -310,6 +317,7 @@ export default function AdminZonesPage() {
         .join(", "),
     );
     setBooths((prev) => [...prev, data]);
+    flash(`✓ Added Booth ${data.booth_number ?? data.label}`);
     setNewNumber("");
     setNewX("");
     setNewY("");
@@ -332,6 +340,7 @@ export default function AdminZonesPage() {
     const vendorName = vendors.find((v) => v.id === vendorId)?.business_name ?? "no vendor";
     logActivity(supabase, "booth", data.id, `Booth ${data.booth_number ?? data.label}`, "Assigned vendor", vendorName);
     setBooths((prev) => prev.map((b) => (b.id === booth.id ? data : b)));
+    flash(`✓ Booth ${data.booth_number ?? data.label} assigned to ${vendorName}`);
   }
 
   async function addBoundary(e: React.FormEvent) {
@@ -355,6 +364,7 @@ export default function AdminZonesPage() {
       return;
     }
     setBoundaries((prev) => [...prev, data]);
+    flash(`✓ Added ${data.boundary_type.replace("_", " ")} boundary`);
     setNewBoundaryLabel("");
     setNewBoundaryPoints("");
     setDrawnPoints([]);
@@ -427,18 +437,21 @@ export default function AdminZonesPage() {
     }
     setBooths((prev) => [...prev, ...(boothRes.data ?? [])]);
     setBoundaries((prev) => [...prev, ...(boundaryRes.data ?? [])]);
+    flash(`✓ Copied zone layout (${boothRes.data?.length ?? 0} booths, ${boundaryRes.data?.length ?? 0} boundaries)`);
     setCopyFromEventId("");
   }
 
-  async function deleteBoundary(id: string) {
+  async function deleteBoundary(b: ZoneBoundary) {
+    if (!window.confirm(`Remove this ${b.boundary_type.replace("_", " ")}${b.label ? ` (${b.label})` : ""}?`)) return;
     setError(null);
     const supabase = createClient();
-    const { error: deleteError } = await supabase.from("zone_boundaries").delete().eq("id", id);
+    const { error: deleteError } = await supabase.from("zone_boundaries").delete().eq("id", b.id);
     if (deleteError) {
       setError(deleteError.message);
       return;
     }
-    setBoundaries((prev) => prev.filter((b) => b.id !== id));
+    setBoundaries((prev) => prev.filter((x) => x.id !== b.id));
+    flash(`✓ Removed ${b.boundary_type.replace("_", " ")}`);
   }
 
   // --- Geo mode: boundary tracing -------------------------------------------------
@@ -472,6 +485,7 @@ export default function AdminZonesPage() {
     setBoundaries((prev) => [...prev, data]);
     setDrawnGeoPoints([]);
     setZoneUiMode("view");
+    flash("✓ Event boundary saved");
   }
 
   async function editEventBoundary() {
@@ -485,6 +499,7 @@ export default function AdminZonesPage() {
       return;
     }
     setBoundaries((prev) => prev.filter((b) => b.id !== eventBoundary.id));
+    flash("✓ Boundary cleared — retrace it now");
     startTraceBoundary();
   }
 
@@ -539,6 +554,7 @@ export default function AdminZonesPage() {
       }
       logActivity(supabase, "booth", data.id, `Booth ${data.booth_number}`, "Placed on Event Zone map");
       setBooths((prev) => [...prev, data]);
+      flash(`✓ Placed Booth ${data.booth_number}`);
     } else {
       const { data, error: insertError } = await supabase
         .from("zone_features")
@@ -556,20 +572,23 @@ export default function AdminZonesPage() {
         return;
       }
       setFeatures((prev) => [...prev, data]);
+      flash(`✓ Placed ${FEATURE_TYPE_LABEL[placingType]}`);
     }
     setPendingPlacement(null);
     setPlacingLabel("");
   }
 
-  async function deleteFeature(id: string) {
+  async function deleteFeature(f: ZoneFeature) {
+    if (!window.confirm(`Remove this ${FEATURE_TYPE_LABEL[f.feature_type]}${f.label ? ` (${f.label})` : ""}?`)) return;
     setError(null);
     const supabase = createClient();
-    const { error: deleteError } = await supabase.from("zone_features").delete().eq("id", id);
+    const { error: deleteError } = await supabase.from("zone_features").delete().eq("id", f.id);
     if (deleteError) {
       setError(deleteError.message);
       return;
     }
-    setFeatures((prev) => prev.filter((f) => f.id !== id));
+    setFeatures((prev) => prev.filter((x) => x.id !== f.id));
+    flash(`✓ Removed ${FEATURE_TYPE_LABEL[f.feature_type]}`);
   }
 
   function exportZoneWord() {
@@ -764,6 +783,7 @@ ${
       )}
 
       {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+      {toast && <p role="status" aria-live="polite" className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">{toast}</p>}
 
       {dataMode === "geo" ? (
         <>
@@ -952,7 +972,7 @@ ${
                     <strong>{FEATURE_TYPE_LABEL[f.feature_type]}</strong>
                     {f.label ? ` — ${f.label}` : ""}
                   </span>
-                  <button type="button" onClick={() => deleteFeature(f.id)} className="text-xs font-semibold text-red-600 underline">
+                  <button type="button" onClick={() => deleteFeature(f)} className="text-xs font-semibold text-red-600 underline">
                     Remove
                   </button>
                 </li>
@@ -1161,7 +1181,7 @@ ${
                     <strong className="capitalize">{b.boundary_type.replace("_", " ")}</strong>
                     {b.label ? ` — ${b.label}` : ""} ({b.points_geo?.length ?? b.points.length} points)
                   </span>
-                  <button type="button" onClick={() => deleteBoundary(b.id)} className="text-xs font-semibold text-red-600 underline">
+                  <button type="button" onClick={() => deleteBoundary(b)} className="text-xs font-semibold text-red-600 underline">
                     Remove
                   </button>
                 </li>

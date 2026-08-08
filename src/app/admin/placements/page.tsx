@@ -31,6 +31,12 @@ export default function AdminPlacementsPage() {
   const [grantTierSlug, setGrantTierSlug] = useState<"vendor-boost" | "top10-30min">("vendor-boost");
   const [granting, setGranting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 4000);
+  }
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -142,16 +148,29 @@ export default function AdminPlacementsPage() {
       const vendor = vendorById.get(grantVendorId);
       logActivity(supabase, "vendor", grantVendorId, vendor?.business_name ?? grantVendorId, "Admin-granted boost", tier.name);
       await loadData();
+      flash(`✓ Granted ${tier.name} to ${vendor?.business_name ?? "vendor"}`);
       setGrantVendorId("");
     } finally {
       setGranting(false);
     }
   }
 
-  async function endBoostNow(bookingId: string) {
+  async function endBoostNow(booking: VendorBoostBooking) {
+    const vendorName = vendorById.get(booking.vendor_id)?.business_name ?? booking.vendor_id;
+    if (!window.confirm(`End ${vendorName}'s boost now?`)) return;
+    setError(null);
     const supabase = createClient();
-    await supabase.from("vendor_boost_bookings").update({ slot_end: new Date().toISOString() }).eq("id", bookingId);
+    const { error: updateError } = await supabase
+      .from("vendor_boost_bookings")
+      .update({ slot_end: new Date().toISOString() })
+      .eq("id", booking.id);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    logActivity(supabase, "vendor", booking.vendor_id, vendorName, "Admin ended boost early");
     await loadData();
+    flash(`✓ Ended ${vendorName}'s boost`);
   }
 
   if (status === "loading") {
@@ -225,6 +244,7 @@ export default function AdminPlacementsPage() {
           </button>
         </div>
         {error && <p role="alert" className="mt-2 text-sm font-medium text-red-600">{error}</p>}
+        {toast && <p role="status" aria-live="polite" className="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">{toast}</p>}
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[700px] border-collapse text-left text-sm">
@@ -271,7 +291,7 @@ export default function AdminPlacementsPage() {
                         {!isExpired && (
                           <button
                             type="button"
-                            onClick={() => endBoostNow(booking.id)}
+                            onClick={() => endBoostNow(booking)}
                             className="rounded-full border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
                           >
                             End Now

@@ -31,6 +31,7 @@ export default function AdminReportsPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "app_bug" | "vendor" | "event">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | ReportStatus>("all");
   const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function flash(msg: string) {
     setToast(msg);
@@ -61,9 +62,13 @@ export default function AdminReportsPage() {
   }, []);
 
   async function setReportStatus(id: string, next: ReportStatus) {
+    setError(null);
     const supabase = createClient();
-    const { error } = await supabase.from("reports").update({ status: next }).eq("id", id);
-    if (error) return;
+    const { error: updateError } = await supabase.from("reports").update({ status: next }).eq("id", id);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
     setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status: next } : r)));
     flash(`✓ Marked ${next}`);
   }
@@ -74,15 +79,16 @@ export default function AdminReportsPage() {
   // reviewed it and decided the report doesn't hold up.
   async function reactivateListing(r: Report) {
     if (!r.target_id) return;
+    setError(null);
     const supabase = createClient();
     const name = r.target_name ?? r.target_type;
-    if (r.target_type === "vendor") {
-      await supabase.from("vendors").update({ status: "active" }).eq("id", r.target_id);
-      logActivity(supabase, "vendor", r.target_id, name, "Admin reactivated listing after report review");
-    } else if (r.target_type === "event") {
-      await supabase.from("lov_entries").update({ status: "active" }).eq("id", r.target_id);
-      logActivity(supabase, "event", r.target_id, name, "Admin reactivated listing after report review");
+    const table = r.target_type === "vendor" ? "vendors" : "lov_entries";
+    const { error: updateError } = await supabase.from(table).update({ status: "active" }).eq("id", r.target_id);
+    if (updateError) {
+      setError(updateError.message);
+      return;
     }
+    logActivity(supabase, r.target_type === "vendor" ? "vendor" : "event", r.target_id, name, "Admin reactivated listing after report review");
     flash(`✓ Reactivated ${name}`);
   }
 
@@ -146,6 +152,7 @@ export default function AdminReportsPage() {
         <span className="ml-auto text-sm font-medium text-slate-500">{filtered.length} shown</span>
       </div>
 
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
       {toast && <p role="status" aria-live="polite" className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">{toast}</p>}
 
       <div className="mt-6 space-y-2">
