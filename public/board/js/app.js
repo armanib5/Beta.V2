@@ -372,7 +372,7 @@ function recurrenceToDayCode(recurrence){
 var LOV_CAT_SLUG_TO_BOARD={
   "farmers-market":"market","farmers-market-vendor":"market","fair":"market",
   "maker-market":"market","night-market":"market","art-walk":"seasonal",
-  "music-festival":"venue","comedy-show":"venue","live-show":"venue",
+  "music-festival":"seasonal","comedy-show":"venue","live-show":"venue",
   "cultural-festival":"venue","gaming-festival":"venue","outdoor-movie":"venue",
   "community-event":"centers","restaurant":"bars","bar":"bars",
   "workshop-class":"workshop","park-event":"parks","city-art":"cityart",
