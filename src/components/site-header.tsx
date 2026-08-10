@@ -158,16 +158,13 @@ export function SiteHeader() {
               {pendingCount}
             </Link>
           )}
+          {/* In normal flow next to the logo (not absolutely centered over
+              the header), so it can never sit on top of a nav link at any
+              viewport width - only shown at xl+ so it stays off tablets. */}
+          <span className="hidden rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 xl:inline-block">
+            Beta V2
+          </span>
         </div>
-
-        {/* Centered-absolute + sm:block (640px+) used to overlap the
-            md:flex desktop nav (768px+) across the whole iPad portrait/
-            landscape range (768-1024px), sitting on top of Directory and
-            other nav items. xl:block keeps it off every tablet width and
-            only shows it on genuinely wide desktop viewports. */}
-        <span className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 xl:block">
-          Beta V2
-        </span>
 
         <nav className="hidden items-center gap-6 md:flex">
           {boardLinks.map((link) => (

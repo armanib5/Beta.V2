@@ -17,7 +17,9 @@ export default function VendorProfilePage() {
 
 function VendorProfile() {
   const slug = useSearchParams().get("slug");
-  const [status, setStatus] = useState<"loading" | "not-found" | "ready">(slug ? "loading" : "not-found");
+  const [status, setStatus] = useState<"loading" | "not-found" | "own-pending" | "ready">(
+    slug ? "loading" : "not-found",
+  );
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [photos, setPhotos] = useState<VendorPhoto[]>([]);
@@ -37,7 +39,27 @@ function VendorProfile() {
       .then(async ({ data: vendorRow }) => {
         if (cancelled) return;
         if (!vendorRow) {
-          setStatus("not-found");
+          // Not live publicly yet - before saying "not found" (which reads
+          // as a broken link/typo), check whether the visitor is signed in
+          // as the vendor this slug actually belongs to. That row is only
+          // readable via RLS by its own owner or an admin regardless of
+          // status, so this never reveals anything about someone else's
+          // not-yet-active listing to an unrelated visitor - a random
+          // visitor still just sees "not found".
+          const { data: authData } = await supabase.auth.getUser();
+          if (authData.user) {
+            const { data: ownRow } = await supabase
+              .from("vendors")
+              .select("slug")
+              .eq("id", authData.user.id)
+              .eq("slug", slug)
+              .maybeSingle<{ slug: string }>();
+            if (!cancelled && ownRow) {
+              setStatus("own-pending");
+              return;
+            }
+          }
+          if (!cancelled) setStatus("not-found");
           return;
         }
         setVendor(vendorRow);
@@ -74,6 +96,21 @@ function VendorProfile() {
 
   if (status === "loading") {
     return <div role="status" aria-live="polite" className="mx-auto max-w-3xl px-4 py-10 text-sm text-slate-500">Loading…</div>;
+  }
+
+  if (status === "own-pending") {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-bold text-slate-900">Your profile is pending approval</h1>
+        <p className="mt-3 text-sm text-slate-600">
+          This public profile page becomes available as soon as your account is activated. You can
+          keep setting it up from your dashboard in the meantime.
+        </p>
+        <Link href="/vendor/dashboard" className="mt-4 inline-block text-sm font-semibold text-slate-900 underline">
+          Go to My Dashboard
+        </Link>
+      </div>
+    );
   }
 
   if (status === "not-found" || !vendor) {

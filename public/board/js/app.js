@@ -341,12 +341,78 @@ function load(){
 }
 
 var WEEKDAY_CODES=[["sun","sunday"],["mon","monday"],["tue","tuesday"],["wed","wednesday"],["thu","thursday"],["fri","friday"],["sat","saturday"]];
+var ORDINAL_WEEK={"1st":1,"first":1,"2nd":2,"second":2,"3rd":3,"third":3,"4th":4,"fourth":4,"5th":5,"fifth":5,"last":-1};
+/* ev.d used to be a single 3-letter code ("fri") picked as whichever
+   weekday name appeared first in a fixed Sunday-Saturday scan - so "1st
+   Friday of every month" (Art Walk) matched every Friday instead of just
+   the first, and "Fridays–Sundays; also Thursdays" (Docent-led Tours)
+   matched only Sunday, silently dropping Thu/Fri/Sat. Two richer (but
+   still single-string, so isToday/isWeek/eventSortKey below only need
+   small additions, not a redesign) encodings fix both: "ord<week><code>"
+   for an ordinal-of-month rule (e.g. "ord1fri" = 1st Friday), and a
+   comma-joined code list ("thu,fri,sat,sun") for a range/list of
+   weekdays that all recur every week. Neither format is ever 10
+   characters long (dates are always exactly "YYYY-MM-DD", 10 chars),
+   so eventSortKey's date-string check below can't collide with them. */
 function recurrenceToDayCode(recurrence){
   var lower=(recurrence||"").toLowerCase();
-  for(var i=0;i<WEEKDAY_CODES.length;i++){
-    if(lower.indexOf(WEEKDAY_CODES[i][1])>=0)return WEEKDAY_CODES[i][0];
+  var i;
+
+  var ordinalRe=/\b(1st|first|2nd|second|3rd|third|4th|fourth|5th|fifth|last)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/;
+  var ordinalMatch=lower.match(ordinalRe);
+  if(ordinalMatch){
+    var week=ORDINAL_WEEK[ordinalMatch[1]];
+    for(i=0;i<WEEKDAY_CODES.length;i++){
+      if(WEEKDAY_CODES[i][1]===ordinalMatch[2])return "ord"+week+WEEKDAY_CODES[i][0];
+    }
   }
+
+  var codes=[];
+  var rangeRe=/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)s?\s*[-–—]+\s*(sunday|monday|tuesday|wednesday|thursday|friday|saturday)s?\b/;
+  var rangeMatch=lower.match(rangeRe);
+  if(rangeMatch){
+    var startIdx=-1,endIdx=-1;
+    for(i=0;i<WEEKDAY_CODES.length;i++){
+      if(WEEKDAY_CODES[i][1]===rangeMatch[1])startIdx=i;
+      if(WEEKDAY_CODES[i][1]===rangeMatch[2])endIdx=i;
+    }
+    if(startIdx>=0&&endIdx>=0){
+      var k=startIdx;
+      for(;;){
+        codes.push(WEEKDAY_CODES[k][0]);
+        if(k===endIdx)break;
+        k=(k+1)%7;
+      }
+    }
+    lower=lower.replace(rangeMatch[0],"");
+  }
+
+  for(i=0;i<WEEKDAY_CODES.length;i++){
+    if(lower.indexOf(WEEKDAY_CODES[i][1])>=0&&codes.indexOf(WEEKDAY_CODES[i][0])<0){
+      codes.push(WEEKDAY_CODES[i][0]);
+    }
+  }
+
+  if(codes.length===1)return codes[0];
+  if(codes.length>1)return codes.join(",");
   return "monthly";
+}
+/* Date-of-month (1-based) for the `week`-th occurrence of `weekday`
+   (0=Sun..6=Sat) in the given month, or null if it doesn't exist (e.g. a
+   "5th Friday" in a month with only 4). week=-1 means "last". Mirrors
+   src/lib/recurrence.ts's nthWeekdayDateOfMonth - same rule, ported
+   because this file has no shared module boundary with the Next app. */
+function nthWeekdayDateOfMonth(year,month,weekday,week){
+  var daysInMonth=new Date(year,month+1,0).getDate();
+  var firstDow=new Date(year,month,1).getDay();
+  var firstOccurrence=1+((weekday-firstDow+7)%7);
+  if(week===-1){
+    var last=firstOccurrence;
+    while(last+7<=daysInMonth)last+=7;
+    return last;
+  }
+  var date=firstOccurrence+(week-1)*7;
+  return date<=daysInMonth?date:null;
 }
 
 /* Calendar events (V2's lov_entries, a *different* Supabase project from
@@ -617,21 +683,36 @@ function expire(){
   var t=todayLocal();
   evts.forEach(function(e){if(e.ed&&e.ed<t)e.exp=true;});
 }
-function isToday(ev){
-  var d=new Date(),dn=["sun","mon","tue","wed","thu","fri","sat"][d.getDay()];
-  if(!ev.d)return false;
-  if(ev.d==="daily"||ev.d==="today")return true;
-  if(ev.d===dn)return true;
-  if(ev.d==="monthly"){
-    if(d.getDay()!==5)return false;
-    var f=new Date(d.getFullYear(),d.getMonth(),1);
-    while(f.getDay()!==5)f.setDate(f.getDate()+1);
-    return d.getDate()===f.getDate();
+/* Whether a recurrence day-code (see recurrenceToDayCode above) matches
+   one specific date - the one place this logic lives, so isToday() and
+   eventOnDate() (which used to each reimplement this matching slightly
+   differently, the actual root cause of the "1st Friday shows every
+   Friday" bug) can't drift apart from each other again. */
+function dayCodeMatchesDate(code,d){
+  var dn=["sun","mon","tue","wed","thu","fri","sat"][d.getDay()];
+  if(!code)return false;
+  if(code==="daily"||code==="today")return true;
+  if(code.indexOf("ord")===0){
+    var ordMatch=code.match(/^ord(-?\d)([a-z]{3})$/);
+    if(!ordMatch||ordMatch[2]!==dn)return false;
+    return d.getDate()===nthWeekdayDateOfMonth(d.getFullYear(),d.getMonth(),d.getDay(),parseInt(ordMatch[1],10));
   }
-  if(ev.d&&ev.d.length===10)return ev.d===todayLocal();
+  if(code.indexOf(",")>=0)return code.split(",").indexOf(dn)>=0;
+  if(code===dn)return true;
+  if(code==="monthly")return isFirstFridayOfMonth(d);
+  if(code.length===10)return code===dateKeyOf(d);
   return false;
 }
-function isWeek(ev){return!isToday(ev)&&!ev.exp&&["daily","wed","thu","fri","sat","sun","mon","tue","monthly"].indexOf(ev.d)>=0;}
+function isToday(ev){
+  if(!ev.d)return false;
+  return dayCodeMatchesDate(ev.d,new Date());
+}
+function isWeek(ev){
+  if(isToday(ev)||ev.exp)return false;
+  if(["daily","wed","thu","fri","sat","sun","mon","tue","monthly"].indexOf(ev.d)>=0)return true;
+  if(ev.d&&(ev.d.indexOf("ord")===0||ev.d.indexOf(",")>=0))return true;
+  return false;
+}
 
 /* Flyers within a category board sort soonest-upcoming-first, past events
    pushed toward the back (most-recently-past before older-past) instead
@@ -855,10 +936,7 @@ function eventOnDate(ev,d){
   if(ev.exp)return false;
   var key=dateKeyOf(d);
   if(ev.ed&&ev.ed<key)return false;
-  if(ev.d==="daily")return true;
-  if(ev.d==="monthly")return isFirstFridayOfMonth(d);
-  if(ev.d&&ev.d.length===10)return ev.d===key;
-  return ev.d===["sun","mon","tue","wed","thu","fri","sat"][d.getDay()];
+  return dayCodeMatchesDate(ev.d,d);
 }
 
 var DOW_CODES=["sun","mon","tue","wed","thu","fri","sat"];
@@ -1130,8 +1208,19 @@ function mkBoard(cat,items){
     afc.addEventListener("click",(function(c){return function(){openForm(c);};})(cat));
     fstrip.appendChild(mkPinSlot(afc,slotIdx++));
 
+    /* These filler slots used to be completely blank dashed boxes with no
+       text at all - next to zero real flyers, a whole empty-looking
+       category read as broken/loading rather than "nothing posted here
+       yet", which is what it actually is. One small label is enough; the
+       rest stay unlabeled so the row doesn't repeat itself. */
+    var firstEmpty=true;
     while(slotIdx<4){
       var empty=document.createElement("div");empty.className="fc-empty";
+      if(firstEmpty&&items.length===0){
+        var el=document.createElement("div");el.className="al";el.textContent="Nothing posted here yet";
+        empty.appendChild(el);
+        firstEmpty=false;
+      }
       empty.addEventListener("click",(function(c){return function(){openForm(c);};})(cat));
       fstrip.appendChild(mkPinSlot(empty,slotIdx++));
     }

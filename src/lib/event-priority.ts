@@ -5,7 +5,7 @@
 // whether it already happened. This buckets by relevance first, then
 // sorts chronologically within each bucket.
 
-import { parseRecurrence } from "./recurrence";
+import { parseRecurrence, recurrenceOccursOn } from "./recurrence";
 
 export type EventPriorityBucket = "now" | "today" | "tomorrow" | "week" | "later" | "past";
 
@@ -57,12 +57,12 @@ export function eventPriorityBucket(event: EventPriorityInput, now: Date = new D
     return "past";
   }
   if (event.recurrence) {
-    // A recurring event with no specific date is "happening now" on the
-    // day of week it actually recurs on, and otherwise stays visible in
-    // "This Week" rather than falling into "Later"/"Past" just because
-    // it has no single event_date to compare.
-    const { dayOfWeek } = parseRecurrence(event.recurrence);
-    if (dayOfWeek === now.getDay()) return "now";
+    // A recurring event with no specific date is "happening now" only on
+    // a date its own recurrence rule actually covers (e.g. the real 1st
+    // Friday of the month, not every Friday), and otherwise stays
+    // visible in "This Week" rather than falling into "Later"/"Past"
+    // just because it has no single event_date to compare.
+    if (recurrenceOccursOn(parseRecurrence(event.recurrence), now)) return "now";
     return "week";
   }
   return "later";

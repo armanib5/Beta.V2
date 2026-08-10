@@ -120,8 +120,9 @@ export default function AdminReportsPage() {
       </div>
       <p className="mt-1 text-sm text-slate-600">
         Every submission from the Report form on a flyer/vendor/pin, or the waffle menu&apos;s &quot;Report a
-        Bug,&quot; timestamped as it comes in. A vendor or event report immediately suspends/hides that listing
-        from the public site — use &quot;Reactivate Listing&quot; below if a report doesn&apos;t hold up.
+        Bug,&quot; timestamped as it comes in. 3 or more reports against the same vendor/event within 24 hours
+        auto-suspend/hide that listing from the public site — use &quot;Reactivate Listing&quot; below if the
+        reports don&apos;t hold up.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">

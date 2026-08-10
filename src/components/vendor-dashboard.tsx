@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { BASE_PATH } from "@/lib/site";
 import {
   formatPrice,
   type AccountLegalAgreement,
@@ -623,10 +624,15 @@ export function VendorDashboard({
 
   async function saveHubType(next: typeof hubType) {
     setSavingHubType(true);
+    setError(null);
     const supabase = createClient();
     const { error: hubError } = await supabase.from("vendors").update({ hub_type: next }).eq("id", vendor.id);
     setSavingHubType(false);
-    if (!hubError) setHubType(next);
+    if (hubError) {
+      setError(hubError.message || "Couldn't switch your hub type. Please try again.");
+      return;
+    }
+    setHubType(next);
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -707,8 +713,18 @@ export function VendorDashboard({
       </div>
       {vendor.status === "pending" && (
         <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <strong>Pending review.</strong> We&apos;ll activate your account after confirming your
-          payment — finish setting up your profile below in the meantime.
+          {vendor.tier_id ? (
+            <>
+              <strong>Pending review.</strong> We&apos;ll activate your account after confirming your
+              payment — finish setting up your profile below in the meantime.
+            </>
+          ) : (
+            <>
+              <strong>Pending review.</strong> Your free listing is waiting on admin approval before
+              it goes live — no payment is needed for this. Finish setting up your profile below in
+              the meantime.
+            </>
+          )}
         </div>
       )}
       {vendor.status === "suspended" && (
@@ -891,7 +907,7 @@ export function VendorDashboard({
           <p className="mt-1 text-xs text-slate-500">
             Powers &quot;Near You&quot; sorting on the Vendor Directory.
           </p>
-          <div className="mt-2 flex items-center gap-3">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={useCurrentLocation}
@@ -900,6 +916,18 @@ export function VendorDashboard({
             >
               {locating ? "Locating…" : "📍 Use My Current Location"}
             </button>
+            {/* GPS needs a permission grant and being physically at the
+               storefront - neither is guaranteed while filling this out.
+               "Manage My Pin" already lets a vendor place their pin by
+               tapping anywhere on a real map instead, with no GPS or new
+               geocoding system needed - it's the same vendors.lat/lng
+               fields, just a fuller editor (public/pins/js/pins.js). */}
+            <a
+              href={`${BASE_PATH}/pins/`}
+              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              🗺️ Set Address on Map
+            </a>
             {location.lat !== null && location.lng !== null && (
               <span className="text-xs text-slate-500">
                 {location.lat.toFixed(4)}, {location.lng.toFixed(4)}

@@ -1,10 +1,11 @@
 /* Report a flyer/event, a vendor listing, or an unauthorized pin - a
    structured form (not a raw mailto:, which turns into unorganized email
    threads) that inserts into Supabase's `reports` table (V2 project -
-   see supabase/migrations/0026_reports.sql and 0049_report_takedown_
-   auto_suspend.sql, the second of which makes a report on a real vendor/
-   event immediately suspend/hide it pending admin review). Reports show
-   up in /admin/'s Reports tab.
+   see supabase/migrations/0026_reports.sql, 0049_report_takedown_
+   auto_suspend.sql, and 0064_report_suspend_threshold.sql, together
+   auto-suspending/hiding a real vendor/event once 3 reports land against
+   it within 24 hours, pending admin review). Reports show up in
+   /admin/'s Reports tab regardless of whether the threshold is met.
 
    Previously wrote through getSupabase() (shared/supabase-client.js),
    which is hardcoded to the OLD V1 project (shared/supabase-config.js) -

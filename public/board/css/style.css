@@ -132,8 +132,9 @@ body{font-family:'Libre Franklin',sans-serif;color:var(--ink);background:#1a0800
 .afc:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);}
 .afc .ap{font-size:24px;font-family:'Special Elite',monospace;}
 .afc .al{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
-.fc-empty{width:100%;min-height:165px;border:2px dashed rgba(255,255,255,.22);background:rgba(0,0,0,.08);border-radius:2px;cursor:pointer;transition:background .2s;}
+.fc-empty{width:100%;min-height:165px;border:2px dashed rgba(255,255,255,.22);background:rgba(0,0,0,.08);border-radius:2px;cursor:pointer;transition:background .2s;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 10px;}
 .fc-empty:hover{background:rgba(255,255,255,.05);}
+.fc-empty .al{font-size:10px;font-weight:700;letter-spacing:.5px;color:rgba(255,255,255,.4);}
 
 #mapSec{max-width:1060px;margin:0 auto 60px;padding:0 14px;display:none;}
 .mframe{background:repeating-linear-gradient(180deg,var(--w1) 0,var(--w2) 4px,var(--w1) 7px,var(--w3) 10px);border-radius:7px;padding:14px;box-shadow:0 0 0 3px var(--w3),0 0 0 6px var(--w1),0 22px 55px rgba(0,0,0,.65);}
