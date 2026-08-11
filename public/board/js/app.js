@@ -109,6 +109,7 @@ function init(){
   applySharedAnchorOnLoad();
   sortCitySelect();
   setBrand(curCity);
+  updateCityLabel();
   renderHoodRow();
   renderToday();
   renderBoards();
@@ -913,11 +914,26 @@ function renderHoodRow(){
   syncStickyOffsets();
 }
 
+/* Small colored dot next to the city/section label - same .dot mechanism
+   the category boards already use (see mkBoard()) - so it's obvious at a
+   glance which city/section's Board is on screen without a second design
+   system or a page reload. */
+function updateCityLabel(){
+  var el=document.getElementById("citylbl");
+  if(!el)return;
+  var label=(CN[curCity]||curCity)+(curHood&&curHood!=="downtown"?" · "+hoodLabel(curHood):"");
+  el.innerHTML="";
+  var dot=document.createElement("span");
+  dot.className="dot city-"+curCity;
+  el.appendChild(dot);
+  el.appendChild(document.createTextNode(label));
+}
+
 function goToHood(hoodId){
   clearJumpSpacer();
   curHood=hoodId;
   document.querySelectorAll(".hoodbtn").forEach(function(b){b.classList.toggle("on",b.dataset.hoodId===hoodId);});
-  document.getElementById("citylbl").textContent=(CN[curCity]||curCity)+(hoodId!=="downtown"?" · "+hoodLabel(hoodId):"");
+  updateCityLabel();
   setCityBg(curCity,curHood);
   renderBoards();
   renderToday();
@@ -932,7 +948,7 @@ function setCity(v){
   curCity=v;
   var hoods=hoodsForCity(v);
   curHood=hoods.length?hoods[0].id:null;
-  document.getElementById("citylbl").textContent=CN[v]||v;
+  updateCityLabel();
   setBrand(v);
   renderHoodRow();
   setCityBg(v,curHood);
