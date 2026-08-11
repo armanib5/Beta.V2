@@ -65,8 +65,10 @@ var HOODS_CAMP = [
   { id: "camp-pruneyard", l: "Pruneyard",          lat: 37.2932, lng: -121.9447, zoom: 15 }
 ];
 var HOODS_GIL = [
-  { id: "gil-downtown", l: "Downtown Gilroy",         lat: 37.0058, lng: -121.5683, zoom: 15 },
-  { id: "gil-outlets",  l: "Gilroy Premium Outlets",  lat: 37.0136, lng: -121.5758, zoom: 15 }
+  { id: "gil-downtown", l: "Historic Downtown Gilroy",  lat: 37.0058, lng: -121.5683, zoom: 15 },
+  { id: "gil-outlets",  l: "Gilroy Premium Outlets",    lat: 37.0253, lng: -121.5654, zoom: 15 },
+  { id: "gil-hecker",   l: "Garlic Festival District",  lat: 37.0060, lng: -121.6280, zoom: 14 },
+  { id: "gil-1st",      l: "First Street Corridor",     lat: 37.0140, lng: -121.5940, zoom: 15 }
 ];
 
 /* Top-level city switcher - each city carries its own list of mini
@@ -184,5 +186,10 @@ var PLACES = [
   { "id": "ctr-sv", "cat": "centers", "hood": "sv-downtown", "t": "Sunnyvale Civic Center", "a": "456 W Olive Ave, Sunnyvale, CA 94086", "lat": 37.3697, "lng": -122.0372, "ds": "City Hall, Community Center, and Senior Center complex." },
   { "id": "ctr-mv", "cat": "centers", "hood": "mv-downtown", "t": "Mountain View Civic Center", "a": "500 Castro St, Mountain View, CA 94041", "lat": 37.3894, "lng": -122.0819, "ds": "City Hall, library, and Center for the Performing Arts." },
   { "id": "ctr-camp", "cat": "centers", "hood": "camp-downtown", "t": "Campbell Community Center", "a": "1 W Campbell Ave, Campbell, CA 95008", "lat": 37.2872, "lng": -121.9497, "ds": "Community center and public services for the City of Campbell." },
-  { "id": "ctr-gil", "cat": "centers", "hood": "gil-downtown", "t": "Gilroy City Hall", "a": "7351 Rosanna St, Gilroy, CA 95020", "lat": 37.0046, "lng": -121.568, "ds": "Civic center for the City of Gilroy." }
+  { "id": "ctr-gil", "cat": "centers", "hood": "gil-downtown", "t": "Gilroy City Hall", "a": "7351 Rosanna St, Gilroy, CA 95020", "lat": 37.0046, "lng": -121.568, "ds": "Civic center for the City of Gilroy." },
+  { "id": "gil-r1", "cat": "restaurants", "hood": "gil-downtown", "t": "Old City Hall Restaurant", "a": "7400 Monterey St, Gilroy, CA 95020", "lat": 37.0070318, "lng": -121.5684330, "ds": "Historic restaurant in Gilroy's original 1905 City Hall building on Monterey Street." },
+  { "id": "gil-shp1", "cat": "shop", "hood": "gil-outlets", "t": "Gilroy Premium Outlets", "a": "681 Leavesley Rd, Gilroy, CA 95020", "lat": 37.0253014, "lng": -121.5653754, "ds": "Outlet shopping center with over 130 stores." },
+  { "id": "gil-tr1", "cat": "transit", "hood": "gil-downtown", "t": "Gilroy Caltrain Station", "a": "7150 Monterey St, Gilroy, CA 95020", "lat": 37.0044505, "lng": -121.5668737, "ds": "Southern terminus of the Caltrain line." },
+  { "id": "gil-ctr2", "cat": "centers", "hood": "gil-downtown", "t": "Gilroy Public Library", "a": "350 W 6th St, Gilroy, CA 95020", "lat": 37.0050762, "lng": -121.5726956, "ds": "Santa Clara County Library District branch serving Gilroy." },
+  { "id": "gil-bar1", "cat": "bars", "hood": "gil-hecker", "t": "Sarah's Vineyard", "a": "4005 Hecker Pass Hwy, Gilroy, CA 95020", "lat": 37.0118415, "lng": -121.6295403, "ds": "Winery and tasting room on Hecker Pass Highway; hosts a recurring Friday night Wine, Dine & Dance music series." }
 ];

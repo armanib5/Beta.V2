@@ -23,8 +23,10 @@ var CITY_CENTERS = [
   { id: "mv-shoreline", city: "Mountain View", section: "Shoreline", label: "Shoreline", lat: 37.4048, lng: -122.0784 },
   { id: "camp-downtown", city: "Campbell", section: "Downtown", label: "Downtown Campbell", lat: 37.2872, lng: -121.95 },
   { id: "camp-pruneyard", city: "Campbell", section: "Pruneyard", label: "Pruneyard", lat: 37.2932, lng: -121.9447 },
-  { id: "gil-downtown", city: "Gilroy", section: "Downtown", label: "Downtown Gilroy", lat: 37.0058, lng: -121.5683 },
-  { id: "gil-outlets", city: "Gilroy", section: "Outlets", label: "Gilroy Premium Outlets", lat: 37.0136, lng: -121.5758 }
+  { id: "gil-downtown", city: "Gilroy", section: "Historic Downtown", label: "Historic Downtown Gilroy / Monterey St Corridor", lat: 37.0058, lng: -121.5683 },
+  { id: "gil-outlets", city: "Gilroy", section: "Premium Outlets", label: "Gilroy Premium Outlets Area", lat: 37.0253, lng: -121.5654 },
+  { id: "gil-hecker", city: "Gilroy", section: "Garlic Festival District", label: "Garlic Festival District / Hecker Pass Corridor", lat: 37.006, lng: -121.628 },
+  { id: "gil-1st", city: "Gilroy", section: "First Street Corridor", label: "First Street Commercial Corridor", lat: 37.014, lng: -121.594 }
 ];
 
 var ANCHOR_STORAGE_KEY = "citypinned_anchor";
