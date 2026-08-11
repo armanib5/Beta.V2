@@ -191,5 +191,5 @@ var PLACES = [
   { "id": "gil-shp1", "cat": "shop", "hood": "gil-outlets", "t": "Gilroy Premium Outlets", "a": "681 Leavesley Rd, Gilroy, CA 95020", "lat": 37.0253014, "lng": -121.5653754, "ds": "Outlet shopping center with over 130 stores." },
   { "id": "gil-tr1", "cat": "transit", "hood": "gil-downtown", "t": "Gilroy Caltrain Station", "a": "7150 Monterey St, Gilroy, CA 95020", "lat": 37.0044505, "lng": -121.5668737, "ds": "Southern terminus of the Caltrain line." },
   { "id": "gil-ctr2", "cat": "centers", "hood": "gil-downtown", "t": "Gilroy Public Library", "a": "350 W 6th St, Gilroy, CA 95020", "lat": 37.0050762, "lng": -121.5726956, "ds": "Santa Clara County Library District branch serving Gilroy." },
-  { "id": "gil-bar1", "cat": "bars", "hood": "gil-hecker", "t": "Sarah's Vineyard", "a": "4005 Hecker Pass Hwy, Gilroy, CA 95020", "lat": 37.0118415, "lng": -121.6295403, "ds": "Winery and tasting room on Hecker Pass Highway; hosts a recurring Friday night Wine, Dine & Dance music series." }
+  { "id": "gil-bar1", "cat": "bars", "hood": "gil-hecker", "t": "Sarah's Vineyard", "a": "4005 Hecker Pass Hwy, Gilroy, CA 95020", "lat": 37.0152984, "lng": -121.6450314, "ds": "Winery and tasting room on Hecker Pass Highway; hosts a recurring Friday night Wine, Dine & Dance music series." }
 ];
