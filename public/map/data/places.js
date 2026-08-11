@@ -85,16 +85,6 @@ var CITIES = [
 
 var PLACES = [
   {
-    "id": "sm", "cat": "foodhall", "hood": "downtown",
-    "t": "SoFA Market", "w": "Open Daily 11am - 9pm", "d": "daily", "sh": 11, "eh": 21,
-    "a": "387 S 1st St, San Jose, CA 95113",
-    "lat": 37.3302, "lng": -121.8864,
-    "ds": "A permanent downtown food hall with multiple restaurants and a craft cocktail bar.",
-    "pk": "Street parking on 1st and 2nd. ParkSJ on 2nd Street.",
-    "tr": "VTA Route 65/68 on 1st Street.",
-    "wb": "https://sofamarketsj.com"
-  },
-  {
     "id": "wc", "cat": "seasonal", "hood": "downtown",
     "t": "Soccer Celebration - World Cup Watch Party", "w": "June 11 - July 19, all matches live", "d": "today", "ed": "2026-07-19",
     "a": "San Pedro Square Market, 87 N San Pedro St, San Jose, CA 95110",
@@ -124,26 +114,6 @@ var PLACES = [
     "tr": "VTA light rail Convention Center stop, 5 min walk.",
     "wb": "https://www.hammertheatre.com"
   },
-  {
-    "id": "ct", "cat": "venue", "hood": "downtown",
-    "t": "California Theatre", "w": "Box office hours vary",
-    "a": "345 S 1st St, San Jose, CA 95113",
-    "lat": 37.3307, "lng": -121.8869,
-    "ds": "Restored 1927 Spanish Colonial Revival theater. Home to Opera San Jose and Symphony Silicon Valley.",
-    "pk": "Street parking on 1st and 2nd.",
-    "tr": "VTA Route 65/68 on 1st Street.",
-    "wb": "https://www.sanjosetheaters.org"
-  },
-  {
-    "id": "cp", "cat": "venue", "hood": "downtown",
-    "t": "Center for the Performing Arts", "w": "Box office hours vary",
-    "a": "255 Almaden Blvd, San Jose, CA 95113",
-    "lat": 37.3305, "lng": -121.8918,
-    "ds": "Major performing arts center hosting Broadway shows, concerts, and dance.",
-    "pk": "Adjacent garages. Convention Center garage nearby.",
-    "tr": "VTA Convention Center light rail stop, 5 min walk.",
-    "wb": "https://www.sanjosetheaters.org"
-  },
   { "id": "pk1", "cat": "parking", "hood": "downtown", "t": "ParkSJ 2nd Street Garage", "a": "2nd St, San Jose, CA", "lat": 37.3362, "lng": -121.8855, "ds": "City parking garage, 2nd Street entrance." },
   { "id": "pk2", "cat": "parking", "hood": "downtown", "t": "ParkSJ 3rd Street Garage", "a": "3rd St, San Jose, CA", "lat": 37.3361, "lng": -121.8834, "ds": "City parking garage, 3rd Street entrance." },
   { "id": "pk3", "cat": "parking", "hood": "downtown", "t": "San Pedro Square Garage", "a": "San Pedro St, San Jose, CA", "lat": 37.3374, "lng": -121.8936, "ds": "Garage adjacent to San Pedro Square Market." },
@@ -165,11 +135,11 @@ var PLACES = [
   { "id": "pk6", "cat": "parking", "hood": "downtown", "t": "Impark", "a": "S 2nd St, San Jose, CA 95113", "lat": 37.3342, "lng": -121.8866, "ds": "Parking lot between 2nd St and the Hammer Theatre plaza." },
   { "id": "rr6", "cat": "restrooms", "hood": "downtown", "t": "Paseo de San Antonio Restrooms (customers only)", "a": "Paseo de San Antonio, San Jose, CA 95113", "lat": 37.3337, "lng": -121.887, "ds": "No public restroom on this block - Whispers Cafe, Campus Burgers, and the nearby Subway all reserve restrooms for paying customers. Buy something small if you need to use one." },
   { "id": "sc1", "cat": "schools", "hood": "downtown", "t": "San Jose State University", "a": "1 Washington Sq, San Jose, CA 95192", "lat": 37.3352, "lng": -121.8811, "ds": "Public university anchoring the east edge of downtown; frequent public events and lectures." },
-  { "id": "ch1", "cat": "churches", "hood": "downtown", "t": "Cathedral Basilica of St. Joseph", "a": "80 S Market St, San Jose, CA 95113", "lat": 37.3358, "lng": -121.8912, "ds": "Historic Catholic cathedral in the heart of downtown; hosts community and holiday services." },
+  { "id": "ch1", "cat": "churches", "hood": "downtown", "t": "Cathedral Basilica of St. Joseph", "a": "80 S Market St, San Jose, CA 95113", "lat": 37.3340969, "lng": -121.8904833, "ds": "Historic Catholic cathedral in the heart of downtown; hosts community and holiday services." },
   { "id": "ho1", "cat": "hospitals", "hood": "east", "t": "Regional Medical Center of San Jose", "a": "225 N Jackson Ave, San Jose, CA 95116", "lat": 37.3621341, "lng": -121.8493685, "ds": "Full-service hospital serving east San Jose. Coordinates corrected 2026-08 - the previous value was about 1 mile off, on the wrong side of Highway 101 (pin-location audit, high-confidence match, address unchanged)." },
   { "id": "htl1", "cat": "hotel", "hood": "downtown", "t": "Signia by Hilton San Jose", "a": "170 S Market St, San Jose, CA 95113", "lat": 37.3325, "lng": -121.8894, "ds": "Downtown's largest hotel, next to Circle of Palms Plaza. Formerly the Fairmont San Jose - coordinates approximate, not geocode-verified.", "wb": "https://www.hilton.com/en/hotels/sjcshsh-signia-san-jose/" },
   { "id": "jt1", "cat": "foodhall", "hood": "japantown", "t": "Japantown Food Row", "a": "Jackson St, San Jose, CA", "lat": 37.3494, "lng": -121.8925, "ds": "Historic strip of Japanese restaurants and cafes." },
-  { "id": "jt2", "cat": "shop", "hood": "japantown", "t": "Nichi Bei Bussan", "a": "140 Jackson St, San Jose, CA", "lat": 37.3496, "lng": -121.892, "ds": "Longtime Japanese import and gift shop." },
+  { "id": "jt2", "cat": "shop", "hood": "japantown", "t": "Nichi Bei Bussan", "a": "140 Jackson St, San Jose, CA", "lat": 37.3481139, "lng": -121.8956797, "ds": "Longtime Japanese import and gift shop." },
   { "id": "jt3", "cat": "parking", "hood": "japantown", "t": "Japantown Public Parking", "a": "Jackson St, San Jose, CA", "lat": 37.35, "lng": -121.8912, "ds": "Public lot serving Japantown businesses." },
   { "id": "sr1", "cat": "shop", "hood": "santana", "t": "Santana Row Shops", "a": "377 Santana Row, San Jose, CA", "lat": 37.3212, "lng": -121.948, "ds": "Upscale open-air shopping and dining district." },
   { "id": "sr2", "cat": "bars", "hood": "santana", "t": "Santana Row Dining", "a": "355 Santana Row, San Jose, CA", "lat": 37.3205, "lng": -121.9487, "ds": "Restaurants and rooftop bars along the row." },
@@ -181,7 +151,7 @@ var PLACES = [
   { "id": "es1", "cat": "market", "hood": "east", "t": "Story Road Market", "a": "Story Rd, San Jose, CA", "lat": 37.3444, "lng": -121.8394, "ds": "Community market along Story Road." },
   { "id": "es2", "cat": "cityart", "hood": "east", "t": "East Side Community Mural", "a": "King Rd, San Jose, CA", "lat": 37.3465, "lng": -121.8362, "ds": "Community mural celebrating East San Jose." },
   { "id": "u1783435013531", "cat": "restaurants", "hood": "downtown", "t": "Eos & Nyx", "a": "201 S Second St #120, San Jose, CA 95113", "lat": 37.3332, "lng": -121.8872, "w": "tue-fri 5pm-9pm", "sh": 17, "eh": 21, "wb": "https://www.eosnyxsj.com/", "ds": "" },
-  { "id": "ctr-sj", "cat": "centers", "hood": "downtown", "t": "San Jose City Hall", "a": "200 E Santa Clara St, San Jose, CA 95113", "lat": 37.3373, "lng": -121.8875, "ds": "Civic center — City Council chambers and public services." },
+  { "id": "ctr-sj", "cat": "centers", "hood": "downtown", "t": "San Jose City Hall", "a": "200 E Santa Clara St, San Jose, CA 95113", "lat": 37.3380339, "lng": -121.8853233, "ds": "Civic center — City Council chambers and public services." },
   { "id": "ctr-sc", "cat": "centers", "hood": "sc-downtown", "t": "Santa Clara City Hall", "a": "1500 Warburton Ave, Santa Clara, CA 95050", "lat": 37.3541, "lng": -121.9552, "ds": "Civic center for the City of Santa Clara." },
   { "id": "ctr-sv", "cat": "centers", "hood": "sv-downtown", "t": "Sunnyvale Civic Center", "a": "456 W Olive Ave, Sunnyvale, CA 94086", "lat": 37.3697, "lng": -122.0372, "ds": "City Hall, Community Center, and Senior Center complex." },
   { "id": "ctr-mv", "cat": "centers", "hood": "mv-downtown", "t": "Mountain View Civic Center", "a": "500 Castro St, Mountain View, CA 94041", "lat": 37.3894, "lng": -122.0819, "ds": "City Hall, library, and Center for the Performing Arts." },
