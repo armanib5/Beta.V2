@@ -83,31 +83,6 @@ var CITIES = [
 
 var PLACES = [
   {
-    "id": "fm",
-    "cat": "market",
-    "hood": "downtown",
-    "t": "Downtown SJ Farmers Market",
-    "a": "Paseo de San Antonio (near 3rd St), San Jose, CA 95113",
-    "lat": 37.3336,
-    "lng": -121.8868,
-    "w": "Wednesdays 9:00am - 1:30pm",
-    "d": "wed",
-    "sh": 9,
-    "eh": 13.5,
-    "wb": "https://sjdowntown.com/downtown-farmers-market/",
-    "ds": "Over 20 local farms and vendors every Wednesday on Paseo de San Antonio.",
-    "pk": "ParkSJ garage 90 min free. Entrances on 2nd and 3rd Street.",
-    "tr": "VTA Light Rail Convention Center stop, 5 min walk.",
-    "zone": [
-      [37.33378979886197, -121.88721299171452],
-      [37.33326089553215, -121.88686430454256],
-      [37.33344146241017, -121.88584685325623],
-      [37.333640512008984, -121.88598096370697],
-      [37.333458523825016, -121.88653349876404],
-      [37.33386941839558, -121.886887550354]
-    ]
-  },
-  {
     "id": "sm", "cat": "foodhall", "hood": "downtown",
     "t": "SoFA Market", "w": "Open Daily 11am - 9pm", "d": "daily", "sh": 11, "eh": 21,
     "a": "387 S 1st St, San Jose, CA 95113",
@@ -126,23 +101,6 @@ var PLACES = [
     "pk": "San Pedro Street garage nearby.",
     "tr": "VTA Route 522 on Santa Clara St.",
     "wb": "https://sanpedrosquaremarket.com"
-  },
-  {
-    "id": "aw", "cat": "seasonal", "hood": "downtown",
-    "t": "South First Fridays ArtWalk",
-    "a": "South 1st Street, SoFA District, San Jose, CA",
-    "lat": 37.3313, "lng": -121.8869,
-    "w": "First Friday Monthly, 5pm - 9pm", "d": "monthly", "sh": 17, "eh": 21,
-    "wb": "https://southfirstfridays.com",
-    "ds": "Free self-guided evening art walk through downtown galleries, museums, and pop-up installations.",
-    "pk": "Street parking on S 1st/2nd/3rd. Free after 6pm in many garages.",
-    "tr": "VTA Route 65/68. Walk south from Convention Center light rail.",
-    "zone": [
-      [37.32774842063718, -121.88445210456848],
-      [37.32800436084695, -121.88401579856874],
-      [37.33152487214223, -121.88670516014099],
-      [37.33127463122837, -121.88725233078003]
-    ]
   },
   {
     "id": "gs", "cat": "cityart", "hood": "downtown",
@@ -221,10 +179,6 @@ var PLACES = [
   { "id": "es1", "cat": "market", "hood": "east", "t": "Story Road Market", "a": "Story Rd, San Jose, CA", "lat": 37.3444, "lng": -121.8394, "ds": "Community market along Story Road." },
   { "id": "es2", "cat": "cityart", "hood": "east", "t": "East Side Community Mural", "a": "King Rd, San Jose, CA", "lat": 37.3465, "lng": -121.8362, "ds": "Community mural celebrating East San Jose." },
   { "id": "u1783435013531", "cat": "restaurants", "hood": "downtown", "t": "Eos & Nyx", "a": "201 S Second St #120, San Jose, CA 95113", "lat": 37.3332, "lng": -121.8872, "w": "tue-fri 5pm-9pm", "sh": 17, "eh": 21, "wb": "https://www.eosnyxsj.com/", "ds": "" },
-  { "id": "jt-fm", "cat": "market", "hood": "japantown", "t": "Japantown Farmers Market", "a": "357 E. Taylor St (Gordon Biersch Brewery parking lot), San Jose, CA", "lat": 37.3533052, "lng": -121.8925223, "w": "Sundays, 8:00am - 12:00pm (May - Oct)", "d": "sun", "sh": 8, "eh": 12, "ds": "Organized by the Japantown Farmers Market Committee / Gordon Biersch." },
-  { "id": "sr-fm", "cat": "market", "hood": "santana", "t": "Santana Row Farmers Market", "a": "Santana Row (between Olin Ave & Olsen Dr), San Jose, CA", "lat": 37.3209796, "lng": -121.9486002, "w": "Wednesdays, 4:00pm - 8:00pm (May - Sept)", "d": "wed", "sh": 16, "eh": 20, "ds": "Organized by the California Farmers' Markets Association (CFMA)." },
-  { "id": "vmc-fm", "cat": "market", "hood": "santana", "t": "Santa Clara Valley Medical Center Farmers Market", "a": "751 S. Bascom Ave (hospital parking lot), San Jose, CA", "lat": 37.3151936, "lng": -121.9332862, "w": "Wednesdays, 9:00am - 1:00pm (May - Nov)", "d": "wed", "sh": 9, "eh": 13, "ds": "Organized by West Coast Farmers Markets (WCFMA)." },
-  { "id": "camp-fm", "cat": "market", "hood": "camp-downtown", "t": "Downtown Campbell Farmers Market", "a": "E. Campbell Ave & N. 1st St, Downtown Campbell, CA", "lat": 37.2870626, "lng": -121.944881, "w": "Sundays, 9:00am - 1:00pm (year-round)", "d": "sun", "sh": 9, "eh": 13, "ds": "Organized by the Urban Village Farmers' Market Association (UVFM)." },
   { "id": "ctr-sj", "cat": "centers", "hood": "downtown", "t": "San Jose City Hall", "a": "200 E Santa Clara St, San Jose, CA 95113", "lat": 37.3373, "lng": -121.8875, "ds": "Civic center — City Council chambers and public services." },
   { "id": "ctr-sc", "cat": "centers", "hood": "sc-downtown", "t": "Santa Clara City Hall", "a": "1500 Warburton Ave, Santa Clara, CA 95050", "lat": 37.3541, "lng": -121.9552, "ds": "Civic center for the City of Santa Clara." },
   { "id": "ctr-sv", "cat": "centers", "hood": "sv-downtown", "t": "Sunnyvale Civic Center", "a": "456 W Olive Ave, Sunnyvale, CA 94086", "lat": 37.3697, "lng": -122.0372, "ds": "City Hall, Community Center, and Senior Center complex." },
