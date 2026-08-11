@@ -49,7 +49,9 @@ function cityOfVendor(v: Vendor): string {
 
 function cityOfEvent(e: LovEntry): string {
   if (e.section_zone) {
-    const bySection = CITY_CENTERS.find((c) => c.section === e.section_zone);
+    // section_zone is a CITY_CENTERS `id` (e.g. "sj-downtown"), not the
+    // bare `section` label - the label collides across all 6 cities.
+    const bySection = CITY_CENTERS.find((c) => c.id === e.section_zone);
     if (bySection) return bySection.city;
   }
   if (e.lat !== null && e.lng !== null) return nearestCityCenter(e.lat, e.lng).city;

@@ -203,6 +203,7 @@ export interface ZoneBoundary {
    * editor - null for legacy percentage-grid boundaries (points). */
   points_geo: ZoneBoundaryGeoPoint[] | null;
   vendor_id: string | null;
+  status: "active" | "archived";
   created_at: string;
   updated_at: string;
 }

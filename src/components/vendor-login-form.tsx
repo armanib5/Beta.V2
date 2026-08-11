@@ -175,6 +175,9 @@ export function VendorLoginForm() {
           >
             {loading ? "Logging in…" : "Log In with PIN"}
           </button>
+          <p className="text-center text-xs text-slate-500">
+            Forgot your PIN? There&rsquo;s no self-service reset for it — ask an admin to issue you a new one.
+          </p>
         </form>
       )}
     </div>

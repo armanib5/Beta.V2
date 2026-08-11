@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { CITY_CENTERS, nearestCityCenter } from "@/lib/geo";
+import { parseRecurrence, recurrenceOccursOn } from "@/lib/recurrence";
 import type { Category, LovEntry, Vendor } from "@/lib/types";
 
 interface Row {
@@ -23,7 +24,9 @@ interface Row {
 
 function cityFromRow(lat: number | null, lng: number | null, sectionZone: string | null): string {
   if (sectionZone) {
-    const bySection = CITY_CENTERS.find((c) => c.section === sectionZone);
+    // sectionZone is a CITY_CENTERS `id` (e.g. "sj-downtown"), not the bare
+    // `section` label - the label collides across all 6 cities.
+    const bySection = CITY_CENTERS.find((c) => c.id === sectionZone);
     if (bySection) return bySection.city;
   }
   if (lat !== null && lng !== null) return nearestCityCenter(lat, lng).city;
@@ -110,7 +113,13 @@ export default function EventLogPage() {
       const date = e.event_date ?? e.created_at;
       const start = e.event_date?.slice(0, 10) ?? null;
       const end = e.end_date?.slice(0, 10) ?? start;
-      const isToday = !start ? Boolean(e.recurrence) : start <= today && (!end || end >= today);
+      // Recurring, no fixed date: "today" only on a day that actually
+      // matches its recurrence rule, not unconditionally every day it's
+      // open (used to mislabel e.g. a monthly "1st Friday" event as
+      // today's event all month).
+      const isToday = !start
+        ? Boolean(e.recurrence) && recurrenceOccursOn(parseRecurrence(e.recurrence), new Date())
+        : start <= today && (!end || end >= today);
       return {
         id: e.id,
         name: e.name,

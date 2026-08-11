@@ -645,6 +645,110 @@ async function handleAdminCreateBusiness(request: Request, env: Env): Promise<Re
   return json({ business_id: vendor.slug, pin, vendor_id: vendor.id });
 }
 
+/* Resets an EXISTING vendor's login PIN (their Supabase Auth password on
+ * the synthetic `<slug>@vendor.citypinned.app` account) - admin-only, the
+ * actual unblock for "I forgot my Business ID login password." The PIN
+ * itself is never stored anywhere retrievable (same as any password), and
+ * handleAdminCreateBusiness above only ever creates a BRAND NEW account -
+ * there was previously no way to issue a fresh PIN for an EXISTING one
+ * short of deleting and recreating the vendor from scratch. Reuses the
+ * same Supabase Admin API this file already calls, just PUT (update
+ * password) on the existing user id instead of POST (create user). */
+async function handleAdminResetVendorPin(request: Request, env: Env): Promise<Response> {
+  const callerId = await resolveAuthenticatedCallerId(request, env);
+  if (!callerId) return json({ error: "Invalid session." }, 401);
+
+  const adminRes = await sb(env, `/admins?id=eq.${callerId}&select=id`);
+  const admins = (await adminRes.json()) as Array<{ id: string }>;
+  if (admins.length === 0) return json({ error: "Admin access required." }, 403);
+
+  let body: { vendor_id?: string; pin?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body." }, 400);
+  }
+  const vendorId = body.vendor_id?.trim();
+  if (!vendorId) return json({ error: "vendor_id is required." }, 400);
+
+  const pin = (body.pin?.trim() || String(Math.floor(100000 + Math.random() * 900000))).slice(0, 20);
+  if (pin.length < 4) return json({ error: "PIN must be at least 4 characters." }, 400);
+
+  const vendorRes = await sb(env, `/vendors?id=eq.${vendorId}&select=id,slug,business_name`);
+  const [vendor] = (await vendorRes.json()) as Array<{ id: string; slug: string; business_name: string }>;
+  if (!vendor) return json({ error: "Vendor not found." }, 404);
+
+  const updateRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${vendorId}`, {
+    method: "PUT",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ password: pin }),
+  });
+  if (!updateRes.ok) {
+    const errText = await updateRes.text();
+    return json({ error: `Could not reset PIN: ${errText}` }, 502);
+  }
+
+  await sb(env, "/activity_log", {
+    method: "POST",
+    body: JSON.stringify({
+      entity_type: "vendor",
+      entity_id: vendor.id,
+      entity_name: vendor.business_name,
+      action: "Admin reset Business PIN",
+      detail: `Business ID: ${vendor.slug}`,
+    }),
+  }).catch(() => {});
+
+  return json({ business_id: vendor.slug, pin, vendor_id: vendor.id });
+}
+
+/* Self-service PIN rotation for a vendor who's ALREADY logged in (wants a
+ * fresh PIN, e.g. after sharing the old one with someone) - not a "forgot
+ * PIN" recovery path, since that inherently requires already being
+ * authenticated. A genuinely locked-out vendor still needs an admin to
+ * use handleAdminResetVendorPin above; there's no way around that without
+ * a real recovery email on file, which no vendor account has today. */
+async function handleVendorRegeneratePin(request: Request, env: Env): Promise<Response> {
+  const callerId = await resolveAuthenticatedCallerId(request, env);
+  if (!callerId) return json({ error: "Invalid session." }, 401);
+
+  const vendorRes = await sb(env, `/vendors?id=eq.${callerId}&select=id,slug,business_name`);
+  const [vendor] = (await vendorRes.json()) as Array<{ id: string; slug: string; business_name: string }>;
+  if (!vendor) return json({ error: "No vendor account found for this session." }, 404);
+
+  const pin = String(Math.floor(100000 + Math.random() * 900000));
+
+  const updateRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${callerId}`, {
+    method: "PUT",
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ password: pin }),
+  });
+  if (!updateRes.ok) {
+    const errText = await updateRes.text();
+    return json({ error: `Could not regenerate PIN: ${errText}` }, 502);
+  }
+
+  await sb(env, "/activity_log", {
+    method: "POST",
+    body: JSON.stringify({
+      entity_type: "vendor",
+      entity_id: vendor.id,
+      entity_name: vendor.business_name,
+      action: "Vendor regenerated own Business PIN",
+    }),
+  }).catch(() => {});
+
+  return json({ business_id: vendor.slug, pin });
+}
+
 // Permanently removes a vendor - the vendors row (every FK to vendors.id
 // is already on delete cascade/set null as of migration 0001 onward, so
 // related listings/photos/menu items/bookings clean up on their own) and
@@ -1011,13 +1115,21 @@ const worker = {
       "/api/log-terms-agreement",
       "/api/admin-create-business",
       "/api/admin-delete-vendor",
+      "/api/admin-reset-vendor-pin",
+      "/api/vendor-regenerate-pin",
     ];
     if (!apiRoutes.includes(url.pathname) || request.method !== "POST") return env.ASSETS.fetch(request);
 
     // /api/log-terms-agreement, /api/admin-create-business, and
     // /api/admin-delete-vendor only touch Supabase, never Stripe - don't
     // block them on Stripe secrets they have no use for.
-    const supabaseOnlyRoutes = ["/api/log-terms-agreement", "/api/admin-create-business", "/api/admin-delete-vendor"];
+    const supabaseOnlyRoutes = [
+      "/api/log-terms-agreement",
+      "/api/admin-create-business",
+      "/api/admin-delete-vendor",
+      "/api/admin-reset-vendor-pin",
+      "/api/vendor-regenerate-pin",
+    ];
     const missing = supabaseOnlyRoutes.includes(url.pathname)
       ? missingEnvVars(env, ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"])
       : missingEnvVars(env);
@@ -1031,6 +1143,8 @@ const worker = {
       if (url.pathname === "/api/log-terms-agreement") return await handleLogTermsAgreement(request, env);
       if (url.pathname === "/api/admin-create-business") return await handleAdminCreateBusiness(request, env);
       if (url.pathname === "/api/admin-delete-vendor") return await handleAdminDeleteVendor(request, env);
+      if (url.pathname === "/api/admin-reset-vendor-pin") return await handleAdminResetVendorPin(request, env);
+      if (url.pathname === "/api/vendor-regenerate-pin") return await handleVendorRegeneratePin(request, env);
       return await handleStripeWebhook(request, env);
     } catch (err) {
       // Whatever the reason, never let an exception escape to Cloudflare's

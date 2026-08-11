@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { CITY_CENTERS, nearestCityCenter } from "@/lib/geo";
+import { parseRecurrence, recurrenceOccursOn } from "@/lib/recurrence";
 import { formatPrice, type ActivityLog, type LovEntry, type PricingTier, type Vendor, type VendorStatusLog } from "@/lib/types";
 
 type TimeBucket = "live" | "future" | "past";
@@ -50,7 +51,9 @@ function todayKey(): string {
 
 function cityForCoords(lat: number | null, lng: number | null, sectionZone?: string | null): string {
   if (sectionZone) {
-    const bySection = CITY_CENTERS.find((c) => c.section === sectionZone);
+    // sectionZone is a CITY_CENTERS `id` (e.g. "sj-downtown"), not the bare
+    // `section` label - the label collides across all 6 cities.
+    const bySection = CITY_CENTERS.find((c) => c.id === sectionZone);
     if (bySection) return bySection.city;
   }
   if (lat !== null && lng !== null) return nearestCityCenter(lat, lng).city;
@@ -85,7 +88,11 @@ function eventToItem(e: LovEntry): Item {
   const today = todayKey();
   const start = e.event_date?.slice(0, 10) ?? null;
   const end = e.end_date?.slice(0, 10) ?? start;
-  let bucket: TimeBucket = "live"; // recurring / no fixed date = ongoing
+  // Recurring, no fixed date: "live" only on a day that actually matches
+  // its recurrence rule, not unconditionally every day it's open (used to
+  // mislabel e.g. a monthly "1st Friday" event as live all month).
+  let bucket: TimeBucket =
+    e.recurrence && recurrenceOccursOn(parseRecurrence(e.recurrence), new Date()) ? "live" : "future";
   if (start) {
     if (end && end < today) bucket = "past";
     else if (start > today) bucket = "future";

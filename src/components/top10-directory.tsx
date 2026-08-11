@@ -59,7 +59,9 @@ function formatCountdown(ms: number): string {
 // for the exact same row. Mirrors that same precedence now.
 function cityInfo(lat: number | null, lng: number | null, sectionZone?: string | null): { city: string; section: string | null } {
   if (sectionZone) {
-    const bySection = CITY_CENTERS.find((c) => c.section === sectionZone);
+    // sectionZone is a CITY_CENTERS `id` (e.g. "sj-downtown"), not the bare
+    // `section` label - the label collides across all 6 cities.
+    const bySection = CITY_CENTERS.find((c) => c.id === sectionZone);
     if (bySection) return { city: bySection.city, section: bySection.section };
   }
   if (lat == null || lng == null) return { city: "Unknown", section: null };
@@ -74,14 +76,18 @@ function classifyGuestPill(entry: LovEntry, categorySlugById: Map<string, string
   return "vendors";
 }
 
-function fromVendor(vendor: Vendor): DirectoryItem {
+function fromVendor(
+  vendor: Vendor & { vendor_categories?: { category_id: string }[] },
+  categoryById: Map<string, Category>,
+): DirectoryItem {
   const pill = vendor.entity_type === "bar" ? "bars" : vendor.entity_type === "restaurant" ? "food" : "vendors";
+  const firstCategoryId = vendor.vendor_categories?.[0]?.category_id;
   return {
     id: `vendor:${vendor.id}`,
     pill,
     name: vendor.business_name,
     logoUrl: vendor.logo_url,
-    categoryIcon: null,
+    categoryIcon: firstCategoryId ? (categoryById.get(firstCategoryId)?.icon ?? null) : null,
     description: vendor.short_description,
     isTop10: vendor.is_top10 || vendor.category_tier === "top_10",
     isFeatured: vendor.category_tier === "featured",
@@ -96,13 +102,17 @@ function fromVendor(vendor: Vendor): DirectoryItem {
   };
 }
 
-function fromGuestListing(entry: LovEntry, categorySlugById: Map<string, string>): DirectoryItem {
+function fromGuestListing(
+  entry: LovEntry,
+  categorySlugById: Map<string, string>,
+  categoryById: Map<string, Category>,
+): DirectoryItem {
   return {
     id: `lov:${entry.id}`,
     pill: classifyGuestPill(entry, categorySlugById),
     name: entry.name,
     logoUrl: entry.flyer_image_url,
-    categoryIcon: null,
+    categoryIcon: categoryById.get(entry.category_id ?? "")?.icon ?? null,
     description: entry.location,
     isTop10: entry.booth_tier === "top" || entry.category_tier === "top_10",
     isFeatured: entry.category_tier === "featured",
@@ -135,7 +145,7 @@ function fromEvent(entry: LovEntry, categoryById: Map<string, Category>): Direct
 }
 
 export function Top10Directory() {
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendors, setVendors] = useState<(Vendor & { vendor_categories?: { category_id: string }[] })[]>([]);
   const [guestListings, setGuestListings] = useState<LovEntry[]>([]);
   const [events, setEvents] = useState<LovEntry[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -156,10 +166,10 @@ export function Top10Directory() {
     const nowIso = new Date().toISOString();
     supabase
       .from("vendors")
-      .select("*")
+      .select("*,vendor_categories(category_id)")
       .eq("status", "active")
       .eq("is_internal", false)
-      .returns<Vendor[]>()
+      .returns<(Vendor & { vendor_categories: { category_id: string }[] })[]>()
       .then(({ data }) => setVendors(data ?? []));
     supabase
       .from("lov_entries")
@@ -222,8 +232,8 @@ export function Top10Directory() {
     const linkedVendorIds = new Set(vendors.map((v) => v.id));
     const unlinkedGuestListings = guestListings.filter((e) => !e.vendor_id || !linkedVendorIds.has(e.vendor_id));
     return [
-      ...vendors.map(fromVendor),
-      ...unlinkedGuestListings.map((e) => fromGuestListing(e, categorySlugById)),
+      ...vendors.map((v) => fromVendor(v, categoryById)),
+      ...unlinkedGuestListings.map((e) => fromGuestListing(e, categorySlugById, categoryById)),
       ...events.map((e) => fromEvent(e, categoryById)),
     ];
   }, [vendors, guestListings, events, categorySlugById, categoryById]);

@@ -121,6 +121,7 @@ function init(){
   loadLovEvents();
   loadLovVendors();
   loadRealVendors();
+  loadBoothVendorLinks();
   loadFlyerRotation();
   loadRealCategories();
   setupWaffleMenu();
@@ -447,10 +448,16 @@ var LOV_CAT_SLUG_TO_BOARD={
 /* Resolves a real city+hood from the row's own lat/lng (every seeded row
    has one) instead of only trusting section_zone, which is null on every
    row seeded so far - that bug was why every farmers market/event showed
-   up filed under Downtown San Jose regardless of its real city. */
+   up filed under Downtown San Jose regardless of its real city.
+
+   section_zone stores a CITY_CENTERS `id` (e.g. "sj-downtown"), not the
+   bare `section` label ("Downtown") - the label collides across all 6
+   cities (every city has its own "Downtown"), so matching on it used to
+   silently resolve to San Jose (the first CITY_CENTERS entry) no matter
+   which city was actually meant. */
 function cityHoodFromRow(r){
   if(r.section_zone&&typeof CITY_CENTERS!=="undefined"){
-    var bySection=CITY_CENTERS.find(function(c){return c.section===r.section_zone;});
+    var bySection=CITY_CENTERS.find(function(c){return c.id===r.section_zone;});
     if(bySection){
       var p=bySection.id.split("-")[0];
       return {city:CN[p]?p:"sj",hood:bySection.id.slice(p.length+1)};
@@ -652,6 +659,36 @@ function loadRealVendors(){
     if(typeof renderBoards==="function")renderBoards();
     openVendorFromQuery();
     openFlyerFromQuery();
+  }).catch(function(){});
+}
+
+/* Real per-event vendor roster, sourced from Event Zone Studio's booth
+   assignments (booths.vendor_id / booths.lov_entry_id) - the actual
+   server-side event<->vendor relationship. js/vendors.js's eventVendors()
+   used to ONLY check v.events, a plain array that's exclusively populated
+   by a visitor manually linking their own listing via "+ Add Your
+   Business" on that one browser (see startAddVendorFlow/subVendorForm) -
+   never written to Supabase, so a fresh browser opening any event's
+   Vendor Hub saw "No vendors listed yet" regardless of real assigned
+   booths (e.g. DTSJ Farmers Market's 20 real booths, one already linked to
+   a real vendor account). This fetch gives every visitor that same real
+   roster. Additive: local self-linking via "+ Add Your Business" still
+   works and still shows up alongside the real booth assignments. */
+var boothVendorKeysByEvent={};
+function loadBoothVendorLinks(){
+  if(typeof V2_SUPABASE_URL==="undefined")return;
+  fetch(V2_SUPABASE_URL+"/rest/v1/booths?select=event_id,vendor_id,lov_entry_id&or=(vendor_id.not.is.null,lov_entry_id.not.is.null)",{
+    headers:{apikey:V2_SUPABASE_ANON_KEY,Authorization:"Bearer "+V2_SUPABASE_ANON_KEY}
+  }).then(function(res){return res.json();}).then(function(rows){
+    if(!Array.isArray(rows))return;
+    var map={};
+    rows.forEach(function(r){
+      var key=r.vendor_id?("vendor-"+r.vendor_id):(r.lov_entry_id?("lov-"+r.lov_entry_id):null);
+      if(!key)return;
+      (map[r.event_id]=map[r.event_id]||[]).push(key);
+    });
+    boothVendorKeysByEvent=map;
+    if(typeof renderBoards==="function")renderBoards();
   }).catch(function(){});
 }
 

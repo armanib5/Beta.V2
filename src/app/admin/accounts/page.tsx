@@ -75,11 +75,51 @@ export default function AccountsDirectoryPage() {
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [resettingPinId, setResettingPinId] = useState<string | null>(null);
+  const [resetPinResult, setResetPinResult] = useState<{ vendorId: string; pin: string } | null>(null);
+  const [resetPinError, setResetPinError] = useState<{ vendorId: string; message: string } | null>(null);
 
   async function refreshVendors() {
     const supabase = createClient();
     const { data } = await supabase.from("vendors").select("*").order("onboarded_at", { ascending: false }).returns<Vendor[]>();
     setVendors(data ?? []);
+  }
+
+  // Issues a fresh login PIN for a vendor who's already onboarded - the
+  // actual unblock for "I forgot my password/PIN," since the PIN itself
+  // is never stored anywhere retrievable and there was previously no way
+  // to reset one for an EXISTING account (only handleAdminCreateBusiness's
+  // brand-new-account path existed). Reuses the same worker auth pattern
+  // CreateBusinessForm below already uses.
+  async function resetVendorPin(vendorId: string, businessName: string) {
+    if (!window.confirm(`Reset ${businessName}'s login PIN? Their old PIN stops working immediately.`)) return;
+    setResetPinError(null);
+    setResettingPinId(vendorId);
+    try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setResetPinError({ vendorId, message: "Your session expired — please log in again." });
+        return;
+      }
+      const res = await fetch("/api/admin-reset-vendor-pin", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ vendor_id: vendorId }),
+      });
+      const data: { pin?: string; error?: string } = await res.json();
+      if (!res.ok || !data.pin) {
+        setResetPinError({ vendorId, message: data.error ?? "Could not reset this PIN." });
+        return;
+      }
+      setResetPinResult({ vendorId, pin: data.pin });
+    } catch {
+      setResetPinError({ vendorId, message: "Could not reach the server. Please try again." });
+    } finally {
+      setResettingPinId(null);
+    }
   }
 
   useEffect(() => {
@@ -389,8 +429,36 @@ export default function AccountsDirectoryPage() {
                                 >
                                   🗂️ Notes &amp; History
                                 </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => resetVendorPin(r.id, r.name)}
+                                  disabled={resettingPinId === r.id}
+                                  className="rounded-full border border-purple-300 bg-white px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-50 disabled:opacity-50"
+                                >
+                                  {resettingPinId === r.id ? "Resetting…" : "🔑 Reset Login PIN"}
+                                </button>
                               </div>
                             </div>
+                            {resetPinResult?.vendorId === r.id && (
+                              <div className="mt-3 rounded-lg border border-green-300 bg-green-50 p-3">
+                                <p className="text-xs font-bold text-green-900">
+                                  ✅ New PIN — hand this to the owner now, it won&rsquo;t be shown again
+                                </p>
+                                <p className="mt-1 font-mono text-base font-bold text-slate-900">{resetPinResult.pin}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => setResetPinResult(null)}
+                                  className="mt-2 text-xs font-semibold text-green-800 underline"
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            )}
+                            {resetPinError?.vendorId === r.id && (
+                              <p role="alert" className="mt-2 text-xs font-medium text-red-600">
+                                {resetPinError.message}
+                              </p>
+                            )}
                           </td>
                         </tr>
                       )}

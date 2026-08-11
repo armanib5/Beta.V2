@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { logActivity } from "@/lib/activity";
-import type { PricingTier, Vendor, VendorBoostBooking } from "@/lib/types";
+import type { LovEntry, PricingTier, Vendor, VendorBoostBooking } from "@/lib/types";
 
 const SLOT_MS = 10 * 60 * 1000;
 const MAX_PER_SLOT = 5;
@@ -26,10 +26,14 @@ export default function AdminPlacementsPage() {
   const [bookings, setBookings] = useState<VendorBoostBooking[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [tiers, setTiers] = useState<PricingTier[]>([]);
+  const [events, setEvents] = useState<LovEntry[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [grantVendorId, setGrantVendorId] = useState("");
   const [grantTierSlug, setGrantTierSlug] = useState<"vendor-boost" | "top10-30min">("vendor-boost");
   const [granting, setGranting] = useState(false);
+  const [addEventId, setAddEventId] = useState("");
+  const [addingEventTop10, setAddingEventTop10] = useState(false);
+  const [removingEventId, setRemovingEventId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -45,14 +49,16 @@ export default function AdminPlacementsPage() {
 
   async function loadData() {
     const supabase = createClient();
-    const [{ data: bookingRows }, { data: vendorRows }, { data: tierRows }] = await Promise.all([
+    const [{ data: bookingRows }, { data: vendorRows }, { data: tierRows }, { data: eventRows }] = await Promise.all([
       supabase.from("vendor_boost_bookings").select("*").order("slot_start", { ascending: false }).returns<VendorBoostBooking[]>(),
       supabase.from("vendors").select("*").returns<Vendor[]>(),
       supabase.from("pricing_tiers").select("*").returns<PricingTier[]>(),
+      supabase.from("lov_entries").select("*").eq("type", "event").eq("status", "active").order("name").returns<LovEntry[]>(),
     ]);
     setBookings(bookingRows ?? []);
     setVendors(vendorRows ?? []);
     setTiers(tierRows ?? []);
+    setEvents(eventRows ?? []);
   }
 
   useEffect(() => {
@@ -82,6 +88,14 @@ export default function AdminPlacementsPage() {
   const featuredVendors = useMemo(
     () => vendors.filter((v) => v.is_top10).sort((a, b) => (a.approved_at ?? "").localeCompare(b.approved_at ?? "")),
     [vendors],
+  );
+  const top10Events = useMemo(
+    () => events.filter((e) => e.category_tier === "top_10").sort((a, b) => a.name.localeCompare(b.name)),
+    [events],
+  );
+  const addableEvents = useMemo(
+    () => events.filter((e) => e.category_tier !== "top_10").sort((a, b) => a.name.localeCompare(b.name)),
+    [events],
   );
 
   const boostRows = useMemo(
@@ -171,6 +185,56 @@ export default function AdminPlacementsPage() {
     logActivity(supabase, "vendor", booking.vendor_id, vendorName, "Admin ended boost early");
     await loadData();
     flash(`✓ Ended ${vendorName}'s boost`);
+  }
+
+  // lov_entries.category_tier is the same column migration 0015 used to
+  // flag an event Top 10 by hand-written SQL (no admin UI existed to set
+  // or clear it before now, which is why a testing-flagged event like Art
+  // Walk had no way to be un-flagged short of another raw SQL statement).
+  async function addEventToTop10() {
+    if (!addEventId) return;
+    setError(null);
+    setAddingEventTop10(true);
+    try {
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from("lov_entries")
+        .update({ category_tier: "top_10" })
+        .eq("id", addEventId);
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+      const event = events.find((e) => e.id === addEventId);
+      logActivity(supabase, "event", addEventId, event?.name ?? addEventId, "Admin added to Top 10");
+      await loadData();
+      flash(`✓ Added ${event?.name ?? "event"} to Top 10`);
+      setAddEventId("");
+    } finally {
+      setAddingEventTop10(false);
+    }
+  }
+
+  async function removeEventFromTop10(event: LovEntry) {
+    if (!window.confirm(`Remove ${event.name} from Top 10? It stays live on the Board/Map, just no longer Featured.`)) return;
+    setError(null);
+    setRemovingEventId(event.id);
+    try {
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from("lov_entries")
+        .update({ category_tier: "standard" })
+        .eq("id", event.id);
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+      logActivity(supabase, "event", event.id, event.name, "Admin removed from Top 10");
+      await loadData();
+      flash(`✓ Removed ${event.name} from Top 10`);
+    } finally {
+      setRemovingEventId(null);
+    }
   }
 
   if (status === "loading") {
@@ -301,6 +365,82 @@ export default function AdminPlacementsPage() {
                     </tr>
                   );
                 })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* EVENT TOP 10 - lov_entries.category_tier='top_10', permanent (not
+          slot-based like Boosts above). Previously only settable/clearable
+          by hand-written SQL - this is the first admin UI for it. */}
+      <section className="mt-8 rounded-2xl border border-purple-300 bg-purple-50 p-6">
+        <h2 className="text-lg font-bold text-slate-900">🌟 Event Top 10 ({top10Events.length})</h2>
+        <p className="mt-1 text-xs text-slate-600">
+          Permanent Featured placement for an event/flyer on the public Top 10 strip — separate from vendor Featured
+          status above, and separate from the temporary vendor Boosts above that too. Removing an event here only
+          clears its Top 10 placement; the event/flyer itself stays live everywhere else.
+        </p>
+
+        <div className="mt-4 flex flex-wrap items-end gap-2 rounded-xl border border-purple-200 bg-white p-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-700">Add an event to Top 10</label>
+            <select
+              value={addEventId}
+              onChange={(e) => setAddEventId(e.target.value)}
+              className="mt-1 w-64 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+            >
+              <option value="">Select event…</option>
+              {addableEvents.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={addEventToTop10}
+            disabled={!addEventId || addingEventTop10}
+            className="rounded-full bg-slate-900 px-4 py-1.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+          >
+            {addingEventTop10 ? "Adding…" : "Add to Top 10"}
+          </button>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[500px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-purple-200 text-xs font-semibold uppercase text-slate-500">
+                <th className="py-2 pr-3">Event</th>
+                <th className="py-2 pr-3">Date</th>
+                <th className="py-2 pr-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {top10Events.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-4 text-slate-500">
+                    No events in Top 10 right now.
+                  </td>
+                </tr>
+              ) : (
+                top10Events.map((e) => (
+                  <tr key={e.id} className="border-b border-purple-100">
+                    <td className="py-2 pr-3 font-medium text-slate-900">{e.name}</td>
+                    <td className="py-2 pr-3 text-slate-500">{e.event_date ? new Date(e.event_date + "T00:00").toLocaleDateString("en-US") : e.recurrence ?? "—"}</td>
+                    <td className="py-2 pr-3">
+                      <button
+                        type="button"
+                        onClick={() => removeEventFromTop10(e)}
+                        disabled={removingEventId === e.id}
+                        className="rounded-full border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {removingEventId === e.id ? "Removing…" : "Remove from Top 10"}
+                      </button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

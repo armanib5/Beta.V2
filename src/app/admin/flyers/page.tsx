@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { logActivity } from "@/lib/activity";
+import { CITY_CENTERS } from "@/lib/geo";
 import type { Category, FlyerBoard, FlyerRotation, FlyerStatus, LovEntry, LovStatusLog, Vendor } from "@/lib/types";
 import { FlyerCropEditor } from "@/components/flyer-crop-editor";
 
@@ -58,6 +59,7 @@ export default function AdminFlyersPage() {
     hosting_vendor_id: "",
     website_url: "",
     ticket_url: "",
+    section_zone: "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -87,6 +89,7 @@ export default function AdminFlyersPage() {
       hosting_vendor_id: f.hosting_vendor_id ?? "",
       website_url: f.website_url ?? "",
       ticket_url: f.ticket_url ?? "",
+      section_zone: f.section_zone ?? "",
     });
   }
 
@@ -104,6 +107,7 @@ export default function AdminFlyersPage() {
       hosting_vendor_id: editForm.hosting_vendor_id || null,
       website_url: editForm.website_url.trim() || null,
       ticket_url: editForm.ticket_url.trim() || null,
+      section_zone: editForm.section_zone || null,
     };
     const { error: updateError } = await supabase.from("lov_entries").update(patch).eq("id", f.id);
     setSavingEdit(false);
@@ -755,6 +759,34 @@ export default function AdminFlyersPage() {
                           ))}
                         </select>
                       </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">City / District</label>
+                      <select
+                        value={editForm.section_zone}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, section_zone: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      >
+                        <option value="">— auto (from address/coordinates) —</option>
+                        {Object.entries(
+                          CITY_CENTERS.reduce<Record<string, typeof CITY_CENTERS>>((acc, c) => {
+                            (acc[c.city] ??= []).push(c);
+                            return acc;
+                          }, {}),
+                        ).map(([city, sections]) => (
+                          <optgroup key={city} label={city}>
+                            {sections.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Which city/district Board this flyer shows on. Leave blank to fall back to its address/
+                        coordinates (usually resolves to Downtown San Jose).
+                      </p>
                     </div>
                     <button
                       type="button"

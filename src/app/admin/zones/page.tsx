@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { checkIsAdmin } from "@/lib/admin";
 import { logActivity } from "@/lib/activity";
 import { CITY_CENTERS, nearestCityCenter } from "@/lib/geo";
+import { parseRecurrence, recurrenceOccursOn } from "@/lib/recurrence";
 import type { Booth, BoundaryType, LovEntry, Vendor, ZoneBoundary, ZoneBoundaryPoint, ZoneBoundaryGeoPoint, ZoneFeature } from "@/lib/types";
 import { ZoneMap } from "@/components/zone-map";
 import { ZoneBoundaryDrawer } from "@/components/zone-boundary-drawer";
@@ -13,7 +14,9 @@ import { ZoneMapLeaflet, FEATURE_TYPE_LABEL, type PlacingType, type ZoneMapConte
 
 function cityOfEvent(e: LovEntry): string {
   if (e.section_zone) {
-    const bySection = CITY_CENTERS.find((c) => c.section === e.section_zone);
+    // section_zone is a CITY_CENTERS `id` (e.g. "sj-downtown"), not the
+    // bare `section` label - the label collides across all 6 cities.
+    const bySection = CITY_CENTERS.find((c) => c.id === e.section_zone);
     if (bySection) return bySection.city;
   }
   if (e.lat !== null && e.lng !== null) return nearestCityCenter(e.lat, e.lng).city;
@@ -28,7 +31,15 @@ type EventTiming = "now" | "soon" | "upcoming" | "past";
 function timingOfEvent(e: LovEntry, today: string): EventTiming {
   const start = e.event_date?.slice(0, 10) ?? null;
   const end = (e.end_date ?? e.event_date)?.slice(0, 10) ?? null;
-  if (!start) return e.recurrence ? "now" : "upcoming";
+  if (!start) {
+    // A recurring event with no fixed date used to be labeled "now"
+    // unconditionally, every single day - e.g. a monthly "1st Friday"
+    // event showed "Happening Now" all month, not just on its actual
+    // recurrence day. Reuses the same recurrenceOccursOn() check
+    // event-priority.ts uses for the public calendar's own "now" bucket,
+    // so this admin view and the public one agree.
+    return e.recurrence && recurrenceOccursOn(parseRecurrence(e.recurrence), new Date()) ? "now" : "upcoming";
+  }
   if (end && end < today) return "past";
   if (start > today) {
     const daysOut = (new Date(start).getTime() - new Date(today).getTime()) / 86400000;
@@ -139,6 +150,7 @@ export default function AdminZonesPage() {
   const [placingLabel, setPlacingLabel] = useState("");
   const [previewPublic, setPreviewPublic] = useState(false);
   const [zonedEventIds, setZonedEventIds] = useState<Set<string>>(new Set());
+  const [zoneStatusByEventId, setZoneStatusByEventId] = useState<Map<string, "active" | "archived">>(new Map());
   const [placementHint, setPlacementHint] = useState<string | null>(null);
   const [editingFeatureId, setEditingFeatureId] = useState<string | null>(null);
   const [editingFeatureLabel, setEditingFeatureLabel] = useState("");
@@ -166,15 +178,17 @@ export default function AdminZonesPage() {
         // all-events dropdown that doesn't say which ones have a zone yet.
         supabase
           .from("zone_boundaries")
-          .select("event_id, points_geo")
+          .select("event_id, points_geo, status")
           .eq("boundary_type", "event_boundary")
-          .returns<{ event_id: string; points_geo: ZoneBoundaryGeoPoint[] | null }[]>(),
+          .returns<{ event_id: string; points_geo: ZoneBoundaryGeoPoint[] | null; status: "active" | "archived" }[]>(),
       ]);
       if (cancelled) return;
       setEvents(data ?? []);
       setEventId(data?.[0]?.id ?? "");
       setVendors(vendorRows ?? []);
-      setZonedEventIds(new Set((boundaryRows ?? []).filter((b) => (b.points_geo?.length ?? 0) >= 3).map((b) => b.event_id)));
+      const tracedBoundaries = (boundaryRows ?? []).filter((b) => (b.points_geo?.length ?? 0) >= 3);
+      setZonedEventIds(new Set(tracedBoundaries.map((b) => b.event_id)));
+      setZoneStatusByEventId(new Map(tracedBoundaries.map((b) => [b.event_id, b.status])));
       setStatus("ready");
     });
     return () => {
@@ -461,6 +475,48 @@ export default function AdminZonesPage() {
     setBoundaries((prev) => [...prev, ...(boundaryRes.data ?? [])]);
     flash(`✓ Copied zone layout (${boothRes.data?.length ?? 0} booths, ${boundaryRes.data?.length ?? 0} boundaries)`);
     setCopyFromEventId("");
+  }
+
+  // Archiving (vs. deleteBoundary below) keeps the traced shape and its
+  // booths/vendor assignments intact - it only flips status so the public
+  // Map stops rendering it (public/map/js/map.js filters
+  // status=eq.active), matching the exact same active/archived convention
+  // lov_entries already uses (migration 0062) rather than a new one.
+  async function archiveBoundary(b: ZoneBoundary) {
+    if (!window.confirm(`Archive this event zone? It disappears from the public Map but stays here for reference — nothing is deleted.`)) return;
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("zone_boundaries")
+      .update({ status: "archived" })
+      .eq("id", b.id)
+      .select("*")
+      .single<ZoneBoundary>();
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not archive this zone.");
+      return;
+    }
+    setBoundaries((prev) => prev.map((x) => (x.id === b.id ? data : x)));
+    setZoneStatusByEventId((prev) => new Map(prev).set(b.event_id, "archived"));
+    flash("✓ Zone archived — hidden from the public Map, still here for reference");
+  }
+
+  async function unarchiveBoundary(b: ZoneBoundary) {
+    setError(null);
+    const supabase = createClient();
+    const { data, error: updateError } = await supabase
+      .from("zone_boundaries")
+      .update({ status: "active" })
+      .eq("id", b.id)
+      .select("*")
+      .single<ZoneBoundary>();
+    if (updateError || !data) {
+      setError(updateError?.message ?? "Could not unarchive this zone.");
+      return;
+    }
+    setBoundaries((prev) => prev.map((x) => (x.id === b.id ? data : x)));
+    setZoneStatusByEventId((prev) => new Map(prev).set(b.event_id, "active"));
+    flash("✓ Zone unarchived — visible on the public Map again");
   }
 
   async function deleteBoundary(b: ZoneBoundary) {
@@ -756,6 +812,9 @@ ${
                 <span className="text-sm text-slate-800">
                   {TIMING_LABEL[timingOfEvent(e, todayKey)]} — <span className="font-semibold">{e.name}</span>
                   {e.event_date ? ` — ${e.event_date}` : ""}
+                  {zoneStatusByEventId.get(e.id) === "archived" && (
+                    <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">Archived</span>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -928,7 +987,12 @@ ${
                 </div>
               ) : eventBoundary ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-slate-600">✓ Event boundary traced ({eventBoundary.points_geo?.length ?? 0} points)</span>
+                  <span className="text-sm text-slate-600">
+                    ✓ Event boundary traced ({eventBoundary.points_geo?.length ?? 0} points)
+                    {eventBoundary.status === "archived" && (
+                      <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">Archived</span>
+                    )}
+                  </span>
                   <button
                     type="button"
                     onClick={editEventBoundary}
@@ -936,6 +1000,23 @@ ${
                   >
                     Edit Boundary
                   </button>
+                  {eventBoundary.status === "archived" ? (
+                    <button
+                      type="button"
+                      onClick={() => unarchiveBoundary(eventBoundary)}
+                      className="rounded-full border border-green-400 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50"
+                    >
+                      ↩ Unarchive
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => archiveBoundary(eventBoundary)}
+                      className="rounded-full border border-amber-400 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                    >
+                      🗄 Archive Zone
+                    </button>
+                  )}
                 </div>
               ) : (
                 <button

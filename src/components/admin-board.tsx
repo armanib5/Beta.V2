@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Booth, LovEntry, Vendor } from "@/lib/types";
 import { logActivity } from "@/lib/activity";
+import { CITY_CENTERS } from "@/lib/geo";
 
 const STATUS_STYLES: Record<Booth["status"], string> = {
   open: "bg-green-50 border-green-300 text-green-800",
@@ -54,6 +55,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
   const [newEventName, setNewEventName] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventLocation, setNewEventLocation] = useState("");
+  const [newEventSectionZone, setNewEventSectionZone] = useState("");
   const [newEventPublishAt, setNewEventPublishAt] = useState("");
   const [showNewEvent, setShowNewEvent] = useState(initialEvents.length === 0);
 
@@ -122,6 +124,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
         name: newEventName.trim(),
         event_date: newEventDate || null,
         location: newEventLocation.trim() || null,
+        section_zone: newEventSectionZone || null,
         publish_at: newEventPublishAt ? new Date(newEventPublishAt).toISOString() : null,
       })
       .select("*")
@@ -144,6 +147,7 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
     setNewEventName("");
     setNewEventDate("");
     setNewEventLocation("");
+    setNewEventSectionZone("");
     setNewEventPublishAt("");
     setShowNewEvent(false);
   }
@@ -336,6 +340,30 @@ export function AdminBoard({ events: initialEvents }: { events: LovEntry[] }) {
                 onChange={(e) => setNewEventLocation(e.target.value)}
                 className="mt-1 w-56 rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">City / District</label>
+              <select
+                value={newEventSectionZone}
+                onChange={(e) => setNewEventSectionZone(e.target.value)}
+                className="mt-1 w-56 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="">— auto (from address) —</option>
+                {Object.entries(
+                  CITY_CENTERS.reduce<Record<string, typeof CITY_CENTERS>>((acc, c) => {
+                    (acc[c.city] ??= []).push(c);
+                    return acc;
+                  }, {}),
+                ).map(([city, sections]) => (
+                  <optgroup key={city} label={city}>
+                    {sections.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700">

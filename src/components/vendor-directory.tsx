@@ -22,13 +22,13 @@ interface DirectoryItem {
   href: string | null;
 }
 
-function fromVendor(vendor: Vendor): DirectoryItem {
+function fromVendor(vendor: Vendor & { vendor_categories?: { category_id: string }[] }): DirectoryItem {
   return {
     id: vendor.id,
     kind: "account",
     name: vendor.business_name,
     logoUrl: vendor.logo_url,
-    categoryId: null,
+    categoryId: vendor.vendor_categories?.[0]?.category_id ?? null,
     description: vendor.short_description,
     instagram: vendor.instagram_handle,
     isTop10: vendor.is_top10,
@@ -55,7 +55,7 @@ function fromLovEntry(entry: LovEntry): DirectoryItem {
 }
 
 export function VendorDirectory() {
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [vendors, setVendors] = useState<(Vendor & { vendor_categories?: { category_id: string }[] })[]>([]);
   const [guestListings, setGuestListings] = useState<LovEntry[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -63,10 +63,10 @@ export function VendorDirectory() {
     const supabase = createClient();
     supabase
       .from("vendors")
-      .select("*")
+      .select("*,vendor_categories(category_id)")
       .eq("status", "active")
       .eq("is_internal", false)
-      .returns<Vendor[]>()
+      .returns<(Vendor & { vendor_categories: { category_id: string }[] })[]>()
       .then(({ data }) => setVendors(data ?? []));
     supabase
       .from("lov_entries")

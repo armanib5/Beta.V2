@@ -10,7 +10,11 @@ import { compareEventPriority } from "@/lib/event-priority";
 
 function cityForEvent(event: LovEntry): string {
   if (event.section_zone) {
-    const bySection = CITY_CENTERS.find((c) => c.section === event.section_zone);
+    // section_zone stores a CITY_CENTERS `id` (e.g. "sj-downtown"), not the
+    // bare `section` label - the label collides across all 6 cities (every
+    // city has its own "Downtown"), so matching on it used to silently
+    // resolve to San Jose no matter which city was actually meant.
+    const bySection = CITY_CENTERS.find((c) => c.id === event.section_zone);
     if (bySection) return bySection.city;
   }
   if (event.lat !== null && event.lng !== null) {

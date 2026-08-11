@@ -380,8 +380,12 @@ function loadLovEvents() {
       // to the host's pin, so this can't live on the (possibly-absent) place object.
       if (r.hosting_vendor_id) hostVendorIdByEventId[r.id] = r.hosting_vendor_id;
       var lat = r.lat, lng = r.lng, hood;
+      // section_zone stores a CITY_CENTERS `id` (e.g. "sj-downtown"), not
+      // the bare `section` label - the label collides across all 6 cities
+      // (every city has its own "Downtown"), so matching on it used to
+      // silently resolve to San Jose no matter which city was meant.
       if (r.section_zone) {
-        var bySection = CITY_CENTERS.find(function (c) { return c.section === r.section_zone; });
+        var bySection = CITY_CENTERS.find(function (c) { return c.id === r.section_zone; });
         if (bySection) {
           hood = nearestHood(bySection.lat, bySection.lng).hood;
           if (lat == null || lng == null) { lat = bySection.lat; lng = bySection.lng; }
@@ -429,7 +433,7 @@ function loadLovVendors() {
       if (PLACES.some(function (p) { return p.id === id; })) return;
       var lat = r.lat, lng = r.lng, hood;
       if (r.section_zone) {
-        var bySection = CITY_CENTERS.find(function (c) { return c.section === r.section_zone; });
+        var bySection = CITY_CENTERS.find(function (c) { return c.id === r.section_zone; });
         if (bySection) {
           hood = nearestHood(bySection.lat, bySection.lng).hood;
           if (lat == null || lng == null) { lat = bySection.lat; lng = bySection.lng; }
@@ -629,7 +633,7 @@ function loadEventZones() {
   if (typeof V2_SUPABASE_URL === "undefined") return Promise.resolve();
   var headers = { apikey: V2_SUPABASE_ANON_KEY, Authorization: "Bearer " + V2_SUPABASE_ANON_KEY };
   return Promise.all([
-    fetch(V2_SUPABASE_URL + "/rest/v1/zone_boundaries?boundary_type=eq.event_boundary&points_geo=not.is.null&select=id,event_id,label,points_geo,lov_entries(name)", { headers: headers }).then(function (r) { return r.json(); }),
+    fetch(V2_SUPABASE_URL + "/rest/v1/zone_boundaries?boundary_type=eq.event_boundary&points_geo=not.is.null&status=eq.active&select=id,event_id,label,points_geo,lov_entries(name)", { headers: headers }).then(function (r) { return r.json(); }),
     fetch(V2_SUPABASE_URL + "/rest/v1/zone_features?select=*", { headers: headers }).then(function (r) { return r.json(); }),
     fetch(V2_SUPABASE_URL + "/rest/v1/booths?select=*&lat=not.is.null&lng=not.is.null", { headers: headers }).then(function (r) { return r.json(); })
   ]).then(function (results) {

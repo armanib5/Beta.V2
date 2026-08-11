@@ -81,7 +81,14 @@ function vendorEvents(v) {
   }).filter(Boolean);
 }
 function eventVendors(ev) {
-  return vendors.filter(function (v) { return isVendorVisible(v) && (v.events || []).indexOf(ev.id) >= 0; });
+  // boothVendorKeysByEvent (js/app.js, loadBoothVendorLinks()) is the real
+  // server-side event<->vendor link (Event Zone Studio's booth
+  // assignments) - v.events alone is only ever set by a visitor manually
+  // self-linking on that one browser, which never touches Supabase.
+  var boothIds = (typeof boothVendorKeysByEvent !== "undefined" && boothVendorKeysByEvent[ev.id]) || [];
+  return vendors.filter(function (v) {
+    return isVendorVisible(v) && ((v.events || []).indexOf(ev.id) >= 0 || boothIds.indexOf(v.id) >= 0);
+  });
 }
 
 /* Vendor profile detail — reuses the same .dpanel/.dhero/.dbody/.igrid

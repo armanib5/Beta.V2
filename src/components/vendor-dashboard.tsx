@@ -905,7 +905,10 @@ export function VendorDashboard({
         <div>
           <p className="text-sm font-semibold text-slate-900">Location</p>
           <p className="mt-1 text-xs text-slate-500">
-            Powers &quot;Near You&quot; sorting on the Vendor Directory.
+            This is the exact spot your business marker shows up on the public Map, and it powers &quot;Near
+            You&quot; sorting on the Vendor Directory — e.g. a customer searching near Santana Row sees you first if
+            your pin is placed there. Setting it here doesn&apos;t change your business address, just where the pin
+            sits.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <button
@@ -987,6 +990,9 @@ function AccountLoginSettings({ vendor }: { vendor: Vendor }) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [latestAgreement, setLatestAgreement] = useState<AccountLegalAgreement | null>(null);
+  const [regeneratingPin, setRegeneratingPin] = useState(false);
+  const [newPin, setNewPin] = useState<string | null>(null);
+  const [pinError, setPinError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -1031,6 +1037,42 @@ function AccountLoginSettings({ vendor }: { vendor: Vendor }) {
     }
   }
 
+  // Self-service PIN rotation for a vendor who's already logged in - not a
+  // "forgot PIN" recovery path (that inherently requires already being
+  // authenticated), just a way to get a fresh one, e.g. after sharing the
+  // old one with a temp worker. A genuinely locked-out vendor needs an
+  // admin to reset it from Accounts Directory instead.
+  async function regeneratePin() {
+    if (!window.confirm("Get a new Business PIN? Your old PIN stops working immediately.")) return;
+    setPinError(null);
+    setNewPin(null);
+    setRegeneratingPin(true);
+    try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setPinError("Your session expired — please log in again.");
+        return;
+      }
+      const res = await fetch("/api/vendor-regenerate-pin", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
+      });
+      const data: { pin?: string; error?: string } = await res.json();
+      if (!res.ok || !data.pin) {
+        setPinError(data.error ?? "Could not get a new PIN.");
+        return;
+      }
+      setNewPin(data.pin);
+    } catch {
+      setPinError("Could not reach the server. Please try again.");
+    } finally {
+      setRegeneratingPin(false);
+    }
+  }
+
   return (
     <div className="mt-10 border-t border-slate-200 pt-6">
       <h2 className="text-lg font-bold text-slate-900">Account Login</h2>
@@ -1060,6 +1102,33 @@ function AccountLoginSettings({ vendor }: { vendor: Vendor }) {
         Your Account ID never changes no matter how you log in, so it stays the same if this account is ever
         moved to a future version of CityPinned.
       </p>
+
+      {isPinLogin && (
+        <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-4">
+          <p className="text-sm font-semibold text-slate-900">Business PIN</p>
+          <p className="mt-1 text-xs text-slate-600">
+            Get a new PIN below (e.g. after sharing the old one with someone). If you&rsquo;re locked out and can&rsquo;t
+            log in at all to get here, ask an admin to reset your PIN instead — there&rsquo;s no self-service recovery
+            for a forgotten PIN, only a fresh one once you&rsquo;re already signed in.
+          </p>
+          {newPin ? (
+            <div className="mt-3 rounded-lg border border-green-300 bg-green-50 p-3">
+              <p className="text-xs font-bold text-green-900">✅ New PIN — it won&rsquo;t be shown again</p>
+              <p className="mt-1 font-mono text-base font-bold text-slate-900">{newPin}</p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={regeneratePin}
+              disabled={regeneratingPin}
+              className="mt-3 rounded-full border border-purple-300 bg-white px-4 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100 disabled:opacity-50"
+            >
+              {regeneratingPin ? "Getting new PIN…" : "🔑 Get a New PIN"}
+            </button>
+          )}
+          {pinError && <p role="alert" className="mt-2 text-xs font-medium text-red-600">{pinError}</p>}
+        </div>
+      )}
 
       {latestAgreement && (
         <p className="mt-3 inline-block rounded-full border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-800">

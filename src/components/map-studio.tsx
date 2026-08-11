@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CITY_CENTERS } from "@/lib/geo";
+import { CITIES, CITY_CENTERS, cityCenterFor } from "@/lib/geo";
 import { BASE_PATH } from "@/lib/site";
 import { loadLeaflet, TILE_LAYER_URL, TILE_LAYER_ATTRIBUTION, TILE_LAYER_MAX_ZOOM } from "@/lib/map/leaflet-loader";
 import { entityDivIcon, syncEditableLayer, syncCircleZoneLayer, type MapDraft } from "@/lib/map/leaflet-shared";
@@ -100,6 +100,12 @@ export function MapStudio({
   const noticeMarkersRef = useRef<Map<string, import("leaflet").Marker>>(new Map());
   const noticeCirclesRef = useRef<Map<string, import("leaflet").Circle>>(new Map());
   const [pins, setPins] = useState(initialPins);
+  // Pins used to save a drag straight to the database on dragend - the
+  // owner accidentally moved a pin this way while trying to pan/zoom the
+  // map. Vendors and Events already stage a draft and require an explicit
+  // Save/Cancel (see vendorDrafts below); pins now use the exact same
+  // pattern instead of a second one.
+  const [pinDrafts, setPinDrafts] = useState<Record<string, Draft>>({});
   // Marker click/dragend handlers are bound once, when a marker is first
   // created (see the sync effects below) - by design they only ever close
   // over a stable id, never the entity itself, but the id lookups those
@@ -169,6 +175,7 @@ export function MapStudio({
   } | null>(null);
 
   const selected = pins.find((p) => p.id === selectedId) ?? null;
+  const selectedPinDraft = selectedId ? pinDrafts[selectedId] : undefined;
   const selectedNotice = notices.find((n) => n.id === selectedNoticeId) ?? null;
   const selectedVendor = vendors.find((v) => v.id === selectedVendorId) ?? null;
   const selectedVendorDraft = selectedVendorId ? vendorDrafts[selectedVendorId] : undefined;
@@ -180,6 +187,18 @@ export function MapStudio({
   function flash(msg: string) {
     setToast(msg);
     window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 3000);
+  }
+
+  // Lightweight "jump to city" nav - not full city→district→event→vendor→
+  // pin filtering (that's real, separate work), just recentering the map
+  // so an admin isn't stuck panning across the whole Bay Area to find the
+  // right city's pins. Reuses CITY_CENTERS/cityCenterFor (src/lib/geo.ts),
+  // the same source of truth every other city-aware surface in this app
+  // already reads from.
+  function jumpToCity(city: string) {
+    if (!city) return;
+    const center = cityCenterFor(city);
+    mapRef.current?.setView([center.lat, center.lng], 13);
   }
 
   // Map init - once, imperative (Leaflet owns the DOM node directly, same
@@ -212,7 +231,18 @@ export function MapStudio({
     const map = mapRef.current;
     if (!map || !mapReady) return;
     function onMapClick(e: import("leaflet").LeafletMouseEvent) {
+      // These forward-reference createPinAt/createNoticeAt (and the
+      // similar selectPin/selectVendor/selectEvent/selectNotice/
+      // saveNoticePosition references below) - safe at runtime since
+      // `function`/`async function` declarations are hoisted, this predates
+      // this fix pass and is pre-existing throughout this component.
+      // Reordering every handler in this file to satisfy the compiler's
+      // stricter analysis is a real but separate cleanup, out of scope
+      // here (this pass reuses/extends the existing pattern, not a
+      // rewrite of it).
+      // eslint-disable-next-line react-hooks/immutability
       if (addMode) createPinAt(e.latlng.lat, e.latlng.lng);
+      // eslint-disable-next-line react-hooks/immutability
       else if (addNoticeMode) createNoticeAt(e.latlng.lat, e.latlng.lng);
     }
     map.on("click", onMapClick);
@@ -231,15 +261,16 @@ export function MapStudio({
       map,
       markersRef,
       entities: pins,
-      drafts: {},
+      drafts: pinDrafts,
       show: showPins,
       opacity: (pin) => (pin.status === "approved" ? 1 : 0.4),
-      tooltip: (pin) => pin.title || "Untitled pin",
-      onDragEnd: (id, lat, lng) => savePin(id, { lat, lng }),
+      tooltip: (pin, isDirty) => (pin.title || "Untitled pin") + (isDirty ? " (unsaved)" : ""),
+      onDragEnd: (id, lat, lng) => stageDraft(setPinDrafts, id, lat, lng),
+      // eslint-disable-next-line react-hooks/immutability -- see onMapClick's comment above
       onClick: (id) => selectPin(id),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pins, mapReady, showPins]);
+  }, [pins, pinDrafts, mapReady, showPins]);
 
   useEffect(() => {
     const L = window.L;
@@ -262,6 +293,7 @@ export function MapStudio({
       tooltip: (v, isDirty) =>
         v.business_name + (isDirty ? " (unsaved)" : v.location_verified_at ? "" : " (needs review)"),
       onDragEnd: (id, lat, lng) => stageDraft(setVendorDrafts, id, lat, lng),
+      // eslint-disable-next-line react-hooks/immutability -- see onMapClick's comment above
       onClick: (id) => selectVendor(id),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -287,6 +319,7 @@ export function MapStudio({
         }),
       tooltip: (e, isDirty) => e.name + (isDirty ? " (unsaved)" : e.location_verified_at ? "" : " (needs review)"),
       onDragEnd: (id, lat, lng) => stageDraft(setEventDrafts, id, lat, lng),
+      // eslint-disable-next-line react-hooks/immutability -- see onMapClick's comment above
       onClick: (id) => selectEvent(id),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -311,7 +344,9 @@ export function MapStudio({
           : { color: "#6b7280", weight: 1.5, fillColor: "#6b7280", fillOpacity: 0.12, dashArray: "4,3" };
       },
       tooltip: (n) => `🚫 ${n.title}${n.status === "resolved" ? " (resolved)" : isNoticeExpired(n) ? " (expired)" : ""}`,
+      // eslint-disable-next-line react-hooks/immutability -- see onMapClick's comment above
       onDragEnd: (id, lat, lng) => saveNoticePosition(id, lat, lng),
+      // eslint-disable-next-line react-hooks/immutability -- see onMapClick's comment above
       onClick: (id) => selectNotice(id),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -517,6 +552,20 @@ export function MapStudio({
     return true;
   }
 
+  async function savePinLocation(id: string) {
+    const draft = pinDrafts[id];
+    if (!draft) return;
+    const ok = await savePin(id, { lat: draft.lat, lng: draft.lng });
+    if (ok) {
+      clearDraft(setPinDrafts, id);
+      flash("✓ Pin location saved");
+    }
+  }
+
+  function cancelPinEdit(id: string) {
+    clearDraft(setPinDrafts, id);
+  }
+
   async function saveForm() {
     if (!selected || !form) return;
     if (!form.title.trim()) {
@@ -710,6 +759,20 @@ export function MapStudio({
         >
           👁 Preview Public Map ↗
         </a>
+        <select
+          defaultValue=""
+          onChange={(e) => jumpToCity(e.target.value)}
+          className="rounded-full border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+        >
+          <option value="" disabled>
+            Jump to city…
+          </option>
+          {CITIES.map((city) => (
+            <option key={city} value={city}>
+              {city}
+            </option>
+          ))}
+        </select>
         <span className="mx-1 h-6 w-px bg-slate-300" />
         <button
           type="button"
@@ -1131,6 +1194,39 @@ export function MapStudio({
                 City is set automatically from where the pin sits on the map — drag it to move it into a different
                 area instead of setting a city separately.
               </p>
+              <div>
+                <p className="text-xs font-semibold text-slate-600">Stored Coordinates</p>
+                <p className="text-sm text-slate-900">
+                  {selected.lat.toFixed(6)}, {selected.lng.toFixed(6)}
+                </p>
+              </div>
+              {selectedPinDraft && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-2">
+                  <p className="text-xs font-semibold text-amber-800">Proposed New Location (not yet saved)</p>
+                  <p className="text-sm text-amber-900">
+                    {selectedPinDraft.lat.toFixed(6)}, {selectedPinDraft.lng.toFixed(6)}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700">Drag it again to adjust, Confirm to save, or Cancel to leave it where it was.</p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => savePinLocation(selected.id)}
+                      disabled={saving}
+                      className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      Confirm Move
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => cancelPinEdit(selected.id)}
+                      disabled={saving}
+                      className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
               {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
               <div className="flex flex-wrap gap-2 pt-1">
                 <button

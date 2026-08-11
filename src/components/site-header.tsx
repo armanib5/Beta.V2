@@ -43,10 +43,16 @@ const appLinks = [
 // The ported V1 BayPinned pages — plain static HTML living in public/,
 // outside the Next app, so these need a real page load (not next/link's
 // client-side routing) and the basePath prefixed by hand.
+//
+// "Manage My Pin" used to be a third link here, but it's redundant for a
+// logged-in vendor (the dashboard already has its own "Set Address on
+// Map" entry point under Location) and confusing for an anonymous visitor
+// (the page requires a vendor login to do anything). Direct access via
+// `${BASE_PATH}/pins/` still works for anyone who navigates there
+// directly - this only removes the top-level nav entry.
 const boardLinks = [
   { href: `${BASE_PATH}/board/`, label: "The Board" },
   { href: `${BASE_PATH}/map/`, label: "The Map" },
-  { href: `${BASE_PATH}/pins/`, label: "Manage My Pin" },
 ];
 
 type Profile = Pick<Vendor, "business_name" | "logo_url"> | null;
