@@ -133,6 +133,13 @@ function flyerHtml(p) {
   html += '<div class="bp-btnrow">';
   html += '<a class="bp-btn blue" href="' + mu + '" target="_blank" rel="noopener">Directions</a>';
   html += '<button class="bp-btn gold" onclick="showFullDetail(\'' + p.id + '\')">Full Details</button>';
+  /* Previously only reachable from inside "Full Details" (an extra tap
+     away) - a visitor viewing just this Map Flyer had no visible way to
+     know a full Board flyer (bigger photo, full description) existed at
+     all. Only shown for a real event row (p.flyerId set - see
+     loadLovEvents()) - never invented for a static/vendor pin with no
+     underlying Board flyer to link to. */
+  if (p.flyerId) html += '<a class="bp-btn gold" href="../board/index.html?flyerId=' + encodeURIComponent(p.flyerId) + '">📋 View Full Board Flyer</a>';
   if (p.wb) html += '<a class="bp-btn purple" href="' + p.wb + '" target="_blank" rel="noopener">Website</a>';
   if (p.tk) html += '<a class="bp-btn purple" href="' + p.tk + '" target="_blank" rel="noopener">🎟 Tickets</a>';
   html += '<button class="bp-btn gray" onclick="openReportForm(\'' + p.id + '\', \'' + p.t.replace(/'/g, "&#39;") + '\')" title="Report Listing / Unauthorized Pin">🚩 Report</button>';

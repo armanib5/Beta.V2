@@ -276,6 +276,14 @@ function openFlyerFromQuery(){
         openForm("");
         setTimeout(function(){var ft=document.getElementById("ft");if(ft)ft.value=openFlyerQuery.title;},50);
       }
+    }else{
+      /* A ?flyerId= link (from Calendar or the Map's "View Full Board
+         Flyer" button) that never matches an event used to fail
+         completely silently - the visitor just landed on the plain Board
+         home with no explanation, easy to mistake for "this took me
+         somewhere else." Never invents a flyer here - just says plainly
+         that this one isn't available. */
+      alert("This event's Board flyer isn't available right now - it may not be published yet, or the listing was removed.");
     }
     openFlyerQuery=undefined;
   }
@@ -1152,18 +1160,19 @@ function renderBoards(){
   bv.innerHTML="";
   var hood=curHood;
   var cityEvts=evts.filter(function(e){return eventInCity(e,curCity);});
-  /* Every neighborhood except downtown starts with zero seed flyers -
-     show all category boards there (not just venue/shop/bars) so
-     residents have somewhere to post the first one instead of hitting
-     what looks like a dead end. */
-  var alwaysShow=hood&&hood!=="downtown";
+  /* Every category board for the current city/section renders every time,
+     even with zero flyers - mkBoard() already has a real "Nothing posted
+     here yet" empty state (Monday stabilization pass), but this used to
+     skip calling mkBoard() at all for most categories whenever downtown
+     (or no hood) had zero items, so a brand-new or quiet city/section
+     looked like it had no Board at all instead of an empty one. Every
+     city/section is now guaranteed its full set of category boards. */
   ORD.forEach(function(cat){
     /* Top 10 / Featured flyers bypass the neighborhood filter (still
        scoped to the current city) - a paid premium placement is meant to
        be seen citywide, not hidden just because a visitor has a specific
        neighborhood picked. */
     var items=cityEvts.filter(function(e){return e.cat===cat&&(e.top||!hood||(e.hood||"downtown")===hood);});
-    if(!items.length&&!alwaysShow&&cat!=="venue"&&cat!=="shop"&&cat!=="bars"&&cat!=="parks")return;
     bv.appendChild(mkBoard(cat,items));
   });
   setupCatScrollSpy();

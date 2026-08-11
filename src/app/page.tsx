@@ -36,12 +36,14 @@ export default function HomePage() {
             CityPinned Version 2.0
           </p>
           <h1 className="mt-3 text-3xl font-extrabold sm:text-5xl">
-            Local vendors, home cooks &amp; artisans — find your spot.
+            Discover what&rsquo;s happening in your city — and what&rsquo;s pinned around it.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base text-slate-300 sm:text-lg">
-            Claim your free CityPinned listing and post a flyer — or lock in a permanent
-            Founding Vendor profile with early-bird pricing, a badge that carries into Version
-            3, and a dashboard you control from your phone.
+            CityPinned is a free, live guide to Bay Area downtowns — browse the events calendar,
+            explore the map for local businesses and vendors, and check the full city directory.
+            Whether you live here or you&rsquo;re just visiting, it&rsquo;s the fastest way to find
+            what&rsquo;s going on and who&rsquo;s around you. Own a business? Claim your free listing
+            below and get pinned yourself.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
@@ -76,9 +78,10 @@ export default function HomePage() {
               The live board &amp; map for Bay Area downtowns
             </h2>
             <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600 sm:text-base">
-              Flyers, markets, events, and an interactive map covering local downtowns across the
-              Bay Area — Top 10 bites, sips, vendors, and events, free for everyone, no account
-              needed.
+              Everything happening near you, in one place: browse the Board for flyers and
+              markets, the Map for local businesses and vendors, and the calendar for what&rsquo;s
+              coming up — plus Top 10 bites, sips, and events. Free for everyone, no account
+              needed, whether you&rsquo;re local or just passing through.
             </p>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
