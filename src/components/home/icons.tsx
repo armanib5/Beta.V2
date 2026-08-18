@@ -226,3 +226,35 @@ export const IconPlus = ({ className }: { className?: string }) => (
     <path d="M12 5v14M5 12h14" />
   </Icon>
 );
+
+export const IconGear = ({ className }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="12" r="3.1" />
+    <path d="M12 3.2v2.1M12 18.7v2.1M20.8 12h-2.1M5.3 12H3.2M18.2 5.8l-1.5 1.5M7.3 16.7l-1.5 1.5M18.2 18.2l-1.5-1.5M7.3 7.3 5.8 5.8" />
+    <circle cx="12" cy="12" r="7.2" strokeDasharray="2.6 2.2" opacity="0.75" />
+  </Icon>
+);
+
+export const IconQuestion = ({ className }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.6 9.4a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.8-.9 1.4v.5" />
+    <path d="M12 16.8h.01" />
+  </Icon>
+);
+
+export const IconUserPlus = ({ className }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="10" cy="8" r="3.5" />
+    <path d="M3 20c0-3.6 3.2-5.8 7-5.8 1 0 1.9.1 2.7.4" />
+    <path d="M17.5 14v6M14.5 17h6" />
+  </Icon>
+);
+
+export const IconUserCircle = ({ className }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="10" r="2.8" />
+    <path d="M6.6 18.4c.9-2 2.9-3.1 5.4-3.1s4.5 1.1 5.4 3.1" />
+  </Icon>
+);
