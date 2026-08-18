@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { BASE_PATH } from "@/lib/site";
@@ -24,7 +23,6 @@ const boardLinks = [
 ];
 
 export function SiteHeader() {
-  const pathname = usePathname();
   const [isSignedIn, setIsSignedIn] = useState(false);
 
   useEffect(() => {
@@ -37,10 +35,6 @@ export function SiteHeader() {
     });
     return () => subscription.unsubscribe();
   }, []);
-
-  // The Home Screen ships its own CityPinned-branded header, nav and menu
-  // (same destinations as this one), so this bar would duplicate it there.
-  if (pathname === "/") return null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
