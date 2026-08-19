@@ -16,3 +16,331 @@ body {
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
+
+/* ===========================================================================
+   CityPinned Home Screen — matte black / black / silver / chrome.
+
+   Every rule is namespaced `cp-*` and only applies where a component opts
+   in, so the rest of the app keeps its existing light styling. Palette and
+   geometry are driven by the custom properties on `.cp-screen`, so a
+   seasonal skin can later be added by overriding those tokens alone —
+   no navigation or page-structure change required.
+   =========================================================================== */
+.cp-screen {
+  /* Surfaces */
+  --cp-void: #030304;
+  --cp-ink: #060708;
+  --cp-matte: #0c0d10;
+  --cp-raised: #191b1f;
+  /* Chrome */
+  --cp-silver: #eef1f4;
+  --cp-silver-2: #b7bec6;
+  --cp-silver-dim: #8f969e;
+  --cp-steel: #5c626a;
+  /* Geometry */
+  --cp-radius: 24px;
+  --cp-radius-sm: 16px;
+  --cp-rim: 2px;
+
+  color-scheme: dark;
+  background-color: var(--cp-void);
+  color: var(--cp-silver);
+  overflow-x: clip;
+}
+
+/* --------------------------------------------------------------- chrome text */
+.cp-chrome-text {
+  background-image: linear-gradient(
+    176deg,
+    #ffffff 0%,
+    #f6f8fa 28%,
+    #c8ced5 45%,
+    #aab1b9 51%,
+    #edf0f3 60%,
+    #ffffff 80%,
+    #c9cfd6 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .cp-chrome-text {
+    color: var(--cp-silver);
+  }
+}
+
+/* ------------------------------------------------------- extruded glass slab
+   Four stacked layers make the slab read as a thick, physical object:
+     background   – dark glass body with a raking light gradient
+     box-shadow   – inner top gloss, inner bottom shade, outer drop + contact
+     ::before     – 2px polished chrome rim (the extruded edge)
+     ::after      – specular sheen across the top third
+   -------------------------------------------------------------------------- */
+.cp-glass {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--cp-radius);
+  background:
+    linear-gradient(
+        158deg,
+        rgba(255, 255, 255, 0.16) 0%,
+        rgba(255, 255, 255, 0.045) 26%,
+        rgba(255, 255, 255, 0) 52%,
+        rgba(255, 255, 255, 0.02) 74%,
+        rgba(255, 255, 255, 0.08) 100%
+      ),
+    linear-gradient(180deg, #23262a 0%, #131519 34%, #0a0b0d 72%, #050607 100%);
+  box-shadow:
+    /* inner top gloss */
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.62),
+    inset 0 4px 12px rgba(255, 255, 255, 0.14),
+    /* inner side fill */ inset 2px 0 6px rgba(255, 255, 255, 0.05),
+    inset -2px 0 6px rgba(255, 255, 255, 0.04),
+    /* inner bottom shade — gives the slab thickness */ inset 0 -2px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -18px 30px rgba(0, 0, 0, 0.8),
+    /* outer lip */ 0 1px 0 rgba(255, 255, 255, 0.1),
+    /* raised drop */ 0 12px 26px rgba(0, 0, 0, 0.78),
+    0 30px 60px rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+}
+
+.cp-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: var(--cp-rim);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(255, 255, 255, 0.42) 14%,
+    rgba(255, 255, 255, 0.06) 34%,
+    rgba(255, 255, 255, 0.03) 56%,
+    rgba(255, 255, 255, 0.45) 80%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.cp-glass::after {
+  content: "";
+  position: absolute;
+  inset: var(--cp-rim) var(--cp-rim) auto var(--cp-rim);
+  z-index: 1;
+  height: 46%;
+  border-radius: inherit;
+  background:
+    radial-gradient(120% 100% at 12% 0%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
+/* Heavier variant for the large panels (menu, hero-scale surfaces). */
+.cp-glass-thick {
+  --cp-rim: 3px;
+  border-radius: 30px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.7),
+    inset 0 6px 16px rgba(255, 255, 255, 0.16),
+    inset 0 -3px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -24px 40px rgba(0, 0, 0, 0.85),
+    0 2px 0 rgba(255, 255, 255, 0.12),
+    0 18px 40px rgba(0, 0, 0, 0.85),
+    0 46px 90px rgba(0, 0, 0, 0.7);
+}
+
+/* Deep matte panel — the recessed interior surface inside a glass frame. */
+.cp-matte-panel {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--cp-radius);
+  background: linear-gradient(180deg, #131519 0%, #0a0b0d 55%, #050607 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -14px 28px rgba(0, 0, 0, 0.78),
+    0 10px 26px rgba(0, 0, 0, 0.6);
+}
+.cp-matte-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    150deg,
+    rgba(255, 255, 255, 0.6),
+    rgba(255, 255, 255, 0.07) 38%,
+    rgba(255, 255, 255, 0.04) 64%,
+    rgba(255, 255, 255, 0.5)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Content above the rim/sheen layers; artwork (.cp-art) below them. */
+.cp-glass > *:not(.cp-art),
+.cp-glass-thick > *:not(.cp-art),
+.cp-matte-panel > *:not(.cp-art),
+.cp-btn > *:not(.cp-art) {
+  position: relative;
+  z-index: 3;
+}
+.cp-content {
+  position: relative;
+  z-index: 3;
+}
+.cp-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ buttons */
+.cp-btn {
+  position: relative;
+  isolation: isolate;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.26) 0%,
+        rgba(255, 255, 255, 0.06) 42%,
+        rgba(255, 255, 255, 0) 54%,
+        rgba(255, 255, 255, 0.1) 100%
+      ),
+    linear-gradient(180deg, #2c2f34 0%, #16181c 48%, #08090b 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.85),
+    inset 0 5px 12px rgba(255, 255, 255, 0.2),
+    inset 0 -5px 12px rgba(0, 0, 0, 0.85),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.14),
+    0 2px 0 rgba(255, 255, 255, 0.12),
+    0 14px 28px rgba(0, 0, 0, 0.85);
+}
+.cp-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 1),
+    rgba(255, 255, 255, 0.24) 32%,
+    rgba(255, 255, 255, 0.06) 56%,
+    rgba(255, 255, 255, 0.95)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------- brushed steel field */
+.cp-field {
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f2f4f6 0%, #d3d8dd 48%, #eceff2 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.45),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.16);
+}
+.cp-field input {
+  color: #0a0b0d;
+}
+.cp-field input::placeholder {
+  color: #5c626a;
+}
+
+/* Recessed dark well. */
+.cp-inset {
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.2)), #0b0c0e;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* --------------------------------------------------------------- interaction */
+.cp-press {
+  transition:
+    transform 150ms ease,
+    filter 150ms ease;
+}
+.cp-press:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.14);
+}
+.cp-press:active {
+  transform: translateY(1px);
+  filter: brightness(0.95);
+}
+.cp-press:focus-visible,
+.cp-focus:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ details */
+.cp-rule {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 20%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0.3) 80%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+.cp-wordmark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.cp-hide-scrollbar {
+  scrollbar-width: none;
+}
+.cp-hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-press,
+  .cp-press:hover,
+  .cp-press:active {
+    transform: none;
+    transition: none;
+  }
+}
